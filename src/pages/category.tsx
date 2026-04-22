@@ -35,15 +35,25 @@ const CategoryProducts: FC<{ categoryId: string }> = ({ categoryId }) => {
 
   if (productsByCategory.length === 0) {
     return (
-      <Box className="flex-1 bg-background p-4 flex justify-center items-center">
-        <Text size="xSmall" className="text-gray">
-          Không có sản phẩm trong danh mục
+      <div className="tm-empty-state" style={{ minHeight: 200 }}>
+        <span className="tm-empty-icon">🍽️</span>
+        <Text style={{ fontWeight: 600, color: 'var(--tm-text-primary)', marginBottom: 4 }}>
+          Chưa có món nào
         </Text>
-      </Box>
+        <Text size="xSmall" style={{ color: 'var(--tm-text-secondary)' }}>
+          Danh mục này chưa có món, hãy thử danh mục khác
+        </Text>
+      </div>
     );
   }
   return (
-    <Box className="bg-background grid grid-cols-2 gap-4 p-4">
+    <Box style={{
+      display: 'grid',
+      gridTemplateColumns: '1fr 1fr',
+      gap: 12,
+      padding: 16,
+      background: 'var(--tm-bg)',
+    }}>
       {productsByCategory.map((product) => (
         <ProductItem key={product.id} product={product} />
       ))}
@@ -53,8 +63,8 @@ const CategoryProducts: FC<{ categoryId: string }> = ({ categoryId }) => {
 
 const CategoryPage: FC = () => {
   return (
-    <Page className="flex flex-col">
-      <Header title="Danh mục" />
+    <Page className="flex flex-col" style={{ background: 'var(--tm-bg)' }}>
+      <Header title="Danh mục món ăn" />
       <CategoryPicker />
     </Page>
   );

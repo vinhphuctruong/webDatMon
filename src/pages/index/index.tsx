@@ -6,23 +6,23 @@ import { Banner } from "./banner";
 import { Categories } from "./categories";
 import { Recommend } from "./recommend";
 import { ProductList } from "./product-list";
-import { Divider } from "components/divider";
 
 const HomePage: React.FunctionComponent = () => {
   return (
-    <Page className="relative flex-1 flex flex-col bg-white">
+    <Page className="relative flex-1 flex flex-col" style={{ background: 'var(--tm-bg)' }}>
       <Welcome />
       <Box className="flex-1 overflow-auto">
         <Inquiry />
         <Banner />
+        <div className="tm-divider" />
         <Suspense>
           <Categories />
         </Suspense>
-        <Divider />
+        <div className="tm-divider" />
         <Recommend />
-        <Divider />
+        <div className="tm-divider" />
         <ProductList />
-        <Divider />
+        <div style={{ height: 16 }} />
       </Box>
     </Page>
   );

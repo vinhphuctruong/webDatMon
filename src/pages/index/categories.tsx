@@ -1,9 +1,18 @@
-import React from "react";
-import { FC } from "react";
+import React, { FC } from "react";
 import { Box, Text } from "zmp-ui";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import { categoriesState, selectedCategoryIdState } from "state";
 import { useNavigate } from "react-router";
+
+const pastelColors = [
+  "tm-pastel-green",
+  "tm-pastel-orange",
+  "tm-pastel-blue",
+  "tm-pastel-pink",
+  "tm-pastel-purple",
+  "tm-pastel-yellow",
+  "tm-pastel-teal",
+];
 
 export const Categories: FC = () => {
   const categories = useRecoilValue(categoriesState);
@@ -16,19 +25,58 @@ export const Categories: FC = () => {
   };
 
   return (
-    <Box className="bg-white grid grid-cols-4 gap-4 p-4">
-      {categories.map((category, i) => (
-        <div
-          key={i}
-          onClick={() => gotoCategory(category.id)}
-          className="flex flex-col space-y-2 items-center"
-        >
-          <img className="w-12 h-12" src={category.icon} />
-          <Text size="xxSmall" className="text-gray">
-            {category.name}
-          </Text>
-        </div>
-      ))}
+    <Box className="bg-white" style={{ padding: '16px 0' }}>
+      {/* Section header */}
+      <div className="tm-section-header" style={{ paddingTop: 0, paddingBottom: 4 }}>
+        <span className="tm-section-title">Danh mục</span>
+        <span className="tm-section-link" onClick={() => navigate("/category")}>
+          Tất cả →
+        </span>
+      </div>
+      {/* Scrollable categories */}
+      <div style={{
+        display: 'flex',
+        gap: 16,
+        padding: '8px 16px',
+        overflowX: 'auto',
+        scrollbarWidth: 'none',
+        msOverflowStyle: 'none',
+      }}>
+        {categories.map((category, i) => (
+          <div
+            key={i}
+            onClick={() => gotoCategory(category.id)}
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 8,
+              minWidth: 64,
+              cursor: 'pointer',
+            }}
+          >
+            <div className={`tm-category-icon ${pastelColors[i % pastelColors.length]}`}>
+              <img
+                src={category.icon}
+                style={{ width: 28, height: 28 }}
+                alt={category.name}
+              />
+            </div>
+            <Text
+              size="xxSmall"
+              style={{
+                color: 'var(--tm-text-primary)',
+                fontWeight: 500,
+                fontSize: 11,
+                textAlign: 'center',
+                lineHeight: '14px',
+              }}
+            >
+              {category.name}
+            </Text>
+          </div>
+        ))}
+      </div>
     </Box>
   );
 };

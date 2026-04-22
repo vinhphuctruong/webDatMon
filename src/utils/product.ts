@@ -83,7 +83,7 @@ const pay = (amount: number, description?: string) =>
   createOrder({
     desc:
       description ??
-      `Thanh toán cho ${getConfig((config) => config.app.title)}`,
+      `Thanh toán đơn giao món tại ${getConfig((config) => config.app.title)}`,
     item: [],
     amount: amount,
     success: (data) => {

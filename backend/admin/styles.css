@@ -1,0 +1,96 @@
+@import url("/shared/portal.css");
+
+.admin-page {
+  --portal-hero-image: url("https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=1400&q=80");
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 230px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.sidebar {
+  padding: 12px;
+  position: sticky;
+  top: 86px;
+  align-self: start;
+}
+
+.nav-btn {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: #234132;
+  border: 1px solid transparent;
+  box-shadow: none;
+  margin-bottom: 6px;
+}
+
+.nav-btn.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
+}
+
+.content {
+  padding: 16px;
+}
+
+.metrics {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.metric {
+  border: 1px solid #d8e2dc;
+  border-radius: 14px;
+  padding: 12px;
+  background: #f8fcf9;
+}
+
+.metric .label {
+  color: #5e7266;
+  font-size: 12px;
+}
+
+.metric .value {
+  margin-top: 8px;
+  font-size: 24px;
+  font-weight: 800;
+  color: #163726;
+}
+
+.note {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b42318;
+}
+
+.form-grid {
+  margin-top: 14px;
+}
+
+.form-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 1080px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    display: flex;
+    gap: 8px;
+  }
+
+  .nav-btn {
+    width: auto;
+  }
+
+  .metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

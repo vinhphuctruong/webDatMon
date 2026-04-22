@@ -5,8 +5,8 @@ import { SearchResult } from "./result";
 
 const SearchPage: FC = () => {
   return (
-    <Page className="flex flex-col">
-      <Header title="Tìm kiếm" />
+    <Page className="flex flex-col" style={{ background: 'var(--tm-bg)' }}>
+      <Header title="Tìm món và quán" />
       <Inquiry />
       <SearchResult />
     </Page>

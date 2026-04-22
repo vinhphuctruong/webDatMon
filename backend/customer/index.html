@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ZaUI Food – Đặt món trực tuyến</title>
+    <meta name="description" content="Đặt món ăn trực tuyến qua ZaUI Food – thanh toán SePay QR hoặc tiền mặt COD, theo dõi đơn hàng." />
+    <link rel="stylesheet" href="/shared/theme.css" />
+    <link rel="stylesheet" href="/customer/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  </head>
+  <body class="portal-page customer-page">
+    <header class="site-topbar">
+      <div class="container topbar-inner">
+        <a class="brand" href="/">ZaUI <span>Food</span></a>
+        <nav class="site-links">
+          <a class="site-link" href="/">Trang chủ</a>
+          <a class="site-link" href="/partner">Cửa hàng</a>
+          <a class="site-link active" href="/customer">Khách hàng</a>
+          <a class="site-link" href="/driver">Tài xế</a>
+          <a class="site-link" href="/admin">Admin</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="portal-main">
+      <div class="container">
+
+        <!-- ===== AUTH ===== -->
+        <section id="auth-screen" class="auth-layout">
+          <article class="auth-promo">
+            <div class="promo-icon">🍔</div>
+            <h1>Đặt món nhanh, giao tận nơi</h1>
+            <p>Đăng ký tài khoản để đặt món yêu thích, thanh toán QR hoặc tiền mặt và theo dõi đơn hàng thời gian thực.</p>
+            <div class="promo-badges">
+              <span class="promo-badge">🏪 Nhiều cửa hàng</span>
+              <span class="promo-badge">📱 QR SePay</span>
+              <span class="promo-badge">💵 Tiền mặt COD</span>
+              <span class="promo-badge">📦 Theo dõi đơn</span>
+            </div>
+          </article>
+
+          <article class="card auth-card">
+            <h2>Cổng khách hàng</h2>
+            <p class="muted intro">Đăng nhập hoặc tạo tài khoản để sử dụng dịch vụ.</p>
+            <div class="tabs">
+              <button class="tab-btn active" data-auth-tab="login">Đăng nhập</button>
+              <button class="tab-btn" data-auth-tab="register">Đăng ký</button>
+            </div>
+
+            <form id="login-form" class="grid" style="margin-top:14px;">
+              <input name="email" type="email" placeholder="customer@zauifood.local" required />
+              <input name="password" type="password" placeholder="Mật khẩu" required />
+              <button id="login-btn" type="submit">Đăng nhập</button>
+              <p class="muted">Demo: <code>customer@zauifood.local / 12345678</code></p>
+            </form>
+
+            <form id="register-form" class="grid hidden" style="margin-top:14px;">
+              <div class="grid two">
+                <input name="name" placeholder="Họ tên" required />
+                <input name="phone" placeholder="Số điện thoại" />
+                <input name="email" type="email" placeholder="Email" required />
+                <input name="password" type="password" placeholder="Mật khẩu (≥8 ký tự)" required />
+              </div>
+              <button id="register-btn" type="submit">Tạo tài khoản</button>
+            </form>
+
+            <p id="auth-error" class="notice"></p>
+          </article>
+        </section>
+
+        <!-- ===== APP SCREEN ===== -->
+        <section id="app-screen" class="app-shell hidden">
+          <div class="app-header">
+            <div class="app-header-info">
+              <div class="customer-avatar">🧑</div>
+              <div>
+                <h2 id="customer-name">Khách hàng</h2>
+                <p class="muted" id="customer-email"></p>
+              </div>
+            </div>
+            <div class="app-header-actions">
+              <button id="refresh-btn" class="secondary btn-sm">🔄 Làm mới</button>
+              <button id="logout-btn" class="danger btn-sm">Đăng xuất</button>
+            </div>
+          </div>
+
+          <nav class="main-tabs">
+            <button class="main-tab active" data-main-tab="orders">📦 Đơn của tôi</button>
+            <button class="main-tab" data-main-tab="stores">🏪 Cửa hàng</button>
+            <button class="main-tab" data-main-tab="place">🛒 Đặt món</button>
+          </nav>
+
+          <!-- ── MY ORDERS ── -->
+          <section data-main-section="orders">
+            <div class="section-toolbar">
+              <h3>Đơn hàng của tôi</h3>
+              <button id="refresh-orders" class="secondary btn-sm">🔄 Làm mới</button>
+            </div>
+            <div id="orders-list" class="order-cards"></div>
+          </section>
+
+          <!-- ── STORES ── -->
+          <section data-main-section="stores" class="hidden">
+            <div class="section-toolbar">
+              <h3>Cửa hàng</h3>
+              <div style="display:flex;gap:8px;align-items:center;">
+                <input id="store-search" placeholder="🔍 Tìm cửa hàng..." style="width:200px;padding:8px 12px;font-size:13px;" />
+                <button id="refresh-stores" class="secondary btn-sm">🔄</button>
+              </div>
+            </div>
+            <div id="stores-grid" class="stores-grid"></div>
+          </section>
+
+          <!-- ── PLACE ORDER ── -->
+          <section data-main-section="place" class="hidden">
+            <div class="section-toolbar">
+              <h3>Đặt món</h3>
+            </div>
+
+            <!-- Step 1: Select store & products -->
+            <div id="place-step1">
+              <div class="card form-panel">
+                <h4>1. Chọn cửa hàng</h4>
+                <select id="place-store-select" style="margin-top:10px;">
+                  <option value="">-- Chọn cửa hàng --</option>
+                </select>
+              </div>
+              <div id="place-products-section" class="hidden">
+                <div class="card form-panel" style="margin-top:12px;">
+                  <h4>2. Chọn món ăn</h4>
+                  <div id="place-products-grid" class="products-grid" style="margin-top:12px;"></div>
+                </div>
+                <div class="card form-panel" id="cart-panel" style="margin-top:12px;display:none;">
+                  <h4>🛒 Giỏ hàng</h4>
+                  <div id="cart-items"></div>
+                  <div class="cart-total">
+                    Tổng: <strong id="cart-total-text">0đ</strong>
+                    + Phí ship: <strong id="cart-fee-text">0đ</strong>
+                    = <strong id="cart-grand-total">0đ</strong>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 2: Checkout -->
+            <div id="place-step2" class="card form-panel" style="display:none;margin-top:12px;">
+              <h4>3. Thông tin giao hàng & Thanh toán</h4>
+              <form id="checkout-form" class="grid" style="margin-top:12px;">
+                <div class="grid two">
+                  <div>
+                    <label>Địa chỉ giao hàng</label>
+                    <input name="street" placeholder="Số nhà, tên đường" required />
+                  </div>
+                  <div>
+                    <label>Quận/Huyện</label>
+                    <input name="district" placeholder="Quận 1" required />
+                  </div>
+                  <div>
+                    <label>Thành phố</label>
+                    <input name="city" value="Hồ Chí Minh" required />
+                  </div>
+                  <div>
+                    <label>Ghi chú</label>
+                    <input name="note" placeholder="Không cay, nhiều đá..." />
+                  </div>
+                </div>
+                <div class="payment-method-select">
+                  <label>Phương thức thanh toán</label>
+                  <div class="pm-options">
+                    <label class="pm-option active" id="pm-qr-label">
+                      <input type="radio" name="paymentMethod" value="SEPAY_QR" checked />
+                      <span class="pm-icon">📱</span>
+                      <div>
+                        <div class="pm-name">Thanh toán QR (SePay)</div>
+                        <div class="pm-desc">Quét QR chuyển khoản ngân hàng</div>
+                      </div>
+                    </label>
+                    <label class="pm-option" id="pm-cod-label">
+                      <input type="radio" name="paymentMethod" value="COD" />
+                      <span class="pm-icon">💵</span>
+                      <div>
+                        <div class="pm-name">Tiền mặt (COD)</div>
+                        <div class="pm-desc">Trả tiền khi nhận hàng</div>
+                      </div>
+                    </label>
+                  </div>
+                </div>
+                <div style="display:flex;gap:10px;">
+                  <button type="submit" id="place-order-btn" class="btn-primary">Đặt hàng ngay →</button>
+                  <button type="button" id="back-to-step1" class="secondary">← Quay lại</button>
+                </div>
+              </form>
+            </div>
+
+            <!-- Step 3: Payment QR or COD confirmation -->
+            <div id="place-step3" class="card form-panel" style="display:none;margin-top:12px;">
+              <h4 id="step3-title">✅ Đặt hàng thành công!</h4>
+              <div id="payment-qr-section" class="hidden">
+                <p class="muted">Quét QR bên dưới để thanh toán qua ngân hàng/SePay:</p>
+                <div class="qr-box">
+                  <div id="order-qr-code"></div>
+                  <p class="qr-amount">Số tiền: <strong id="order-amount-display">--</strong></p>
+                  <p class="qr-ref">Nội dung CK: <code id="order-ref-code">--</code></p>
+                  <p style="font-size:12px;color:#6b7f72;text-align:center;">Chuyển khoản đúng nội dung – hệ thống tự xác nhận</p>
+                </div>
+                <div style="text-align:center;margin-top:16px;">
+                  <button id="check-payment-btn" class="secondary">🔄 Kiểm tra thanh toán</button>
+                </div>
+              </div>
+              <div id="payment-cod-section" class="hidden">
+                <div class="cod-badge">
+                  <div class="cod-icon">💵</div>
+                  <div>
+                    <div class="cod-title">Thanh toán tiền mặt khi nhận hàng</div>
+                    <div class="cod-desc">Tài xế sẽ giao và thu tiền tại địa chỉ của bạn.<br>Vui lòng chuẩn bị đúng số tiền.</div>
+                    <div class="cod-amount" id="cod-amount">--</div>
+                  </div>
+                </div>
+              </div>
+              <div style="margin-top:16px;">
+                <button id="go-to-orders" class="btn-primary">📦 Xem đơn hàng →</button>
+              </div>
+            </div>
+
+            <div style="text-align:center;margin-top:12px;">
+              <button id="checkout-next" class="btn-primary hidden">Tiến hành thanh toán →</button>
+            </div>
+          </section>
+
+        </section><!-- /app-screen -->
+      </div>
+    </main>
+
+    <!-- Order detail modal -->
+    <div class="modal-overlay hidden" id="order-detail-modal">
+      <div class="modal-box card">
+        <div class="modal-header">
+          <h3>📦 Chi tiết đơn hàng</h3>
+          <button class="modal-close" id="close-order-modal">✕</button>
+        </div>
+        <div id="order-detail-content"></div>
+      </div>
+    </div>
+
+    <script src="/customer/app.js" defer></script>
+  </body>
+</html>

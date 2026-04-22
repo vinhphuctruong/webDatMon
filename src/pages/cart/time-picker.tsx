@@ -5,9 +5,9 @@ import { displayDate, displayHalfAnHourTimeRange } from "utils/date";
 import { matchStatusBarColor } from "utils/device";
 import { Picker } from "zmp-ui";
 
-// Opening hours: 7:00 - 21:00
-const OPENING_HOUR = 7;
-const CLOSING_HOUR = 21;
+// Opening hours: 6:00 - 22:00
+const OPENING_HOUR = 6;
+const CLOSING_HOUR = 22;
 
 export const TimePicker: FC = () => {
   const [date, setDate] = useState(+new Date());
@@ -57,8 +57,8 @@ export const TimePicker: FC = () => {
       maskClosable
       onVisibilityChange={(visbile) => matchStatusBarColor(visbile)}
       inputClass="border-none bg-transparent text-sm text-primary font-medium text-md m-0 p-0 h-auto"
-      placeholder="Chọn thời gian nhận hàng"
-      title="Thời gian nhận hàng"
+      placeholder="Chọn thời gian giao hàng"
+      title="Khung giờ giao hàng"
       value={{
         date,
         time: availableTimes.find((t) => +t === time)

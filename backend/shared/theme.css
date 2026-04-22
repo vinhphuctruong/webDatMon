@@ -1,0 +1,249 @@
+@import url("https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;700&display=swap");
+
+:root {
+  --brand: #00b14f;
+  --brand-strong: #008a3a;
+  --brand-soft: #dff8ea;
+  --bg: #eef2ef;
+  --surface: #ffffff;
+  --text: #11321f;
+  --muted: #5d6f63;
+  --border: #d3ddd7;
+  --danger: #dc2626;
+  --shadow: 0 16px 36px rgba(10, 36, 22, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  min-height: 100vh;
+  font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(circle at 10% 0%, #f8fffb 0, transparent 30%),
+    radial-gradient(circle at 90% 8%, #effff5 0, transparent 32%),
+    var(--bg);
+}
+
+a {
+  color: inherit;
+}
+
+.container {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.site-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  backdrop-filter: blur(8px);
+  background: rgba(248, 252, 249, 0.88);
+  border-bottom: 1px solid rgba(16, 53, 32, 0.12);
+}
+
+.topbar-inner {
+  min-height: 72px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.brand {
+  text-decoration: none;
+  font-family: "Space Grotesk", sans-serif;
+  font-size: 32px;
+  line-height: 1;
+  color: var(--brand);
+  letter-spacing: -0.03em;
+}
+
+.brand span {
+  color: var(--brand-strong);
+}
+
+.site-links {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.site-link {
+  text-decoration: none;
+  font-weight: 600;
+  color: #2f4738;
+  border-radius: 999px;
+  padding: 9px 14px;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.site-link:hover {
+  background: rgba(0, 177, 79, 0.1);
+  color: #0a5f2f;
+}
+
+.site-link.active {
+  background: var(--brand-soft);
+  color: #0a5f2f;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+button,
+.btn {
+  font: inherit;
+  text-decoration: none;
+  border: none;
+  border-radius: 12px;
+  padding: 11px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+button:hover,
+.btn:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.02);
+}
+
+button:disabled,
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+button,
+.btn.primary {
+  color: #fff;
+  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
+  box-shadow: 0 10px 24px rgba(0, 138, 58, 0.32);
+}
+
+button.secondary,
+.btn.secondary {
+  color: #1a3024;
+  background: #f2f6f3;
+  border: 1px solid #c9d5cd;
+  box-shadow: none;
+}
+
+button.danger,
+.btn.danger {
+  color: #fff;
+  background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%);
+  box-shadow: 0 10px 20px rgba(185, 28, 28, 0.24);
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  font: inherit;
+  color: #102a1d;
+  background: #fbfdfb;
+  border: 1px solid #c6d4cb;
+  border-radius: 12px;
+  padding: 11px 12px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: #62cc93;
+  box-shadow: 0 0 0 4px rgba(0, 177, 79, 0.14);
+}
+
+label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2f4738;
+}
+
+.grid {
+  display: grid;
+  gap: 12px;
+}
+
+.grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hidden {
+  display: none !important;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.notice {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #b42318;
+}
+
+.table-wrap {
+  overflow: auto;
+  border: 1px solid #cfdbd3;
+  border-radius: 14px;
+}
+
+table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  background: #fff;
+}
+
+th,
+td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #e2ebe6;
+}
+
+th {
+  background: #f3f8f5;
+  color: #2d4436;
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 940px) {
+  .topbar-inner {
+    min-height: 64px;
+  }
+
+  .brand {
+    font-size: 28px;
+  }
+
+  .grid.two {
+    grid-template-columns: 1fr;
+  }
+}

@@ -1,6 +1,6 @@
 {
   "app": {
-    "title": "ZaUI Coffee",
+    "title": "TM Food",
     "textColor": "black",
     "leftButton": "none",
     "statusBar": "transparent",
@@ -12,9 +12,18 @@
   "listCSS": [],
   "listSyncJS": [],
   "listAsyncJS": [],
+  "pages": [
+    "/",
+    "/search",
+    "/category",
+    "/notification",
+    "/cart",
+    "/profile",
+    "/result"
+  ],
   "template": {
     "name": "zaui-coffee",
-    "primaryColor": "#006af5",
+    "primaryColor": "#00a96d",
     "prefixCurrencySymbol": false,
     "currencySymbol": "đ",
     "headerLogo": ""

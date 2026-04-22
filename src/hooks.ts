@@ -3,6 +3,9 @@ import { useEffect, useRef, useState } from "react";
 import { matchStatusBarColor } from "utils/device";
 import { EventName, events, Payment } from "zmp-sdk";
 import { useNavigate, useSnackbar } from "zmp-ui";
+import { useRecoilValueLoadable, useSetRecoilState } from "recoil";
+import { cartState, remoteStoresState, storesState } from "state";
+import { fetchCart } from "services/backend";
 
 export function useMatchStatusTextColor(visible?: boolean) {
   const changedRef = useRef(false);
@@ -60,6 +63,26 @@ export const useHandlePayment = () => {
       });
     });
   }, []);
+};
+
+export const useSyncBackendState = () => {
+  const setCart = useSetRecoilState(cartState);
+  const setStores = useSetRecoilState(storesState);
+  const remoteStores = useRecoilValueLoadable(remoteStoresState);
+
+  useEffect(() => {
+    fetchCart()
+      .then(setCart)
+      .catch((error) => {
+        console.warn("Sync cart from backend failed", error);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (remoteStores.state === "hasValue") {
+      setStores(remoteStores.contents);
+    }
+  }, [remoteStores.state, remoteStores.contents]);
 };
 
 export function useToBeImplemented() {

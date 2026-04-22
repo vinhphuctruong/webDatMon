@@ -1,0 +1,461 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+  STORE_MANAGER
+  DRIVER
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PREPARING
+  PICKED_UP
+  DELIVERED
+  CANCELLED
+}
+
+enum DiscountType {
+  PERCENT
+  FIXED
+}
+
+enum PaymentMethod {
+  SEPAY_QR
+  COD
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELED
+  REFUNDED
+}
+
+enum CodHoldStatus {
+  NONE
+  HELD
+  RELEASED
+  REFUNDED
+}
+
+enum WalletOwnerType {
+  USER
+  STORE
+  PLATFORM
+}
+
+enum WalletType {
+  MERCHANT
+  DRIVER_CREDIT
+  DRIVER_CASH
+  PLATFORM_ESCROW
+  PLATFORM_REVENUE
+}
+
+enum WalletTxnDirection {
+  CREDIT
+  DEBIT
+}
+
+enum WalletTxnStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+enum WalletTransactionType {
+  TOPUP_SEPAY
+  WITHDRAW_REQUEST
+  WITHDRAW_COMPLETED
+  COD_HOLD
+  COD_HOLD_RELEASE
+  COD_HOLD_REFUND
+  ORDER_ESCROW_IN
+  ORDER_MERCHANT_SETTLEMENT
+  ORDER_DRIVER_SETTLEMENT
+  ORDER_PLATFORM_REVENUE
+  ORDER_REFUND_OUT
+  DRIVER_APP_FEE
+  MANUAL_ADJUSTMENT
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+}
+
+enum SePayTopupStatus {
+  PENDING
+  CONFIRMED
+  EXPIRED
+  CANCELED
+}
+
+model User {
+  id                String            @id @default(uuid())
+  email             String            @unique
+  name              String
+  phone             String?           @unique
+  passwordHash      String
+  role              UserRole          @default(CUSTOMER)
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+  addresses         Address[]
+  cartItems         CartItem[]
+  orders            Order[]
+  deliveryOrders    Order[]           @relation("OrderDriver")
+  refreshToken      RefreshToken[]
+  managedStore      Store?            @relation("StoreManager")
+  driverProfile     DriverProfile?
+  wallets           Wallet[]          @relation("UserWallets")
+  requestedPayouts  WalletPayout[]    @relation("RequestedPayouts")
+  sepayTopupRequest SePayTopupRequest[]
+}
+
+model Address {
+  id           String   @id @default(uuid())
+  userId       String
+  label        String
+  receiverName String
+  phone        String
+  street       String
+  ward         String
+  district     String
+  city         String
+  latitude     Float?
+  longitude    Float?
+  isDefault    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orders       Order[]
+
+  @@index([userId])
+}
+
+model Store {
+  id            String    @id @default(uuid())
+  name          String
+  slug          String    @unique
+  address       String
+  latitude      Float?
+  longitude     Float?
+  rating        Float     @default(4.5)
+  etaMinutesMin Int       @default(20)
+  etaMinutesMax Int       @default(35)
+  isOpen        Boolean   @default(true)
+  managerId     String?   @unique
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  products      Product[]
+  orders        Order[]
+  manager       User?     @relation("StoreManager", fields: [managerId], references: [id], onDelete: SetNull)
+  wallets       Wallet[]  @relation("StoreWallets")
+
+  @@index([name])
+}
+
+model Category {
+  id        String            @id @default(uuid())
+  key       String            @unique
+  name      String
+  slug      String            @unique
+  iconUrl   String?
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  products  ProductCategory[]
+}
+
+model Product {
+  id            String            @id @default(uuid())
+  externalId    Int?              @unique
+  storeId       String
+  name          String
+  slug          String            @unique
+  description   String?
+  imageUrl      String?
+  price         Int
+  discountType  DiscountType?
+  discountValue Int?
+  deliveryFee   Int               @default(15000)
+  rating        Float             @default(4.5)
+  soldCount     Int               @default(0)
+  isAvailable   Boolean           @default(true)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  store         Store             @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  categories    ProductCategory[]
+  optionGroups  OptionGroup[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+
+  @@index([storeId])
+  @@index([name])
+}
+
+model ProductCategory {
+  productId  String
+  categoryId String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+}
+
+model OptionGroup {
+  id         String   @id @default(uuid())
+  productId  String
+  key        String
+  name       String
+  minSelect  Int      @default(0)
+  maxSelect  Int      @default(1)
+  isRequired Boolean  @default(false)
+  sortOrder  Int      @default(0)
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  options    Option[]
+
+  @@unique([productId, key])
+  @@index([productId])
+}
+
+model Option {
+  id         String      @id @default(uuid())
+  groupId    String
+  key        String
+  name       String
+  priceDelta Int         @default(0)
+  isDefault  Boolean     @default(false)
+  sortOrder  Int         @default(0)
+  group      OptionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, key])
+  @@index([groupId])
+}
+
+model CartItem {
+  id              String   @id @default(uuid())
+  userId          String
+  productId       String
+  quantity        Int
+  selectedOptions Json
+  optionsHash     String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId, optionsHash])
+  @@index([userId])
+}
+
+model Order {
+  id                  String              @id @default(uuid())
+  userId              String
+  storeId             String
+  driverId            String?
+  addressId           String?
+  status              OrderStatus         @default(PENDING)
+  paymentMethod       PaymentMethod       @default(SEPAY_QR)
+  paymentStatus       PaymentStatus       @default(PENDING)
+  subtotal            Int
+  deliveryFee         Int
+  platformFee         Int
+  total               Int
+  merchantCommission  Int                 @default(0)
+  driverCommission    Int                 @default(0)
+  merchantPayout      Int                 @default(0)
+  driverPayout        Int                 @default(0)
+  platformRevenue     Int                 @default(0)
+  codHoldAmount       Int                 @default(0)
+  codHoldStatus       CodHoldStatus       @default(NONE)
+  note                String?
+  deliveryAddress     Json
+  estimatedDeliveryAt DateTime?
+  completedAt         DateTime?
+  placedAt            DateTime            @default(now())
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+  user                User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  driver              User?               @relation("OrderDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  store               Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  address             Address?            @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  items               OrderItem[]
+  payment             OrderPayment?
+  walletTransactions  WalletTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([driverId])
+  @@index([storeId, status])
+  @@index([paymentMethod, paymentStatus])
+  @@index([completedAt])
+}
+
+model OrderItem {
+  id              String   @id @default(uuid())
+  orderId         String
+  productId       String
+  productName     String
+  unitPrice       Int
+  quantity        Int
+  selectedOptions Json
+  lineTotal       Int
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product         Product  @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model DriverProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  vehicleType  String
+  licensePlate String   @unique
+  isOnline     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Wallet {
+  id               String             @id @default(uuid())
+  ownerType        WalletOwnerType
+  ownerUserId      String?
+  ownerStoreId     String?
+  type             WalletType
+  scopeKey         String             @unique
+  currency         String             @default("VND")
+  availableBalance Int                @default(0)
+  holdBalance      Int                @default(0)
+  isActive         Boolean            @default(true)
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+  ownerUser        User?              @relation("UserWallets", fields: [ownerUserId], references: [id], onDelete: Cascade)
+  ownerStore       Store?             @relation("StoreWallets", fields: [ownerStoreId], references: [id], onDelete: Cascade)
+  transactions     WalletTransaction[]
+  payouts          WalletPayout[]
+  topupRequests    SePayTopupRequest[]
+
+  @@index([ownerUserId])
+  @@index([ownerStoreId])
+  @@index([type])
+}
+
+model WalletTransaction {
+  id              String                @id @default(uuid())
+  walletId        String
+  orderId         String?
+  paymentId       String?
+  payoutId        String?
+  topupId         String?
+  type            WalletTransactionType
+  direction       WalletTxnDirection
+  status          WalletTxnStatus       @default(COMPLETED)
+  amount          Int
+  availableBefore Int
+  availableAfter  Int
+  holdBefore      Int
+  holdAfter       Int
+  referenceCode   String?
+  note            String?
+  metadata        Json?
+  createdAt       DateTime              @default(now())
+  wallet          Wallet                @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  order           Order?                @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  payment         OrderPayment?         @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  payout          WalletPayout?         @relation(fields: [payoutId], references: [id], onDelete: SetNull)
+  topup           SePayTopupRequest?    @relation(fields: [topupId], references: [id], onDelete: SetNull)
+
+  @@index([walletId, createdAt])
+  @@index([orderId])
+  @@index([paymentId])
+  @@index([payoutId])
+  @@index([referenceCode])
+}
+
+model OrderPayment {
+  id                 String              @id @default(uuid())
+  orderId            String              @unique
+  method             PaymentMethod
+  status             PaymentStatus       @default(PENDING)
+  amount             Int
+  sepayReferenceCode String?             @unique
+  sepayQrContent     String?
+  sepayTransactionId String?
+  paidAt             DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  order              Order               @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  walletTransactions WalletTransaction[]
+
+  @@index([status, createdAt])
+}
+
+model WalletPayout {
+  id                String              @id @default(uuid())
+  walletId          String
+  requestedByUserId String?
+  amount            Int
+  fee               Int                 @default(0)
+  netAmount         Int
+  bankCode          String
+  bankAccountNumber String
+  bankAccountName   String
+  status            PayoutStatus        @default(PENDING)
+  sepayReferenceCode String?            @unique
+  note              String?
+  processedAt       DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  wallet            Wallet              @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  requestedByUser   User?               @relation("RequestedPayouts", fields: [requestedByUserId], references: [id], onDelete: SetNull)
+  transactions      WalletTransaction[]
+
+  @@index([walletId, status])
+  @@index([requestedByUserId])
+}
+
+model SePayTopupRequest {
+  id                String               @id @default(uuid())
+  walletId          String
+  userId            String
+  amount            Int
+  status            SePayTopupStatus     @default(PENDING)
+  referenceCode     String               @unique
+  qrContent         String
+  sepayTransactionId String?
+  confirmedAt       DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  wallet            Wallet               @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  user              User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions      WalletTransaction[]
+
+  @@index([userId, createdAt])
+  @@index([walletId, status])
+}
