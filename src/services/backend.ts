@@ -89,6 +89,15 @@ interface ApiOrder {
   status: string;
   total: number;
   estimatedDeliveryAt?: string;
+  store: {
+    id: string;
+    name: string;
+  };
+  items: {
+    id: string;
+    productName: string;
+    quantity: number;
+  }[];
 }
 
 function mapOptionGroupToVariant(group: ApiOptionGroup): Variant {
@@ -282,4 +291,40 @@ export async function createOrder(payload?: CreateOrderPayload) {
   );
 
   return response.data;
+}
+
+export async function fetchOrders(status?: string) {
+  const url = status ? `/orders?status=${status}&limit=50` : `/orders?limit=50`;
+  const response = await apiFetch<{ data: ApiOrder[] }>(url, undefined, { auth: true });
+  return response.data;
+}
+
+// --- STORE APPLICATIONS ---
+export async function submitStoreApplication(data: {
+  storeName: string;
+  storeAddress: string;
+  storeLatitude?: number | null;
+  storeLongitude?: number | null;
+  storePhone: string;
+  frontStoreImageData?: string;
+  businessLicenseImageData?: string;
+}) {
+  const response = await apiFetch<any>("/store-applications", {
+    method: "POST",
+    body: JSON.stringify(data),
+  }, { auth: true });
+
+  return response;
+}
+
+export async function getMyStoreApplication() {
+  try {
+    const response = await apiFetch<any>("/store-applications/me", undefined, { auth: true });
+    return response;
+  } catch (error: any) {
+    if (error.message && error.message.includes("404")) {
+      return null;
+    }
+    throw error;
+  }
 }

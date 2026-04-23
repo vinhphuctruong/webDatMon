@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => {
     base: "",
     plugins: [tsconfigPaths(), react(), ZaloMiniApp()],
     server: {
+      host: true,
+      allowedHosts: true,
       proxy: {
         "/api": {
           target: apiProxyTarget,

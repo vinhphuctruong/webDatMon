@@ -32,5 +32,31 @@ services:
       postgres:
         condition: service_healthy
 
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: zaui-food-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    env_file:
+      - ./backend/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zaui-food-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
 volumes:
   zaui_food_pgdata:
+

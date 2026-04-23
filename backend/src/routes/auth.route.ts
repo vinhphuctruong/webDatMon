@@ -2,9 +2,12 @@ import { Router } from "express";
 import { randomUUID } from "node:crypto";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
-import { UserRole } from "@prisma/client";
+import { PartnerApplicationStatus, UserRole } from "@prisma/client";
+import { env } from "../config/env";
 import { prisma } from "../db/prisma";
 import { asyncHandler } from "../lib/async-handler";
+import { sendOtpEmail } from "../lib/email-service";
+import { issueEmailOtp, verifyEmailOtp } from "../lib/email-otp";
 import { HttpError } from "../lib/http-error";
 import { requireAuth } from "../middlewares/auth";
 import {
@@ -23,6 +26,14 @@ const registerSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(64),
   phone: z.string().min(8).max(20).optional(),
+});
+
+const registerCustomerSchema = z.object({
+  name: z.string().min(2).max(120),
+  email: z.string().email(),
+  password: z.string().min(8).max(64),
+  phone: z.string().min(8).max(20),
+  otpCode: z.string().regex(/^\d{6}$/, "OTP phải gồm 6 chữ số"),
 });
 
 const registerStoreSchema = z.object({
@@ -45,6 +56,31 @@ const registerDriverSchema = z.object({
   licensePlate: z.string().min(4).max(20),
 });
 
+const imageDataUrlSchema = z
+  .string()
+  .refine(
+    (value) =>
+      /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/i.test(value),
+    "Image must be JPEG, PNG or WEBP data URL",
+  )
+  .refine((value) => value.length >= 12_000, "Image quality is too low or file is invalid");
+
+const registerDriverApplicationSchema = z.object({
+  fullName: z.string().min(2).max(120),
+  dateOfBirth: z.coerce.date(),
+  email: z.string().email(),
+  password: z.string().min(8).max(64),
+  phone: z.string().min(8).max(20).optional(),
+  vehicleType: z.string().min(2).max(60),
+  licensePlate: z.string().min(4).max(20),
+  portraitImageData: imageDataUrlSchema,
+  idCardImageData: imageDataUrlSchema,
+  driverLicenseImageData: imageDataUrlSchema,
+  portraitQualityScore: z.coerce.number().min(110),
+  idCardQualityScore: z.coerce.number().min(110),
+  driverLicenseQualityScore: z.coerce.number().min(110),
+});
+
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(64),
@@ -52,6 +88,29 @@ const loginSchema = z.object({
 
 const refreshSchema = z.object({
   refreshToken: z.string().min(10),
+});
+
+const requestEmailOtpSchema = z.object({
+  email: z.string().email(),
+});
+
+const updateProfileSchema = z.object({
+  name: z.string().min(2).max(120).optional(),
+  email: z.string().email().optional(),
+  phone: z.string().min(8).max(20).optional().nullable(),
+  avatarUrl: z
+    .string()
+    .refine(
+      (value) => /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/i.test(value),
+      "Avatar must be an uploaded JPEG, PNG or WEBP image",
+    )
+    .optional()
+    .nullable(),
+});
+
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(8).max(64),
+  newPassword: z.string().min(8).max(64),
 });
 
 async function issueTokens(user: { id: string; email: string; role: UserRole }) {
@@ -115,6 +174,7 @@ authRouter.post(
         id: true,
         email: true,
         name: true,
+        avatarUrl: true,
         role: true,
       },
     });
@@ -131,26 +191,30 @@ authRouter.post(
 authRouter.post(
   "/register/customer",
   asyncHandler(async (req, res) => {
-    req.body = {
-      ...req.body,
-    };
-    const payload = registerSchema.parse(req.body);
+    const payload = registerCustomerSchema.parse(req.body);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    const normalizedPhone = payload.phone.trim();
 
     const existed = await prisma.user.findUnique({
-      where: { email: payload.email },
+      where: { email: normalizedEmail },
     });
 
     if (existed) {
       throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
     }
 
+    const verified = verifyEmailOtp(normalizedEmail, payload.otpCode);
+    if (!verified.ok) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, verified.message);
+    }
+
     const passwordHash = await hashPassword(payload.password);
 
     const user = await prisma.user.create({
       data: {
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone,
+        name: payload.name.trim(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
         passwordHash,
         role: UserRole.CUSTOMER,
       },
@@ -158,6 +222,7 @@ authRouter.post(
         id: true,
         email: true,
         name: true,
+        avatarUrl: true,
         role: true,
       },
     });
@@ -167,6 +232,68 @@ authRouter.post(
     res.status(StatusCodes.CREATED).json({
       user,
       tokens,
+    });
+  }),
+);
+
+authRouter.post(
+  "/email-otp/request",
+  asyncHandler(async (req, res) => {
+    const payload = requestEmailOtpSchema.parse(req.body);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+
+    const existed = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+
+    if (existed) {
+      throw new HttpError(StatusCodes.CONFLICT, "Email đã tồn tại, vui lòng dùng email khác");
+    }
+
+    const otp = issueEmailOtp(normalizedEmail);
+
+    let sentByEmail = false;
+    let emailDeliveryError: unknown;
+    try {
+      const result = await sendOtpEmail({
+        toEmail: normalizedEmail,
+        otpCode: otp.code,
+        expiresInSeconds: otp.expiresInSeconds,
+      });
+      sentByEmail = result.sent;
+    } catch (error) {
+      emailDeliveryError = error;
+      console.error("[auth][email-otp] Failed to send OTP email", error);
+      if (env.NODE_ENV === "production") {
+        throw new HttpError(
+          StatusCodes.INTERNAL_SERVER_ERROR,
+          "Khong gui duoc OTP qua email. Vui long thu lai sau.",
+        );
+      }
+    }
+
+    if (!sentByEmail) {
+      if (env.NODE_ENV === "production") {
+        throw new HttpError(
+          StatusCodes.INTERNAL_SERVER_ERROR,
+          "He thong OTP email chua duoc cau hinh.",
+        );
+      }
+      console.log(
+        `[auth][email-otp][dev-fallback] ${normalizedEmail} => ${otp.code} (expires in ${otp.expiresInSeconds}s)${emailDeliveryError ? " due to email delivery error" : ""}`,
+      );
+    }
+
+    res.json({
+      message: sentByEmail
+        ? "Da gui ma OTP den email. Vui long kiem tra hop thu."
+        : emailDeliveryError
+          ? "Khong gui duoc OTP qua email. Da chuyen sang che do local, vui long dung debugOtp de test."
+          : "OTP da duoc tao (che do local). Vui long dung debugOtp de test.",
+      expiresInSeconds: otp.expiresInSeconds,
+      retryAfterSeconds: otp.retryAfterSeconds,
+      ...(env.NODE_ENV === "production" ? {} : { debugOtp: otp.code }),
     });
   }),
 );
@@ -206,6 +333,7 @@ authRouter.post(
           id: true,
           email: true,
           name: true,
+          avatarUrl: true,
           role: true,
         },
       });
@@ -286,6 +414,7 @@ authRouter.post(
         id: true,
         email: true,
         name: true,
+        avatarUrl: true,
         role: true,
       },
     });
@@ -295,6 +424,86 @@ authRouter.post(
     res.status(StatusCodes.CREATED).json({
       user,
       tokens,
+    });
+  }),
+);
+
+authRouter.post(
+  "/partner/driver-application",
+  asyncHandler(async (req, res) => {
+    const payload = registerDriverApplicationSchema.parse(req.body);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    const normalizedPlate = payload.licensePlate.trim().toUpperCase();
+
+    const minAdultAge = 18;
+    const ageMs = Date.now() - payload.dateOfBirth.getTime();
+    const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000);
+    if (ageYears < minAdultAge) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Driver applicant must be at least 18 years old");
+    }
+
+    const [emailExisted, plateExisted, pendingByEmail, pendingByPlate] = await Promise.all([
+      prisma.user.findUnique({
+        where: { email: normalizedEmail },
+        select: { id: true },
+      }),
+      prisma.driverProfile.findUnique({
+        where: { licensePlate: normalizedPlate },
+        select: { id: true },
+      }),
+      prisma.driverApplication.findFirst({
+        where: {
+          email: normalizedEmail,
+          status: PartnerApplicationStatus.PENDING,
+        },
+        select: { id: true },
+      }),
+      prisma.driverApplication.findFirst({
+        where: {
+          licensePlate: normalizedPlate,
+          status: PartnerApplicationStatus.PENDING,
+        },
+        select: { id: true },
+      }),
+    ]);
+
+    if (emailExisted || pendingByEmail) {
+      throw new HttpError(StatusCodes.CONFLICT, "Email already exists or has pending application");
+    }
+
+    if (plateExisted || pendingByPlate) {
+      throw new HttpError(StatusCodes.CONFLICT, "License plate already exists or is pending review");
+    }
+
+    const passwordHash = await hashPassword(payload.password);
+
+    const application = await prisma.driverApplication.create({
+      data: {
+        fullName: payload.fullName,
+        dateOfBirth: payload.dateOfBirth,
+        email: normalizedEmail,
+        phone: payload.phone,
+        passwordHash,
+        vehicleType: payload.vehicleType,
+        licensePlate: normalizedPlate,
+        portraitImageData: payload.portraitImageData,
+        idCardImageData: payload.idCardImageData,
+        driverLicenseImageData: payload.driverLicenseImageData,
+        portraitQualityScore: payload.portraitQualityScore,
+        idCardQualityScore: payload.idCardQualityScore,
+        driverLicenseQualityScore: payload.driverLicenseQualityScore,
+        status: PartnerApplicationStatus.PENDING,
+      },
+      select: {
+        id: true,
+        status: true,
+        createdAt: true,
+      },
+    });
+
+    res.status(StatusCodes.CREATED).json({
+      data: application,
+      message: "Driver application submitted and waiting for admin approval",
     });
   }),
 );
@@ -351,6 +560,7 @@ authRouter.get(
         name: true,
         email: true,
         phone: true,
+        avatarUrl: true,
         role: true,
         createdAt: true,
       },
@@ -361,6 +571,141 @@ authRouter.get(
     }
 
     res.json(user);
+  }),
+);
+
+authRouter.patch(
+  "/me",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Unauthorized");
+    }
+
+    const payload = updateProfileSchema.parse(req.body);
+
+    if (
+      payload.name === undefined &&
+      payload.email === undefined &&
+      payload.phone === undefined &&
+      payload.avatarUrl === undefined
+    ) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "No profile fields provided");
+    }
+
+    const nextEmail = payload.email?.trim().toLowerCase();
+    const nextPhone = payload.phone === undefined ? undefined : payload.phone?.trim() || null;
+
+    const [emailExisted, phoneExisted] = await Promise.all([
+      nextEmail
+        ? prisma.user.findFirst({
+            where: {
+              email: nextEmail,
+              id: { not: userId },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+      nextPhone
+        ? prisma.user.findFirst({
+            where: {
+              phone: nextPhone,
+              id: { not: userId },
+            },
+            select: { id: true },
+          })
+        : Promise.resolve(null),
+    ]);
+
+    if (emailExisted) {
+      throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
+    }
+
+    if (phoneExisted) {
+      throw new HttpError(StatusCodes.CONFLICT, "Phone already exists");
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(payload.name !== undefined ? { name: payload.name.trim() } : {}),
+        ...(nextEmail !== undefined ? { email: nextEmail } : {}),
+        ...(nextPhone !== undefined ? { phone: nextPhone } : {}),
+        ...(payload.avatarUrl !== undefined
+          ? { avatarUrl: payload.avatarUrl?.trim() || null }
+          : {}),
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        avatarUrl: true,
+        role: true,
+        createdAt: true,
+      },
+    });
+
+    res.json({
+      data: updated,
+      message: "Profile updated successfully",
+    });
+  }),
+);
+
+authRouter.patch(
+  "/change-password",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Unauthorized");
+    }
+
+    const payload = changePasswordSchema.parse(req.body);
+    if (payload.currentPassword === payload.newPassword) {
+      throw new HttpError(
+        StatusCodes.BAD_REQUEST,
+        "New password must be different from current password",
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, passwordHash: true },
+    });
+
+    if (!user) {
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "User not found");
+    }
+
+    const matched = await comparePassword(payload.currentPassword, user.passwordHash);
+    if (!matched) {
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Current password is incorrect");
+    }
+
+    const newHash = await hashPassword(payload.newPassword);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { passwordHash: newHash },
+      }),
+      prisma.refreshToken.updateMany({
+        where: {
+          userId,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      }),
+    ]);
+
+    res.json({
+      message: "Password changed successfully. Please login again.",
+    });
   }),
 );
 
@@ -387,6 +732,7 @@ authRouter.post(
             email: true,
             role: true,
             name: true,
+            avatarUrl: true,
           },
         },
       },

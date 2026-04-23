@@ -5,6 +5,7 @@ const state = {
   tokens: null,
   user: null,
   stores: [],
+  driverApplications: [],
 };
 
 const els = {
@@ -19,8 +20,11 @@ const els = {
   sections: Array.from(document.querySelectorAll("[data-section]")),
   refreshOverview: document.getElementById("refresh-overview"),
   refreshStores: document.getElementById("refresh-stores"),
+  refreshDriverApplications: document.getElementById("refresh-driver-applications"),
   dashboardMetrics: document.getElementById("dashboard-metrics"),
   storesBody: document.getElementById("stores-body"),
+  driverApplicationsBody: document.getElementById("driver-applications-body"),
+  driverApplicationStatusFilter: document.getElementById("driver-application-status-filter"),
   createStoreForm: document.getElementById("create-store-form"),
 };
 
@@ -112,6 +116,7 @@ function renderMetrics(metrics, stores) {
     ["Đang mở cửa", openStores],
     ["Đã gán quản lý", assignedManagers],
     ["Đơn chờ xác nhận", metrics.pendingOrders],
+    ["Hồ sơ tài xế chờ duyệt", metrics.pendingDriverApplications || 0],
     ["Doanh thu hôm nay", new Intl.NumberFormat("vi-VN").format(metrics.revenueToday || 0) + "đ"],
   ];
 
@@ -166,6 +171,132 @@ async function loadStores() {
   renderStoresTable(state.stores);
 }
 
+function formatDateTime(iso) {
+  try {
+    return new Date(iso).toLocaleString("vi-VN", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch (_error) {
+    return iso || "-";
+  }
+}
+
+function docPreviewHtml(label, dataUrl) {
+  if (!dataUrl) {
+    return `<div class="doc-preview"><span>${label}</span><small>Khong co</small></div>`;
+  }
+  return `
+    <div class="doc-preview">
+      <span>${label}</span>
+      <a href="${dataUrl}" target="_blank" rel="noreferrer">
+        <img src="${dataUrl}" alt="${label}" />
+      </a>
+    </div>
+  `;
+}
+
+function renderDriverApplicationsTable(rows) {
+  els.driverApplicationsBody.innerHTML = rows
+    .map(
+      (row) => `
+      <tr>
+        <td>
+          <strong>${formatDateTime(row.createdAt)}</strong><br>
+          <small>Sinh: ${formatDateTime(row.dateOfBirth)}</small>
+        </td>
+        <td>
+          <strong>${row.fullName}</strong><br>
+          <small>${row.email}</small><br>
+          <small>${row.phone || "Khong co SDT"}</small>
+        </td>
+        <td>
+          <small>Loai xe: ${row.vehicleType}</small><br>
+          <small>Bien so: <strong>${row.licensePlate}</strong></small>
+        </td>
+        <td>
+          <div class="doc-grid">
+            ${docPreviewHtml("Chan dung", row.portraitImageData)}
+            ${docPreviewHtml("CCCD", row.idCardImageData)}
+            ${docPreviewHtml("Bang lai", row.driverLicenseImageData)}
+          </div>
+        </td>
+        <td>
+          <small>Chan dung: ${row.portraitQualityScore.toFixed(1)}</small><br>
+          <small>CCCD: ${row.idCardQualityScore.toFixed(1)}</small><br>
+          <small>Bang lai: ${row.driverLicenseQualityScore.toFixed(1)}</small>
+        </td>
+        <td>
+          <strong>${row.status}</strong><br>
+          <small>${row.adminNote || "-"}</small><br>
+          ${
+            row.status === "PENDING"
+              ? `
+                <div class="action-row">
+                  <button class="secondary btn-sm" data-approve-driver-app="${row.id}">Duyet</button>
+                  <button class="danger btn-sm" data-reject-driver-app="${row.id}">Tu choi</button>
+                </div>
+              `
+              : `<small>${row.reviewedAt ? `Xu ly: ${formatDateTime(row.reviewedAt)}` : ""}</small>`
+          }
+        </td>
+      </tr>
+    `,
+    )
+    .join("");
+
+  els.driverApplicationsBody
+    .querySelectorAll("button[data-approve-driver-app]")
+    .forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        const applicationId = event.currentTarget.dataset.approveDriverApp;
+        try {
+          await api(`/admin/driver-applications/${applicationId}/approve`, {
+            method: "POST",
+            body: JSON.stringify({}),
+          });
+          await loadDriverApplications();
+          await loadOverview();
+          alert("Duyet ho so tai xe thanh cong");
+        } catch (error) {
+          alert(`Khong the duyet ho so: ${error.message}`);
+        }
+      });
+    });
+
+  els.driverApplicationsBody
+    .querySelectorAll("button[data-reject-driver-app]")
+    .forEach((button) => {
+      button.addEventListener("click", async (event) => {
+        const applicationId = event.currentTarget.dataset.rejectDriverApp;
+        const adminNote = prompt("Nhap ly do tu choi ho so:", "Thong tin ho so chua hop le");
+        if (!adminNote) return;
+        try {
+          await api(`/admin/driver-applications/${applicationId}/reject`, {
+            method: "POST",
+            body: JSON.stringify({ adminNote }),
+          });
+          await loadDriverApplications();
+          await loadOverview();
+          alert("Da tu choi ho so tai xe");
+        } catch (error) {
+          alert(`Khong the tu choi ho so: ${error.message}`);
+        }
+      });
+    });
+}
+
+async function loadDriverApplications() {
+  const status = (els.driverApplicationStatusFilter?.value || "").trim();
+  const qs = status ? `?status=${encodeURIComponent(status)}&limit=100` : "?limit=100";
+  const response = await api(`/admin/driver-applications${qs}`);
+  state.driverApplications = response.data;
+  renderDriverApplicationsTable(state.driverApplications);
+}
+
 async function loadOverview() {
   const response = await api("/admin/overview");
   renderMetrics(response.data.metrics, state.stores);
@@ -177,6 +308,7 @@ async function bootApp() {
   els.appScreen.classList.remove("hidden");
 
   await loadStores();
+  await loadDriverApplications();
   await loadOverview();
 }
 
@@ -240,6 +372,12 @@ els.navButtons.forEach((btn) => {
 
 els.refreshOverview.addEventListener("click", () => loadOverview().catch((err) => alert(err.message)));
 els.refreshStores.addEventListener("click", () => loadStores().then(loadOverview).catch((err) => alert(err.message)));
+els.refreshDriverApplications.addEventListener("click", () =>
+  loadDriverApplications().then(loadOverview).catch((err) => alert(err.message)),
+);
+els.driverApplicationStatusFilter.addEventListener("change", () =>
+  loadDriverApplications().catch((err) => alert(err.message)),
+);
 
 els.createStoreForm.addEventListener("submit", async (event) => {
   event.preventDefault();

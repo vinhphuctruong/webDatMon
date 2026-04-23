@@ -15,7 +15,55 @@ interface Session {
   refreshToken: string;
 }
 
+type AppUserRole = "CUSTOMER" | "ADMIN" | "STORE_MANAGER" | "DRIVER";
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  role: AppUserRole;
+}
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface RegisterCustomerPayload {
+  name: string;
+  email: string;
+  password: string;
+  phone: string;
+  otpCode: string;
+}
+
+export interface DriverApplicationPayload {
+  fullName: string;
+  dateOfBirth: string;
+  email: string;
+  password: string;
+  phone?: string;
+  vehicleType: string;
+  licensePlate: string;
+  portraitImageData: string;
+  idCardImageData: string;
+  driverLicenseImageData: string;
+  portraitQualityScore: number;
+  idCardQualityScore: number;
+  driverLicenseQualityScore: number;
+}
+
+export interface UpdateProfilePayload {
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+}
+
 const SESSION_KEY = "zaui_food_session";
+const AUTO_DEMO_LOGIN_BLOCK_KEY = "zaui_food_block_demo_auto_login";
 const DEFAULT_API_BASE_URL = "/api/v1";
 
 function resolveApiBaseUrl() {
@@ -40,6 +88,26 @@ const DEMO_EMAIL = import.meta.env.VITE_API_DEMO_EMAIL || "customer@zauifood.loc
 const DEMO_PASSWORD = import.meta.env.VITE_API_DEMO_PASSWORD || "12345678";
 
 let cachedSession: Session | null = null;
+
+function isAutoDemoLoginBlocked() {
+  try {
+    return localStorage.getItem(AUTO_DEMO_LOGIN_BLOCK_KEY) === "1";
+  } catch (_error) {
+    return false;
+  }
+}
+
+function setAutoDemoLoginBlocked(blocked: boolean) {
+  try {
+    if (blocked) {
+      localStorage.setItem(AUTO_DEMO_LOGIN_BLOCK_KEY, "1");
+      return;
+    }
+    localStorage.removeItem(AUTO_DEMO_LOGIN_BLOCK_KEY);
+  } catch (_error) {
+    // Ignore storage errors on restricted environments
+  }
+}
 
 function getApiBaseCandidates() {
   if (API_BASE_URL === DEFAULT_API_BASE_URL) {
@@ -86,6 +154,20 @@ function writeSession(session: Session | null) {
   }
 }
 
+function normalizeTextErrorMessage(raw: string) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+
+  // Avoid surfacing full HTML pages as toast messages.
+  if (/^<!doctype html>/i.test(trimmed) || /^<html/i.test(trimmed)) {
+    return "";
+  }
+
+  return trimmed.length > 240 ? `${trimmed.slice(0, 240)}...` : trimmed;
+}
+
 async function request<T>(
   path: string,
   init: RequestInit = {},
@@ -100,6 +182,9 @@ async function request<T>(
   if (accessToken) {
     headers.set("Authorization", `Bearer ${accessToken}`);
   }
+
+  // Bypass ngrok browser warning for local testing via ngrok
+  headers.set("ngrok-skip-browser-warning", "true");
 
   let response: Response | undefined;
   let lastNetworkError: unknown;
@@ -125,14 +210,21 @@ async function request<T>(
   }
 
   let payload: any = null;
+  let rawTextPayload = "";
   try {
-    payload = await response.json();
+    payload = await response.clone().json();
   } catch (_error) {
     payload = null;
+    try {
+      rawTextPayload = await response.text();
+    } catch (_textError) {
+      rawTextPayload = "";
+    }
   }
 
   if (!response.ok) {
-    const message = payload?.message || `API request failed (${response.status})`;
+    const textMessage = normalizeTextErrorMessage(rawTextPayload);
+    const message = payload?.message || textMessage || `API request failed (${response.status})`;
     throw new ApiError(message, response.status, payload?.details);
   }
 
@@ -150,6 +242,7 @@ async function loginDemo(): Promise<Session> {
     }),
   });
 
+  setAutoDemoLoginBlocked(false);
   writeSession(payload.tokens);
   return payload.tokens;
 }
@@ -172,6 +265,9 @@ async function ensureSession() {
   const existing = readSession();
   if (existing) {
     return existing;
+  }
+  if (isAutoDemoLoginBlocked()) {
+    throw new ApiError("Vui lòng đăng nhập để tiếp tục", 401);
   }
   return loginDemo();
 }
@@ -200,6 +296,10 @@ export async function apiFetch<T>(
       session = await refreshAccessToken(session);
       return await request<T>(path, init, session.accessToken);
     } catch (_refreshError) {
+      writeSession(null);
+      if (isAutoDemoLoginBlocked()) {
+        throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại", 401);
+      }
       session = await loginDemo();
       return request<T>(path, init, session.accessToken);
     }
@@ -208,4 +308,109 @@ export async function apiFetch<T>(
 
 export function clearApiSession() {
   writeSession(null);
+  setAutoDemoLoginBlocked(true);
+}
+
+export function resumeAutoDemoLogin() {
+  setAutoDemoLoginBlocked(false);
+}
+
+export function isAutoDemoLoginDisabled() {
+  return isAutoDemoLoginBlocked();
+}
+
+export async function loginWithCredentials(payload: LoginPayload): Promise<AuthUser> {
+  const response = await request<{
+    user: AuthUser;
+    tokens: Session;
+  }>("/auth/login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  setAutoDemoLoginBlocked(false);
+  writeSession(response.tokens);
+  return response.user;
+}
+
+export async function registerCustomerAccount(
+  payload: RegisterCustomerPayload,
+): Promise<AuthUser> {
+  const response = await request<{
+    user: AuthUser;
+    tokens: Session;
+  }>("/auth/register/customer", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  setAutoDemoLoginBlocked(false);
+  writeSession(response.tokens);
+  return response.user;
+}
+
+export async function requestEmailOtp(email: string) {
+  const response = await request<{
+    message?: string;
+    expiresInSeconds?: number;
+    retryAfterSeconds?: number;
+    debugOtp?: string;
+  }>("/auth/email-otp/request", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+  return response;
+}
+
+export async function submitDriverApplication(payload: DriverApplicationPayload) {
+  const response = await request<{
+    data: {
+      id: string;
+      status: string;
+      createdAt: string;
+    };
+    message?: string;
+  }>("/auth/partner/driver-application", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return response;
+}
+
+export async function fetchMyProfile(): Promise<AuthUser & { createdAt?: string }> {
+  return apiFetch<AuthUser & { createdAt?: string }>("/auth/me", undefined, {
+    auth: true,
+  });
+}
+
+export async function updateMyProfile(payload: UpdateProfilePayload) {
+  const response = await apiFetch<{
+    data: AuthUser & { createdAt?: string };
+    message?: string;
+  }>(
+    "/auth/me",
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+    },
+    { auth: true },
+  );
+  return response;
+}
+
+export async function changeMyPassword(currentPassword: string, newPassword: string) {
+  const response = await apiFetch<{ message?: string }>(
+    "/auth/change-password",
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        currentPassword,
+        newPassword,
+      }),
+    },
+    { auth: true },
+  );
+  return response;
 }

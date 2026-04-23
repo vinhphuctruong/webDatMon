@@ -1,6 +1,6 @@
 import React, { FC, useMemo, useState } from "react";
-import { useRecoilState } from "recoil";
-import { selectedDeliveryTimeState } from "state";
+import { useRecoilState, useRecoilValue } from "recoil";
+import { selectedDeliveryTimeState, selectedStoreState } from "state";
 import { displayDate, displayHalfAnHourTimeRange } from "utils/date";
 import { matchStatusBarColor } from "utils/device";
 import { Picker } from "zmp-ui";
@@ -12,6 +12,7 @@ const CLOSING_HOUR = 22;
 export const TimePicker: FC = () => {
   const [date, setDate] = useState(+new Date());
   const [time, setTime] = useRecoilState(selectedDeliveryTimeState);
+  const selectedStore = useRecoilValue(selectedStoreState) as any;
 
   const availableDates = useMemo(() => {
     const days: Date[] = [];
@@ -26,7 +27,20 @@ export const TimePicker: FC = () => {
 
   const availableTimes = useMemo(() => {
     const times: Date[] = [];
-    const now = new Date();
+    let now = new Date();
+    
+    // Cộng thêm ETA (Thời gian chuẩn bị + di chuyển + dự phòng) vào giờ hiện tại
+    if (selectedStore?.distance) {
+      const distance = selectedStore.distance;
+      const prepTime = 10;
+      const travelTime = Math.ceil(distance * 2);
+      const bufferTime = 10;
+      const totalEtaMinutes = prepTime + travelTime + bufferTime;
+      now = new Date(now.getTime() + totalEtaMinutes * 60000);
+    } else {
+      // Mặc định cộng 30 phút nếu không có thông tin khoảng cách
+      now = new Date(now.getTime() + 30 * 60000);
+    }
     let time = new Date();
     if (now.getDate() === new Date(date).getDate()) {
       // Starting time is the current time rounded up to the nearest 30 minutes

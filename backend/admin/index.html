@@ -68,6 +68,7 @@
             <aside class="card sidebar">
               <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
               <button class="nav-btn" data-tab="stores">Cua hang</button>
+              <button class="nav-btn" data-tab="driver-applications">Ho so tai xe</button>
             </aside>
 
             <main class="card content">
@@ -121,6 +122,37 @@
                       </tr>
                     </thead>
                     <tbody id="stores-body"></tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section data-section="driver-applications" class="hidden">
+                <div class="portal-heading" style="margin-bottom: 12px;">
+                  <h3>Xet duyet doi tac tai xe</h3>
+                  <div class="portal-actions">
+                    <select id="driver-application-status-filter">
+                      <option value="PENDING">Dang cho duyet</option>
+                      <option value="">Tat ca</option>
+                      <option value="APPROVED">Da duyet</option>
+                      <option value="REJECTED">Tu choi</option>
+                    </select>
+                    <button id="refresh-driver-applications" class="secondary">Lam moi</button>
+                  </div>
+                </div>
+
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Ngay tao</th>
+                        <th>Ung vien</th>
+                        <th>Thong tin xe</th>
+                        <th>Giay to</th>
+                        <th>Diem chat luong</th>
+                        <th>Trang thai / Xu ly</th>
+                      </tr>
+                    </thead>
+                    <tbody id="driver-applications-body"></tbody>
                   </table>
                 </div>
               </section>

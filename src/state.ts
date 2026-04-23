@@ -16,7 +16,7 @@ import {
 import { Store } from "types/delivery";
 import { calcFinalPrice } from "utils/product";
 import { wait } from "utils/async";
-import { fetchCategories, fetchProducts, fetchStores } from "services/backend";
+import { fetchCategories, fetchOrders, fetchProducts, fetchStores } from "services/backend";
 
 type CustomerLocation = { latitude: string; longitude: string };
 type CustomerContact = { name: string; phone: string };
@@ -216,8 +216,26 @@ export const vouchersAtom = atom<any[]>({
 export const userState = selector({
   key: "user",
   get: async () => {
-    const { userInfo } = await getUserInfo({ autoRequestPermission: true });
-    return userInfo;
+    try {
+      const { userInfo } = await getUserInfo({ autoRequestPermission: true });
+      return userInfo;
+    } catch { return null; }
+  },
+});
+
+export const activeOrdersState = selector({
+  key: "activeOrders",
+  get: async ({ get }) => {
+    try {
+      const user = get(userState);
+      if (!user) return [];
+      const orders = await fetchOrders();
+      return orders.filter(
+        (o) => o.status !== "DELIVERED" && o.status !== "CANCELLED" && o.status !== "REJECTED" && o.status !== "FAILED"
+      );
+    } catch {
+      return [];
+    }
   },
 });
 
@@ -651,4 +669,35 @@ export const customerAddressDisplayState = selector<string>({
 export const orderNoteState = atom({
   key: "orderNote",
   default: "",
+});
+
+export interface SavedAddress {
+  id: string;
+  label: string;
+  address: string;
+  lat: number;
+  long: number;
+  contactName: string;
+  contactPhone: string;
+}
+
+function loadSavedAddresses(): SavedAddress[] {
+  try {
+    const raw = localStorage.getItem("tm_saved_addresses");
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+
+function saveSavedAddresses(addresses: SavedAddress[]) {
+  localStorage.setItem("tm_saved_addresses", JSON.stringify(addresses));
+}
+
+export const savedAddressesState = atom<SavedAddress[]>({
+  key: "savedAddresses",
+  default: loadSavedAddresses(),
+  effects: [
+    ({ onSet }) => {
+      onSet((newValue) => saveSavedAddresses(newValue));
+    }
+  ]
 });

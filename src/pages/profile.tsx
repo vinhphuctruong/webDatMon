@@ -1,15 +1,21 @@
 import React, { FC, Suspense, useState } from "react";
-import { Box, Header, Page, Text } from "zmp-ui";
+import { Box, Page, Text, useNavigate, useSnackbar } from "zmp-ui";
 import { useToBeImplemented } from "hooks";
-import { useRecoilCallback, useRecoilValue, useRecoilValueLoadable } from "recoil";
-import { userState } from "state";
+import { useSetRecoilState, useRecoilValue, useRecoilValueLoadable } from "recoil";
+import { cartState, userState } from "state";
 import { DisplayPrice } from "components/display/price";
 import {
+  appliedVoucherCodeState,
   favoriteIdsState,
   orderHistoryState,
   OrderHistoryItem,
   vouchersState,
 } from "services/features";
+import {
+  clearApiSession,
+  resumeAutoDemoLogin,
+  isAutoDemoLoginDisabled,
+} from "services/api";
 
 const ProfileHeader: FC = () => {
   const user = useRecoilValueLoadable(userState);
@@ -96,99 +102,6 @@ const StatsRow: FC = () => {
   );
 };
 
-const OrderHistorySection: FC = () => {
-  const orders = useRecoilValue(orderHistoryState);
-  const [showAll, setShowAll] = useState(false);
-  const displayOrders = showAll ? orders : orders.slice(0, 3);
-
-  if (orders.length === 0) return null;
-
-  return (
-    <Box style={{ padding: "16px" }}>
-      <div className="tm-section-header" style={{ paddingLeft: 0, paddingRight: 0, paddingTop: 0 }}>
-        <span className="tm-section-title">📦 Đơn hàng gần đây</span>
-        {orders.length > 3 && (
-          <span
-            className="tm-section-link"
-            onClick={() => setShowAll(!showAll)}
-            style={{ cursor: "pointer" }}
-          >
-            {showAll ? "Thu gọn" : `Xem tất cả (${orders.length})`}
-          </span>
-        )}
-      </div>
-      <div className="space-y-3">
-        {displayOrders.map((order, i) => (
-          <OrderCard key={`${order.id}-${i}`} order={order} />
-        ))}
-      </div>
-    </Box>
-  );
-};
-
-const OrderCard: FC<{ order: OrderHistoryItem }> = ({ order }) => {
-  const statusConfig = {
-    success: { label: "Thành công", color: "var(--tm-primary)", bg: "var(--tm-primary-light)" },
-    failed: { label: "Thất bại", color: "var(--tm-danger)", bg: "#fef2f2" },
-    pending: { label: "Đang xử lý", color: "var(--tm-warning)", bg: "#fef9e7" },
-  };
-  const status = statusConfig[order.status];
-  const date = new Date(order.date);
-  const dateStr = date.toLocaleDateString("vi-VN", {
-    day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit",
-  });
-
-  return (
-    <div className="tm-card" style={{ padding: "14px 16px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <div>
-          <Text style={{ fontWeight: 600, fontSize: 14, color: "var(--tm-text-primary)" }}>
-            #{order.id}
-          </Text>
-          <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-            {dateStr}
-          </Text>
-        </div>
-        <span
-          style={{
-            background: status.bg, color: status.color,
-            padding: "3px 10px", borderRadius: 12,
-            fontSize: 11, fontWeight: 600,
-          }}
-        >
-          {status.label}
-        </span>
-      </div>
-      <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 4 }}>
-        {order.storeName} · {order.items.length} món
-      </Text>
-      <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-        {order.items.map((item) => `${item.name} x${item.quantity}`).join(", ")}
-      </Text>
-      <div
-        style={{
-          display: "flex", justifyContent: "space-between", alignItems: "center",
-          marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--tm-border)",
-        }}
-      >
-        <Text style={{ fontWeight: 700, color: "var(--tm-primary)", fontSize: 15 }}>
-          <DisplayPrice>{order.total}</DisplayPrice>
-        </Text>
-        <button
-          style={{
-            background: "var(--tm-primary-light)", color: "var(--tm-primary)",
-            border: "none", borderRadius: 12, padding: "5px 14px",
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-            fontFamily: "Inter, sans-serif",
-          }}
-        >
-          Đặt lại
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const MembershipCard: FC = () => {
   const orders = useRecoilValue(orderHistoryState);
   const points = orders.filter((o) => o.status === "success").length * 100 + 50;
@@ -242,6 +155,8 @@ const MembershipCard: FC = () => {
 interface MenuItemData {
   icon: string;
   label: string;
+  tone?: "default" | "danger";
+  action?: "logout" | "login_demo" | "partner_onboarding" | "register_store" | "account";
 }
 
 const MenuItem: FC<{ item: MenuItemData; onClick: () => void }> = ({ item, onClick }) => (
@@ -255,20 +170,65 @@ const MenuItem: FC<{ item: MenuItemData; onClick: () => void }> = ({ item, onCli
     <span style={{ fontSize: 18, marginRight: 12, width: 24, textAlign: "center" }}>
       {item.icon}
     </span>
-    <Text style={{ flex: 1, fontWeight: 500, color: "var(--tm-text-primary)", fontSize: 14 }}>
+    <Text
+      style={{
+        flex: 1,
+        fontWeight: 500,
+        color: item.tone === "danger" ? "var(--tm-danger)" : "var(--tm-text-primary)",
+        fontSize: 14,
+      }}
+    >
       {item.label}
     </Text>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="var(--tm-text-tertiary)">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill={item.tone === "danger" ? "var(--tm-danger)" : "var(--tm-text-tertiary)"}
+    >
       <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
     </svg>
   </div>
 );
 
 const MenuSections: FC = () => {
+  const navigate = useNavigate();
+  const snackbar = useSnackbar();
+  const [autoLoginDisabled, setAutoLoginDisabled] = useState(isAutoDemoLoginDisabled());
+  const setCart = useSetRecoilState(cartState);
+  const setOrderHistory = useSetRecoilState(orderHistoryState);
+  const setFavorites = useSetRecoilState(favoriteIdsState);
+  const setAppliedVoucherCode = useSetRecoilState(appliedVoucherCodeState);
   const onClick = useToBeImplemented();
 
+  const handleLogout = () => {
+    clearApiSession();
+    setCart([]);
+    setOrderHistory([]);
+    setFavorites([]);
+    setAppliedVoucherCode(null);
+    setAutoLoginDisabled(true);
+    snackbar.openSnackbar({
+      type: "success",
+      text: "Đã đăng xuất. Ứng dụng sẽ không tự đăng nhập lại demo",
+    });
+    navigate("/");
+  };
+
+  const handleResumeDemoLogin = () => {
+    resumeAutoDemoLogin();
+    setAutoLoginDisabled(false);
+    snackbar.openSnackbar({
+      type: "success",
+      text: "Đã bật lại đăng nhập demo tự động",
+    });
+    navigate("/");
+  };
+
   const personalItems: MenuItemData[] = [
-    { icon: "👤", label: "Thông tin tài khoản" },
+    { icon: "🤝", label: "Trở thành tài xế", action: "partner_onboarding" },
+    { icon: "🏪", label: "Đăng ký mở quán", action: "register_store" },
+    { icon: "👤", label: "Thông tin tài khoản", action: "account" },
     { icon: "📦", label: "Đơn hàng gần đây" },
     { icon: "📍", label: "Địa chỉ đã lưu" },
     { icon: "💳", label: "Phương thức thanh toán" },
@@ -279,7 +239,35 @@ const MenuSections: FC = () => {
     { icon: "📞", label: "Hỗ trợ & góp ý" },
     { icon: "📄", label: "Điều khoản sử dụng" },
     { icon: "ℹ️", label: "Về TM Food" },
+    autoLoginDisabled
+      ? { icon: "🔐", label: "Đăng nhập lại demo", action: "login_demo" as const }
+      : { icon: "🚪", label: "Đăng xuất", tone: "danger", action: "logout" as const },
   ];
+
+  const resolveMenuClick = (item: MenuItemData) => {
+    if (item.action === "logout") {
+      return handleLogout;
+    }
+    if (item.action === "login_demo") {
+      return handleResumeDemoLogin;
+    }
+    if (item.action === "partner_onboarding") {
+      return () => navigate("/partner-onboarding");
+    }
+    if (item.action === "register_store") {
+      return () => navigate("/register-store");
+    }
+    if (item.action === "account") {
+      return () => navigate("/account");
+    }
+    if (item.label === "Đơn hàng gần đây") {
+      return () => navigate("/orders");
+    }
+    if (item.label === "Địa chỉ đã lưu") {
+      return () => navigate("/addresses");
+    }
+    return onClick;
+  };
 
   return (
     <Box style={{ padding: "16px 16px 32px" }}>
@@ -295,7 +283,7 @@ const MenuSections: FC = () => {
           Cá nhân
         </Text>
         {personalItems.map((item, i) => (
-          <MenuItem key={i} item={item} onClick={onClick} />
+          <MenuItem key={i} item={item} onClick={resolveMenuClick(item)} />
         ))}
       </div>
       <div className="tm-card" style={{ padding: "4px 16px" }}>
@@ -310,7 +298,11 @@ const MenuSections: FC = () => {
           Khác
         </Text>
         {otherItems.map((item, i) => (
-          <MenuItem key={i} item={item} onClick={onClick} />
+          <MenuItem
+            key={i}
+            item={item}
+            onClick={resolveMenuClick(item)}
+          />
         ))}
       </div>
     </Box>
@@ -325,7 +317,7 @@ const ProfilePage: FC = () => {
       </Suspense>
       <StatsRow />
       <MembershipCard />
-      <OrderHistorySection />
+      
       <MenuSections />
     </Page>
   );
