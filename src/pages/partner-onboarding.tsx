@@ -61,6 +61,7 @@ const PartnerOnboardingPage: FC = () => {
   const [requireRegistration, setRequireRegistration] = useState<boolean>(() =>
     parseRequiredFromSearch(location.search),
   );
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
@@ -99,7 +100,14 @@ const PartnerOnboardingPage: FC = () => {
   useEffect(() => {
     const required = parseRequiredFromSearch(location.search);
     setRequireRegistration(required);
-    setMode(required ? "register_customer" : parseModeFromSearch(location.search));
+    const session = localStorage.getItem("zaui_food_session");
+    setIsLoggedIn(!!session);
+    
+    if (session && parseModeFromSearch(location.search) !== "partner") {
+      setMode("partner");
+    } else {
+      setMode(required ? "register_customer" : parseModeFromSearch(location.search));
+    }
     setPartnerRole(parsePartnerRoleFromSearch(location.search));
   }, [location.search]);
 
@@ -439,8 +447,10 @@ const PartnerOnboardingPage: FC = () => {
       <div style={{ padding: "16px", display: "grid", gap: 12 }}>
         <div className="tm-card" style={{ padding: 10, display: "flex", gap: 8 }}>
           {[
-            { key: "login", label: "Đăng nhập" },
-            { key: "register_customer", label: "Đăng ký khách hàng" },
+            ...(isLoggedIn ? [] : [
+              { key: "login", label: "Đăng nhập" },
+              { key: "register_customer", label: "Đăng ký khách hàng" },
+            ]),
             { key: "partner", label: "Trở thành đối tác" },
           ].map((tab) => {
             const active = mode === (tab.key as AuthMode);
@@ -674,7 +684,23 @@ const PartnerOnboardingPage: FC = () => {
                   color: "var(--tm-text-secondary)",
                 }}
               >
-                Luồng đăng ký cửa hàng sẽ được bổ sung ở bước tiếp theo.
+                <div style={{ marginBottom: 12 }}>Đăng ký trở thành đối tác Cửa hàng/Quán ăn để tiếp cận hàng ngàn khách hàng.</div>
+                <button
+                  type="button"
+                  onClick={() => navigate("/register-store")}
+                  style={{
+                    border: "none",
+                    borderRadius: 10,
+                    padding: "10px 16px",
+                    fontWeight: 700,
+                    color: "#fff",
+                    background: "var(--tm-primary)",
+                    cursor: "pointer",
+                    width: "100%",
+                  }}
+                >
+                  Đăng ký mở Cửa hàng ngay
+                </button>
               </div>
             ) : (
               <div style={{ display: "grid", gap: 10 }}>

@@ -546,4 +546,136 @@ orderRouter.patch(
   }),
 );
 
+// --------------------------------------------------------------------------------
+// Order Cancellation logic (Khách hàng & Quán)
+// --------------------------------------------------------------------------------
+orderRouter.post(
+  "/:orderId/cancel",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const user = req.user!;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+
+      if (user.role === UserRole.CUSTOMER) {
+        if (order.userId !== user.id) {
+          throw new HttpError(StatusCodes.FORBIDDEN, "Not your order");
+        }
+        if (order.status !== OrderStatus.PENDING) {
+          throw new HttpError(
+            StatusCodes.FORBIDDEN,
+            "Chỉ có thể tự hủy khi đơn đang chờ xác nhận. Quán đã nhận đơn, vui lòng gọi điện để yêu cầu hủy."
+          );
+        }
+      } else if (user.role === UserRole.STORE_MANAGER) {
+        const store = await tx.store.findUnique({ where: { managerId: user.id } });
+        if (!store || order.storeId !== store.id) {
+          throw new HttpError(StatusCodes.FORBIDDEN, "Not your store's order");
+        }
+        if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PREPARING) {
+          throw new HttpError(StatusCodes.FORBIDDEN, "Chỉ có thể hủy khi đơn đang chờ hoặc đang chuẩn bị.");
+        }
+      } else if (user.role !== UserRole.ADMIN) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Unauthorized role to cancel");
+      }
+
+      await cancelOrderWithSettlementRollback(tx, {
+        orderId,
+        reason: reason || "User cancelled",
+      });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+// --------------------------------------------------------------------------------
+// Driver Reject Order (Nhả đơn)
+// --------------------------------------------------------------------------------
+orderRouter.post(
+  "/:orderId/driver-reject",
+  requireRole(UserRole.DRIVER),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const user = req.user!;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      
+      if (order.driverId !== user.id) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Not your assigned order");
+      }
+      
+      if (order.status !== OrderStatus.CONFIRMED && order.status !== OrderStatus.PREPARING) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không thể nhả đơn ở trạng thái này.");
+      }
+
+      // Nhả đơn: Bỏ driverId, cho phép tài xế khác nhận
+      await tx.order.update({
+        where: { id: orderId },
+        data: { 
+          driverId: null,
+          note: order.note ? `${order.note} | Tài xế huỷ nhận chuyến: ${reason}` : `Tài xế huỷ nhận chuyến: ${reason}`
+        },
+      });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+// --------------------------------------------------------------------------------
+// Driver Failed Order (Giao thất bại / Khách bom hàng)
+// --------------------------------------------------------------------------------
+orderRouter.post(
+  "/:orderId/driver-failed",
+  requireRole(UserRole.DRIVER),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const { reason } = req.body;
+    const user = req.user!;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      
+      if (order.driverId !== user.id) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Not your assigned order");
+      }
+      
+      if (order.status !== OrderStatus.PICKED_UP) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Chỉ có thể báo giao thất bại khi đang đi giao.");
+      }
+
+      await cancelOrderWithSettlementRollback(tx, {
+        orderId,
+        reason: reason ? `Giao thất bại: ${reason}` : "Giao thất bại (Khách bom hàng)",
+      });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
 export default orderRouter;

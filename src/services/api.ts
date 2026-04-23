@@ -414,3 +414,36 @@ export async function changeMyPassword(currentPassword: string, newPassword: str
   );
   return response;
 }
+
+export async function cancelOrder(orderId: string, reason?: string) {
+  return apiFetch<{ data: any }>(
+    `/orders/${orderId}/cancel`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+    { auth: true },
+  );
+}
+
+export async function rejectOrderDriver(orderId: string, reason?: string) {
+  return apiFetch<{ data: any }>(
+    `/orders/${orderId}/driver-reject`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+    { auth: true },
+  );
+}
+
+export async function markOrderFailedDriver(orderId: string, reason?: string) {
+  return apiFetch<{ data: any }>(
+    `/orders/${orderId}/driver-failed`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+    { auth: true },
+  );
+}

@@ -1,12 +1,12 @@
 import express from "express";
 import { PrismaClient } from "@prisma/client";
-import { authenticate } from "../middlewares/auth";
+import { requireAuth } from "../middlewares/auth";
 
 const router = express.Router();
 const prisma = new PrismaClient();
 
 // Get current user's store application
-router.get("/me", authenticate, async (req, res) => {
+router.get("/me", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
     const application = await prisma.storeApplication.findFirst({
@@ -26,7 +26,7 @@ router.get("/me", authenticate, async (req, res) => {
 });
 
 // Submit a new store application
-router.post("/", authenticate, async (req, res) => {
+router.post("/", requireAuth, async (req, res) => {
   try {
     const userId = req.user!.id;
     
@@ -87,3 +87,4 @@ router.post("/", authenticate, async (req, res) => {
 });
 
 export default router;
+// Trigger TS refresh

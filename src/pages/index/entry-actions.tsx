@@ -1,8 +1,14 @@
-import React, { FC } from "react";
+import React, { FC, useEffect, useState } from "react";
 import { Box, Text, useNavigate } from "zmp-ui";
 
 export const EntryActions: FC = () => {
   const navigate = useNavigate();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const session = localStorage.getItem("zaui_food_session");
+    setIsLoggedIn(!!session);
+  }, []);
 
   return (
     <Box className="bg-white" style={{ padding: "12px 16px 0" }}>
@@ -26,23 +32,25 @@ export const EntryActions: FC = () => {
           </Text>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <button
-            type="button"
-            onClick={() => navigate("/partner-onboarding?mode=login")}
-            style={{
-              border: "1px solid var(--tm-border)",
-              borderRadius: 12,
-              padding: "10px 12px",
-              fontWeight: 700,
-              fontSize: 13,
-              color: "var(--tm-text-primary)",
-              background: "#fff",
-              cursor: "pointer",
-            }}
-          >
-            🔐 Đăng ký/Đăng nhập
-          </button>
+        <div style={{ display: "grid", gridTemplateColumns: isLoggedIn ? "1fr" : "1fr 1fr", gap: 8 }}>
+          {!isLoggedIn && (
+            <button
+              type="button"
+              onClick={() => navigate("/partner-onboarding?mode=login")}
+              style={{
+                border: "1px solid var(--tm-border)",
+                borderRadius: 12,
+                padding: "10px 12px",
+                fontWeight: 700,
+                fontSize: 13,
+                color: "var(--tm-text-primary)",
+                background: "#fff",
+                cursor: "pointer",
+              }}
+            >
+              🔐 Đăng ký/Đăng nhập
+            </button>
+          )}
 
           <button
             type="button"
