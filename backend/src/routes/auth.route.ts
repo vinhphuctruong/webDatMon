@@ -7,7 +7,7 @@ import { env } from "../config/env";
 import { prisma } from "../db/prisma";
 import { asyncHandler } from "../lib/async-handler";
 import { sendOtpEmail } from "../lib/email-service";
-import { issueEmailOtp, verifyEmailOtp } from "../lib/email-otp";
+import { issueEmailOtp, verifyEmailOtp, peekEmailOtp } from "../lib/email-otp";
 import { HttpError } from "../lib/http-error";
 import { requireAuth } from "../middlewares/auth";
 import {
@@ -153,12 +153,17 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = registerSchema.parse(req.body);
 
-    const existed = await prisma.user.findUnique({
-      where: { email: payload.email },
-    });
+    const [existedEmail, existedPhone] = await Promise.all([
+      prisma.user.findUnique({ where: { email: payload.email } }),
+      payload.phone ? prisma.user.findUnique({ where: { phone: payload.phone } }) : Promise.resolve(null),
+    ]);
 
-    if (existed) {
+    if (existedEmail) {
       throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
+    }
+
+    if (existedPhone) {
+      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại đã có người đăng ký");
     }
 
     const passwordHash = await hashPassword(payload.password);
@@ -195,12 +200,17 @@ authRouter.post(
     const normalizedEmail = payload.email.trim().toLowerCase();
     const normalizedPhone = payload.phone.trim();
 
-    const existed = await prisma.user.findUnique({
-      where: { email: normalizedEmail },
-    });
+    const [existedEmail, existedPhone] = await Promise.all([
+      prisma.user.findUnique({ where: { email: normalizedEmail } }),
+      prisma.user.findUnique({ where: { phone: normalizedPhone } }),
+    ]);
 
-    if (existed) {
+    if (existedEmail) {
       throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
+    }
+
+    if (existedPhone) {
+      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại đã có người đăng ký");
     }
 
     const verified = verifyEmailOtp(normalizedEmail, payload.otpCode);
@@ -310,12 +320,17 @@ authRouter.post(
       );
     }
 
-    const existed = await prisma.user.findUnique({
-      where: { email: payload.managerEmail },
-    });
+    const [existedEmail, existedPhone] = await Promise.all([
+      prisma.user.findUnique({ where: { email: payload.managerEmail } }),
+      payload.managerPhone ? prisma.user.findUnique({ where: { phone: payload.managerPhone } }) : Promise.resolve(null),
+    ]);
 
-    if (existed) {
+    if (existedEmail) {
       throw new HttpError(StatusCodes.CONFLICT, "Manager email already exists");
+    }
+
+    if (existedPhone) {
+      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại quản lý đã có người đăng ký");
     }
 
     const passwordHash = await hashPassword(payload.managerPassword);
@@ -376,17 +391,22 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = registerDriverSchema.parse(req.body);
 
-    const [emailExisted, plateExisted] = await Promise.all([
+    const [emailExisted, plateExisted, phoneExisted] = await Promise.all([
       prisma.user.findUnique({
         where: { email: payload.email },
       }),
       prisma.driverProfile.findUnique({
         where: { licensePlate: payload.licensePlate },
       }),
+      payload.phone ? prisma.user.findUnique({ where: { phone: payload.phone } }) : Promise.resolve(null),
     ]);
 
     if (emailExisted) {
       throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
+    }
+
+    if (phoneExisted) {
+      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại đã có người đăng ký");
     }
 
     if (plateExisted) {
@@ -504,6 +524,139 @@ authRouter.post(
     res.status(StatusCodes.CREATED).json({
       data: application,
       message: "Driver application submitted and waiting for admin approval",
+    });
+  }),
+);
+
+// ─── Forgot Password ───────────────────────────────────────────────
+const forgotPasswordRequestSchema = z.object({
+  email: z.string().email(),
+});
+
+const forgotPasswordResetSchema = z.object({
+  email: z.string().email(),
+  otpCode: z.string().regex(/^\d{6}$/, "OTP phải gồm 6 chữ số"),
+  newPassword: z.string().min(8).max(64),
+});
+
+authRouter.post(
+  "/forgot-password/request-otp",
+  asyncHandler(async (req, res) => {
+    const payload = forgotPasswordRequestSchema.parse(req.body);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Email chưa được đăng ký trong hệ thống");
+    }
+
+    const otp = issueEmailOtp(normalizedEmail);
+
+    let sentByEmail = false;
+    let emailDeliveryError: unknown;
+    try {
+      const result = await sendOtpEmail({
+        toEmail: normalizedEmail,
+        otpCode: otp.code,
+        expiresInSeconds: otp.expiresInSeconds,
+      });
+      sentByEmail = result.sent;
+    } catch (error) {
+      emailDeliveryError = error;
+      console.error("[auth][forgot-password] Failed to send OTP email", error);
+      if (env.NODE_ENV === "production") {
+        throw new HttpError(
+          StatusCodes.INTERNAL_SERVER_ERROR,
+          "Không gửi được OTP qua email. Vui lòng thử lại sau.",
+        );
+      }
+    }
+
+    if (!sentByEmail) {
+      if (env.NODE_ENV === "production") {
+        throw new HttpError(
+          StatusCodes.INTERNAL_SERVER_ERROR,
+          "Hệ thống OTP email chưa được cấu hình.",
+        );
+      }
+      console.log(
+        `[auth][forgot-password][dev-fallback] ${normalizedEmail} => ${otp.code} (expires in ${otp.expiresInSeconds}s)`,
+      );
+    }
+
+    res.json({
+      message: sentByEmail
+        ? "Đã gửi mã OTP đến email. Vui lòng kiểm tra hộp thư."
+        : "OTP đã được tạo (chế độ local). Vui lòng dùng debugOtp để test.",
+      expiresInSeconds: otp.expiresInSeconds,
+      retryAfterSeconds: otp.retryAfterSeconds,
+      ...(env.NODE_ENV === "production" ? {} : { debugOtp: otp.code }),
+    });
+  }),
+);
+
+authRouter.post(
+  "/forgot-password/verify-otp",
+  asyncHandler(async (req, res) => {
+    const payload = z.object({
+      email: z.string().email(),
+      otpCode: z.string().regex(/^\d{6}$/, "OTP phải gồm 6 chữ số"),
+    }).parse(req.body);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+
+    const result = peekEmailOtp(normalizedEmail, payload.otpCode);
+    if (!result.ok) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, result.message);
+    }
+
+    res.json({ verified: true, message: "OTP hợp lệ. Vui lòng đặt mật khẩu mới." });
+  }),
+);
+
+authRouter.post(
+  "/forgot-password/reset",
+  asyncHandler(async (req, res) => {
+    const payload = forgotPasswordResetSchema.parse(req.body);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+
+    const user = await prisma.user.findUnique({
+      where: { email: normalizedEmail },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Email không tồn tại");
+    }
+
+    const verified = verifyEmailOtp(normalizedEmail, payload.otpCode);
+    if (!verified.ok) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, verified.message);
+    }
+
+    const newHash = await hashPassword(payload.newPassword);
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash: newHash },
+      }),
+      prisma.refreshToken.updateMany({
+        where: {
+          userId: user.id,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      }),
+    ]);
+
+    res.json({
+      message: "Đặt lại mật khẩu thành công. Vui lòng đăng nhập lại.",
     });
   }),
 );

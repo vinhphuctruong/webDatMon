@@ -48,7 +48,7 @@ services:
 
   frontend:
     build:
-      context: .
+      context: ./miniapp-customer
       dockerfile: Dockerfile
     container_name: zaui-food-frontend
     restart: unless-stopped

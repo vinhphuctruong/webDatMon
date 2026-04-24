@@ -1,0 +1,731 @@
+/* ========================================
+   TM Food — Premium Design System
+   ======================================== */
+
+:root {
+  --tm-primary: #00a96d;
+  --tm-primary-dark: #008f5d;
+  --tm-primary-light: #e6f9f1;
+  --tm-accent: #ff6b35;
+  --tm-accent-light: #fff3ed;
+  --tm-warning: #ffb800;
+  --tm-danger: #ff4757;
+  --tm-bg: #f5f6f8;
+  --tm-bg-card: #ffffff;
+  --tm-text-primary: #1a1a2e;
+  --tm-text-secondary: #6b7280;
+  --tm-text-tertiary: #9ca3af;
+  --tm-border: #e5e7eb;
+  --tm-shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --tm-shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --tm-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --tm-radius-sm: 8px;
+  --tm-radius-md: 12px;
+  --tm-radius-lg: 16px;
+  --tm-radius-xl: 20px;
+  --tm-radius-full: 9999px;
+  --tm-safe-area-inset-top: 0px;
+  --tm-safe-area-top: max(
+    max(var(--tm-safe-area-inset-top, 0px), var(--zaui-safe-area-inset-top, 0px)),
+    env(safe-area-inset-top, 0px)
+  );
+  --tm-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --tm-page-horizontal: clamp(12px, 4vw, 16px);
+}
+
+/* ── Base ────────────────────────────── */
+body {
+  background-color: var(--tm-bg);
+  user-select: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--tm-text-primary);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.zaui-routes {
+  height: 100%;
+}
+
+.zaui-page {
+  min-height: unset;
+}
+
+.page-with-bg {
+  background: var(--tm-bg);
+}
+
+.tm-page-safe-top {
+  padding-top: calc(var(--tm-safe-area-top) + 10px) !important;
+}
+
+.tm-page-safe-bottom {
+  padding-bottom: calc(12px + var(--tm-safe-area-bottom)) !important;
+}
+
+.tm-content-pad {
+  padding-left: var(--tm-page-horizontal) !important;
+  padding-right: var(--tm-page-horizontal) !important;
+}
+
+.tm-page-topbar {
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-left: var(--tm-page-horizontal);
+  padding-right: var(--tm-page-horizontal);
+  padding-bottom: 12px;
+}
+
+.tm-page-topbar-wrap {
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.tm-page-topbar-title {
+  margin: 0;
+  line-height: 1.25;
+  font-size: clamp(19px, 5.6vw, 22px);
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.tm-page-topbar-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.tm-btn-primary-inline {
+  background: var(--tm-primary);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-weight: 600;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.tm-link-back {
+  padding: 8px 0;
+  cursor: pointer;
+  color: var(--tm-text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Header ──────────────────────────── */
+.zaui-header {
+  position: sticky;
+  height: auto;
+  margin-bottom: 0;
+  flex: none;
+
+  &::after {
+    display: none;
+  }
+}
+
+/* ── Inputs ──────────────────────────── */
+.zaui-input-affix-wrapper {
+  margin: 0;
+  border-radius: var(--tm-radius-full) !important;
+  background: var(--tm-bg) !important;
+  border: none !important;
+  transition: all 0.2s ease;
+
+  &:focus-within {
+    box-shadow: 0 0 0 2px rgba(0, 169, 109, 0.2) !important;
+    background: #fff !important;
+  }
+}
+
+.zaui-text-xxxxSmall {
+  line-height: 16px;
+}
+
+/* ── Buttons & Active States ─────────── */
+.zaui-btn-tertiary,
+.zaui-btn-tertiary.zaui-btn-highlight,
+.zaui-bottom-navigation-item-active {
+  color: var(--zmp-primary-color);
+}
+
+.zaui-btn-primary,
+.zaui-btn-primary.zaui-btn-highlight,
+.zaui-radio-checked .zaui-radio-checkmark,
+.zaui-btn-primary:active,
+.zaui-btn-primary.zaui-btn-highlight:active,
+.zaui-btn-primary:focus-visible,
+.zaui-btn-primary.zaui-btn-highlight:focus-visible {
+  background: linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%);
+  border: none;
+  border-radius: var(--tm-radius-md);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.zaui-btn-primary:active,
+.zaui-btn-primary.zaui-btn-highlight:active,
+.zaui-btn-primary:focus-visible,
+.zaui-btn-primary.zaui-btn-highlight:focus-visible {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+.zaui-picker-item-selected {
+  color: var(--zmp-primary-color);
+}
+
+.zaui-input-affix-wrapper-focused,
+.zaui-input-affix-wrapper:hover,
+.zaui-input-affix-wrapper:focus,
+.zaui-input-affix-wrapper:focus-visible {
+  border-color: var(--zmp-primary-color);
+}
+
+.zaui-tabs-tabbar-active-line {
+  background-color: var(--zmp-primary-color);
+}
+
+.border-inset {
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+}
+
+/* ── Category Tabs ───────────────────── */
+.category-tabs {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+
+  .zaui-tabs-tabbar {
+    flex: none;
+    background: #fff;
+    padding: 0 8px;
+  }
+  .zaui-tab-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow-y: auto;
+  }
+  .zaui-tab {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+  }
+}
+
+/* ── Swiper Pagination ───────────────── */
+.swiper-pagination.swiper-pagination-horizontal {
+  display: flex;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.25);
+  width: auto;
+  left: 50%;
+  transform: translateX(-50%);
+  border-radius: 100px;
+  padding: 4px 6px;
+  bottom: 12px;
+  backdrop-filter: blur(4px);
+
+  > .swiper-pagination-bullet {
+    width: 5px;
+    height: 5px;
+    margin: 0;
+    background: rgba(255, 255, 255, 0.5);
+    transition: all 0.3s ease;
+
+    &.swiper-pagination-bullet-active {
+      background: #ffffff;
+      width: 16px;
+      border-radius: 4px;
+    }
+  }
+}
+
+/* ── Bottom Navigation ───────────────── */
+.zaui-bottom-navigation {
+  background: #fff !important;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.06) !important;
+  border-top: none !important;
+  padding-bottom: var(--tm-safe-area-bottom) !important;
+
+  .zaui-bottom-navigation-item {
+    transition: all 0.2s ease;
+
+    &-active {
+      .zaui-bottom-navigation-item-label {
+        font-weight: 600;
+      }
+    }
+  }
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse-badge {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+@keyframes countdownPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ── Utility Classes ─────────────────── */
+.animate-shimmer {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* ── Card System ─────────────────────── */
+.tm-card {
+  background: var(--tm-bg-card);
+  border-radius: var(--tm-radius-lg);
+  box-shadow: var(--tm-shadow-sm);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+  &:active {
+    transform: scale(0.98);
+    box-shadow: var(--tm-shadow-md);
+  }
+}
+
+.tm-card-elevated {
+  box-shadow: var(--tm-shadow-md);
+}
+
+/* ── Badge System ────────────────────── */
+.tm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 8px;
+  border-radius: var(--tm-radius-full);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 16px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.tm-badge-sale {
+  background: var(--tm-accent);
+  color: #fff;
+}
+
+.tm-badge-new {
+  background: var(--tm-primary);
+  color: #fff;
+}
+
+.tm-badge-hot {
+  background: linear-gradient(135deg, #ff6b35, #ff4757);
+  color: #fff;
+  animation: pulse-badge 2s infinite;
+}
+
+.tm-badge-freeship {
+  background: var(--tm-primary-light);
+  color: var(--tm-primary);
+  border: 1px solid rgba(0, 169, 109, 0.2);
+}
+
+/* ── Gradient Header ─────────────────── */
+.tm-header-gradient {
+  background: linear-gradient(135deg, var(--tm-primary) 0%, #00c97d 50%, #00e68a 100%);
+  color: #fff;
+  padding: 12px 16px;
+  padding-top: calc(var(--tm-safe-area-top) + 8px);
+}
+
+/* ── Tag / Chip ──────────────────────── */
+.tm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 14px;
+  border-radius: var(--tm-radius-full);
+  font-size: 12px;
+  font-weight: 500;
+  background: #fff;
+  border: 1px solid var(--tm-border);
+  color: var(--tm-text-primary);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  &:active {
+    background: var(--tm-primary-light);
+    border-color: var(--tm-primary);
+    color: var(--tm-primary);
+  }
+}
+
+.tm-chip-active {
+  background: var(--tm-primary-light);
+  border-color: var(--tm-primary);
+  color: var(--tm-primary);
+  font-weight: 600;
+}
+
+/* ── Rating Stars ────────────────────── */
+.tm-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--tm-warning);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* ── Flash Deal Bar ──────────────────── */
+.tm-flash-deal {
+  background: linear-gradient(90deg, #ff4757, #ff6b35);
+  color: #fff;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.tm-flash-timer {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tm-flash-timer-box {
+  background: rgba(0,0,0,0.3);
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-size: 12px;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* ── Quick Add Button ────────────────── */
+.tm-add-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--tm-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(0, 169, 109, 0.3);
+  transition: all 0.2s ease;
+  border: none;
+  cursor: pointer;
+
+  &:active {
+    transform: scale(0.9);
+    background: var(--tm-primary-dark);
+  }
+}
+
+/* ── Promo / Voucher Cards ───────────── */
+.tm-promo-card {
+  border-radius: var(--tm-radius-lg);
+  padding: 16px;
+  position: relative;
+  overflow: hidden;
+  color: #fff;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -30%;
+    right: -20%;
+    width: 120px;
+    height: 120px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 50%;
+  }
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -20%;
+    right: 10%;
+    width: 80px;
+    height: 80px;
+    background: rgba(255,255,255,0.08);
+    border-radius: 50%;
+  }
+}
+
+.tm-promo-gradient-1 {
+  background: linear-gradient(135deg, #00a96d, #00c98d);
+}
+.tm-promo-gradient-2 {
+  background: linear-gradient(135deg, #ff6b35, #ff8f65);
+}
+.tm-promo-gradient-3 {
+  background: linear-gradient(135deg, #6c5ce7, #a29bfe);
+}
+
+/* ── Sticky Bottom Bar ───────────────── */
+.tm-sticky-bottom {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+  padding: 12px 16px;
+  padding-bottom: calc(12px + var(--tm-safe-area-bottom));
+  z-index: 50;
+}
+
+/* ── Skeleton with Shimmer ───────────── */
+.bg-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%) !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 1.5s infinite !important;
+}
+
+/* ── Section Header ──────────────────── */
+.tm-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px;
+}
+
+.tm-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tm-text-primary);
+}
+
+.tm-section-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--tm-primary);
+}
+
+/* ── Product Sheet ───────────────────── */
+.zaui-sheet {
+  border-radius: var(--tm-radius-xl) var(--tm-radius-xl) 0 0 !important;
+}
+
+/* ── Stats Row ───────────────────────── */
+.tm-stats-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--tm-text-secondary);
+}
+
+.tm-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--tm-text-tertiary);
+  flex-shrink: 0;
+}
+
+/* ── Empty State ─────────────────────── */
+.tm-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--tm-text-secondary);
+}
+
+.tm-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+/* ── Voucher Card ────────────────────── */
+.tm-voucher {
+  display: flex;
+  background: #fff;
+  border-radius: var(--tm-radius-md);
+  border: 1px dashed var(--tm-border);
+  overflow: hidden;
+  transition: all 0.2s ease;
+
+  &:active {
+    border-color: var(--tm-primary);
+    background: var(--tm-primary-light);
+  }
+}
+
+.tm-voucher-left {
+  width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--tm-primary-light);
+  flex-shrink: 0;
+}
+
+.tm-voucher-right {
+  flex: 1;
+  padding: 12px;
+}
+
+/* ── Category Circle Icons ───────────── */
+.tm-category-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
+
+  &:active {
+    transform: scale(0.92);
+  }
+
+  img {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+/* ── Pastel backgrounds for categories ── */
+.tm-pastel-green { background: #e6f9f1; }
+.tm-pastel-orange { background: #fff3ed; }
+.tm-pastel-blue { background: #e8f4fd; }
+.tm-pastel-pink { background: #fde8f0; }
+.tm-pastel-purple { background: #f0e8fd; }
+.tm-pastel-yellow { background: #fef9e7; }
+.tm-pastel-teal { background: #e6f7f5; }
+
+/* ── Profile avatar ──────────────────── */
+.tm-avatar {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  box-shadow: var(--tm-shadow-md);
+  object-fit: cover;
+}
+
+.tm-avatar-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.8);
+  object-fit: cover;
+}
+
+/* ── Membership Card ─────────────────── */
+.tm-membership {
+  background: linear-gradient(135deg, #1a1a2e 0%, #2d2d44 100%);
+  border-radius: var(--tm-radius-lg);
+  padding: 20px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -30%;
+    width: 200px;
+    height: 200px;
+    background: radial-gradient(circle, rgba(0,169,109,0.3), transparent);
+    border-radius: 50%;
+  }
+}
+
+/* ── Divider ─────────────────────────── */
+.tm-divider {
+  height: 8px;
+  background: var(--tm-bg);
+}
+
+@media (max-width: 390px) {
+  .tm-page-topbar {
+    gap: 8px;
+    padding-bottom: 10px;
+  }
+
+  .tm-page-topbar-wrap .tm-page-topbar-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .tm-page-topbar-title {
+    font-size: clamp(18px, 6vw, 20px);
+  }
+
+  .tm-btn-primary-inline {
+    min-height: 36px;
+    font-size: 12px;
+    padding: 7px 10px;
+  }
+
+  .zaui-bottom-navigation .zaui-bottom-navigation-item .zaui-bottom-navigation-item-label {
+    font-size: 11px !important;
+  }
+}

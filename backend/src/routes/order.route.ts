@@ -363,7 +363,7 @@ orderRouter.post(
     });
 
     if (!existing) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
     }
 
     if (req.user!.role !== UserRole.ADMIN && existing.userId !== req.user!.id) {
@@ -408,7 +408,7 @@ orderRouter.get(
       });
 
       if (!managedStore) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Store manager is not assigned to a store");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Bạn chưa được cấp quyền quản lý cửa hàng nào");
       }
 
       scopedWhere = { storeId: managedStore.id };
@@ -465,7 +465,7 @@ orderRouter.get(
     });
 
     if (!order) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
     }
 
     const role = req.user!.role;
@@ -512,7 +512,7 @@ orderRouter.patch(
     const updated = await prisma.$transaction(async (tx) => {
       const existing = await tx.order.findUnique({ where: { id: orderId } });
       if (!existing) {
-        throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+        throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       }
 
       if (payload.status === OrderStatus.CANCELLED) {
@@ -547,6 +547,79 @@ orderRouter.patch(
 );
 
 // --------------------------------------------------------------------------------
+// Store Manager Order Actions
+// --------------------------------------------------------------------------------
+orderRouter.post(
+  "/:orderId/store-confirm",
+  requireRole(UserRole.STORE_MANAGER),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const user = req.user!;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+
+      const store = await tx.store.findUnique({ where: { managerId: user.id } });
+      if (!store || order.storeId !== store.id) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Not your store's order");
+      }
+
+      if (order.status !== OrderStatus.PENDING) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Order must be in PENDING status to confirm");
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.CONFIRMED },
+      });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+orderRouter.post(
+  "/:orderId/store-ready",
+  requireRole(UserRole.STORE_MANAGER),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const user = req.user!;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+
+      const store = await tx.store.findUnique({ where: { managerId: user.id } });
+      if (!store || order.storeId !== store.id) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Not your store's order");
+      }
+
+      if (order.status !== OrderStatus.CONFIRMED) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Order must be in CONFIRMED status to mark as ready/preparing");
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: { status: OrderStatus.PREPARING },
+      });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+// --------------------------------------------------------------------------------
 // Order Cancellation logic (Khách hàng & Quán)
 // --------------------------------------------------------------------------------
 orderRouter.post(
@@ -559,7 +632,7 @@ orderRouter.post(
 
     const updated = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
-      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
 
       if (user.role === UserRole.CUSTOMER) {
         if (order.userId !== user.id) {
@@ -611,7 +684,7 @@ orderRouter.post(
 
     const updated = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
-      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       
       if (order.driverId !== user.id) {
         throw new HttpError(StatusCodes.FORBIDDEN, "Not your assigned order");
@@ -653,7 +726,7 @@ orderRouter.post(
 
     const updated = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({ where: { id: orderId } });
-      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       
       if (order.driverId !== user.id) {
         throw new HttpError(StatusCodes.FORBIDDEN, "Not your assigned order");

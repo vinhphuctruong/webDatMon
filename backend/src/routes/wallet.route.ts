@@ -104,7 +104,7 @@ walletRouter.get(
     if (role === UserRole.STORE_MANAGER) {
       const storeId = await getStoreIdByManager(userId);
       if (!storeId) {
-        throw new HttpError(StatusCodes.NOT_FOUND, "No store assigned for this manager");
+        throw new HttpError(StatusCodes.NOT_FOUND, "Chưa có cửa hàng nào được gán cho quản lý này");
       }
 
       const wallet = await prisma.$transaction(async (tx) => ensureMerchantWallet(tx, storeId));
@@ -310,7 +310,7 @@ walletRouter.post(
       } else {
         const storeId = await getStoreIdByManager(req.user!.id);
         if (!storeId) {
-          throw new HttpError(StatusCodes.NOT_FOUND, "No store assigned for this manager");
+          throw new HttpError(StatusCodes.NOT_FOUND, "Chưa có cửa hàng nào được gán cho quản lý này");
         }
 
         const wallet = await ensureMerchantWallet(tx, storeId);

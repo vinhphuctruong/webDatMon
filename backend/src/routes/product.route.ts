@@ -164,7 +164,7 @@ productRouter.get(
     });
 
     if (!managedStore) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Store manager is not assigned to a store");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Bạn chưa được cấp quyền quản lý cửa hàng nào");
     }
 
     const products = await prisma.product.findMany({
@@ -214,7 +214,7 @@ productRouter.post(
 
     const managerStoreId = manager?.managedStore?.id;
     if (!managerStoreId) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Store manager is not assigned to a store");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Bạn chưa được cấp quyền quản lý cửa hàng nào");
     }
 
     const categories = await prisma.category.findMany({
@@ -285,7 +285,7 @@ productRouter.patch(
 
     const managerStoreId = manager?.managedStore?.id;
     if (!managerStoreId) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Store manager is not assigned to a store");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Bạn chưa được cấp quyền quản lý cửa hàng nào");
     }
 
     const existing = await prisma.product.findFirst({
@@ -298,7 +298,7 @@ productRouter.patch(
     if (!existing) {
       throw new HttpError(
         StatusCodes.NOT_FOUND,
-        "Product not found in your managed store",
+        "Không tìm thấy sản phẩm in your managed store",
       );
     }
 
@@ -381,7 +381,7 @@ productRouter.delete(
 
     const managerStoreId = manager?.managedStore?.id;
     if (!managerStoreId) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Store manager is not assigned to a store");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Bạn chưa được cấp quyền quản lý cửa hàng nào");
     }
 
     const existing = await prisma.product.findFirst({
@@ -394,7 +394,7 @@ productRouter.delete(
     if (!existing) {
       throw new HttpError(
         StatusCodes.NOT_FOUND,
-        "Product not found in your managed store",
+        "Không tìm thấy sản phẩm in your managed store",
       );
     }
 
@@ -430,7 +430,7 @@ productRouter.get(
     });
 
     if (!product) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Product not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy sản phẩm");
     }
 
     res.json({ data: toProductResponse(product) });

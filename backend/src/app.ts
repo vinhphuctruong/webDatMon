@@ -4,7 +4,6 @@ import helmet from "helmet";
 import morgan from "morgan";
 import path from "node:path";
 import apiRouter from "./routes";
-import storeApplicationRoutes from "./routes/store-applications";
 import { env } from "./config/env";
 import { notFoundHandler } from "./middlewares/not-found";
 import { errorHandler } from "./middlewares/error-handler";
@@ -109,7 +108,6 @@ export function createApp() {
   app.use(express.urlencoded({ extended: false }));
 
   app.use(env.API_PREFIX, apiRouter);
-  app.use("/api/store-applications", storeApplicationRoutes);
 
   const sharedDir = path.resolve(webRootDir, "shared");
   app.use("/shared", express.static(sharedDir));
@@ -123,7 +121,7 @@ export function createApp() {
   const adminDir = path.resolve(webRootDir, "admin");
   app.use("/admin", express.static(adminDir));
   app.get("/admin", (_req, res) => {
-    res.sendFile(path.resolve(adminDir, "index.html"));
+    res.redirect("/admin/");
   });
 
   const partnerDir = path.resolve(webRootDir, "partner");

@@ -1,0 +1,31 @@
+{
+  "app": {
+    "title": "TM Food Quán",
+    "textColor": "black",
+    "leftButton": "none",
+    "statusBar": "transparent",
+    "selfControlLoading": false,
+    "hideAndroidBottomNavigationBar": false,
+    "hideIOSSafeAreaBottom": false,
+    "actionBarHidden": true
+  },
+  "listCSS": [],
+  "listSyncJS": [],
+  "listAsyncJS": [],
+  "pages": [
+    "/",
+    "/search",
+    "/category",
+    "/notification",
+    "/cart",
+    "/profile",
+    "/result"
+  ],
+  "template": {
+    "name": "tm-food-store",
+    "primaryColor": "#00a96d",
+    "prefixCurrencySymbol": false,
+    "currencySymbol": "đ",
+    "headerLogo": ""
+  }
+}

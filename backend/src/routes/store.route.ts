@@ -26,7 +26,7 @@ const listStoreQuerySchema = z.object({
 const adminCreateStoreSchema = z.object({
   name: z.string().min(2).max(160),
   address: z.string().min(4).max(300),
-  rating: z.coerce.number().min(0).max(5).optional().default(4.5),
+  rating: z.coerce.number().min(0).max(5).optional().default(0),
   etaMinutesMin: z.coerce.number().int().min(5).max(120).optional().default(20),
   etaMinutesMax: z.coerce.number().int().min(5).max(180).optional().default(35),
   latitude: z.coerce.number().optional(),
@@ -45,6 +45,14 @@ const adminUpdateStoreSchema = z.object({
   etaMinutesMax: z.coerce.number().int().min(5).max(180).optional(),
   latitude: z.coerce.number().optional(),
   longitude: z.coerce.number().optional(),
+  isOpen: z.boolean().optional(),
+});
+
+const managerUpdateStoreSchema = z.object({
+  name: z.string().min(2).max(160).optional(),
+  address: z.string().min(4).max(300).optional(),
+  etaMinutesMin: z.coerce.number().int().min(5).max(120).optional(),
+  etaMinutesMax: z.coerce.number().int().min(5).max(180).optional(),
   isOpen: z.boolean().optional(),
 });
 
@@ -80,10 +88,71 @@ storeRouter.get(
     });
 
     if (!store) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "No store assigned for this manager");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Chưa có cửa hàng nào được gán cho quản lý này");
     }
 
     res.json({ data: store });
+  }),
+);
+
+storeRouter.patch(
+  "/managed/me",
+  requireAuth,
+  requireRole(UserRole.STORE_MANAGER),
+  asyncHandler(async (req, res) => {
+    const payload = managerUpdateStoreSchema.parse(req.body);
+
+    const store = await prisma.store.findFirst({
+      where: { managerId: req.user!.id },
+      select: { id: true },
+    });
+
+    if (!store) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Chưa có cửa hàng nào được gán cho quản lý này");
+    }
+
+    if (
+      payload.etaMinutesMin !== undefined &&
+      payload.etaMinutesMax !== undefined &&
+      payload.etaMinutesMin > payload.etaMinutesMax
+    ) {
+      throw new HttpError(
+        StatusCodes.BAD_REQUEST,
+        "etaMinutesMin must be less than or equal etaMinutesMax",
+      );
+    }
+
+    const updated = await prisma.store.update({
+      where: { id: store.id },
+      data: payload,
+    });
+
+    res.json({ data: updated });
+  }),
+);
+
+storeRouter.patch(
+  "/managed/toggle-open",
+  requireAuth,
+  requireRole(UserRole.STORE_MANAGER),
+  asyncHandler(async (req, res) => {
+    const payload = z.object({ isOpen: z.boolean() }).parse(req.body);
+
+    const store = await prisma.store.findFirst({
+      where: { managerId: req.user!.id },
+      select: { id: true, isOpen: true },
+    });
+
+    if (!store) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Chưa có cửa hàng nào được gán cho quản lý này");
+    }
+
+    const updated = await prisma.store.update({
+      where: { id: store.id },
+      data: { isOpen: payload.isOpen },
+    });
+
+    res.json({ data: updated });
   }),
 );
 
@@ -106,7 +175,7 @@ storeRouter.get(
     });
 
     if (!managedStore) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "No store assigned for this manager");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Chưa có cửa hàng nào được gán cho quản lý này");
     }
 
     const now = new Date();
@@ -423,7 +492,7 @@ storeRouter.patch(
     });
 
     if (!existing) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Store not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy cửa hàng");
     }
 
     if (

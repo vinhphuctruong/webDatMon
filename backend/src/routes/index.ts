@@ -10,6 +10,7 @@ import adminRouter from "./admin.route";
 import driverRouter from "./driver.route";
 import walletRouter from "./wallet.route";
 import paymentRouter from "./payment.route";
+import storeApplicationRoutes from "./store-applications";
 
 const apiRouter = Router();
 
@@ -24,5 +25,6 @@ apiRouter.use("/admin", adminRouter);
 apiRouter.use("/drivers", driverRouter);
 apiRouter.use("/wallets", walletRouter);
 apiRouter.use("/payments", paymentRouter);
+apiRouter.use("/store-applications", storeApplicationRoutes);
 
 export default apiRouter;

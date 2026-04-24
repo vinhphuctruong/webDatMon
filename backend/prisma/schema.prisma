@@ -163,7 +163,7 @@ model Store {
   address       String
   latitude      Float?
   longitude     Float?
-  rating        Float     @default(4.5)
+  rating        Float     @default(0)
   etaMinutesMin Int       @default(20)
   etaMinutesMax Int       @default(35)
   isOpen        Boolean   @default(true)

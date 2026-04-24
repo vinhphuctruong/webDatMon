@@ -4,8 +4,8 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>ZaUI Food Admin</title>
-    <link rel="stylesheet" href="/shared/theme.css" />
-    <link rel="stylesheet" href="/admin/styles.css" />
+    <link rel="stylesheet" href="../shared/theme.css" />
+    <link rel="stylesheet" href="./styles.css" />
   </head>
   <body class="portal-page admin-page">
     <header class="site-topbar">
@@ -69,6 +69,7 @@
               <button class="nav-btn active" data-tab="dashboard">Dashboard</button>
               <button class="nav-btn" data-tab="stores">Cua hang</button>
               <button class="nav-btn" data-tab="driver-applications">Ho so tai xe</button>
+              <button class="nav-btn" data-tab="store-applications">Ho so cua hang</button>
             </aside>
 
             <main class="card content">
@@ -95,7 +96,7 @@
                   <div class="grid two" style="margin-top: 10px;">
                     <input name="name" placeholder="Ten cua hang" required />
                     <input name="address" placeholder="Dia chi" required />
-                    <input name="rating" type="number" step="0.1" min="0" max="5" placeholder="Rating" value="4.5" />
+                    <input name="rating" type="number" step="0.1" min="0" max="5" placeholder="Rating" value="0" />
                     <div class="form-inline">
                       <input name="etaMin" type="number" placeholder="ETA min" value="20" required />
                       <input name="etaMax" type="number" placeholder="ETA max" value="35" required />
@@ -156,12 +157,42 @@
                   </table>
                 </div>
               </section>
+
+              <section data-section="store-applications" class="hidden">
+                <div class="portal-heading" style="margin-bottom: 12px;">
+                  <h3>Xet duyet doi tac cua hang</h3>
+                  <div class="portal-actions">
+                    <select id="store-application-status-filter">
+                      <option value="PENDING">Dang cho duyet</option>
+                      <option value="">Tat ca</option>
+                      <option value="APPROVED">Da duyet</option>
+                      <option value="REJECTED">Tu choi</option>
+                    </select>
+                    <button id="refresh-store-applications" class="secondary">Lam moi</button>
+                  </div>
+                </div>
+
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Ngay tao</th>
+                        <th>Ung vien</th>
+                        <th>Thong tin cua hang</th>
+                        <th>Giay to</th>
+                        <th>Trang thai / Xu ly</th>
+                      </tr>
+                    </thead>
+                    <tbody id="store-applications-body"></tbody>
+                  </table>
+                </div>
+              </section>
             </main>
           </div>
         </section>
       </div>
     </main>
 
-    <script src="/admin/app.js" defer></script>
+    <script src="./app.js" defer></script>
   </body>
 </html>

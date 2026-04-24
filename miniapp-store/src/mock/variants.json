@@ -1,0 +1,166 @@
+[
+  {
+    "id": "portion",
+    "label": "Khẩu phần",
+    "type": "single",
+    "default": "m",
+    "options": [
+      {
+        "id": "s",
+        "label": "Nhỏ"
+      },
+      {
+        "id": "m",
+        "label": "Vừa"
+      },
+      {
+        "id": "l",
+        "label": "Lớn",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 12000
+        }
+      }
+    ]
+  },
+  {
+    "id": "spicy",
+    "label": "Độ cay",
+    "type": "single",
+    "default": "normal",
+    "options": [
+      {
+        "id": "no",
+        "label": "Không cay"
+      },
+      {
+        "id": "normal",
+        "label": "Cay vừa"
+      },
+      {
+        "id": "hot",
+        "label": "Cay nhiều"
+      }
+    ]
+  },
+  {
+    "id": "addon",
+    "label": "Thêm món",
+    "type": "multiple",
+    "default": [],
+    "options": [
+      {
+        "id": "egg",
+        "label": "Trứng lòng đào",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 7000
+        }
+      },
+      {
+        "id": "cheese",
+        "label": "Phô mai thêm",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 9000
+        }
+      },
+      {
+        "id": "rice",
+        "label": "Thêm cơm",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 5000
+        }
+      },
+      {
+        "id": "vegetable",
+        "label": "Rau thêm",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 4000
+        }
+      }
+    ]
+  },
+  {
+    "id": "drink_size",
+    "label": "Size ly",
+    "type": "single",
+    "default": "m",
+    "options": [
+      {
+        "id": "s",
+        "label": "Nhỏ"
+      },
+      {
+        "id": "m",
+        "label": "Vừa"
+      },
+      {
+        "id": "l",
+        "label": "Lớn",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 8000
+        }
+      }
+    ]
+  },
+  {
+    "id": "drink_topping",
+    "label": "Topping",
+    "type": "multiple",
+    "default": [],
+    "options": [
+      {
+        "id": "pearl",
+        "label": "Trân châu",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 6000
+        }
+      },
+      {
+        "id": "jelly",
+        "label": "Thạch trái cây",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 5000
+        }
+      },
+      {
+        "id": "cream",
+        "label": "Kem cheese",
+        "priceChange": {
+          "type": "fixed",
+          "amount": 9000
+        }
+      },
+      {
+        "id": "less_ice",
+        "label": "Ít đá",
+        "priceChange": {
+          "type": "fixed",
+          "amount": -2000
+        }
+      }
+    ]
+  },
+  {
+    "id": "utensil",
+    "label": "Dụng cụ ăn",
+    "type": "single",
+    "default": "yes",
+    "options": [
+      {
+        "id": "yes",
+        "label": "Lấy muỗng đũa"
+      },
+      {
+        "id": "no",
+        "label": "Không cần"
+      }
+    ]
+  }
+]

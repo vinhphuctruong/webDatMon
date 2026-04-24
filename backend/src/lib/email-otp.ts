@@ -107,3 +107,33 @@ export function verifyEmailOtp(email: string, otpCode: string): OtpVerifyResult 
   return { ok: true };
 }
 
+/** Check OTP without consuming it (for multi-step flows) */
+export function peekEmailOtp(email: string, otpCode: string): OtpVerifyResult {
+  pruneExpired();
+  const normalized = normalizeEmail(email);
+  const normalizedCode = otpCode.trim();
+  const record = otpByEmail.get(normalized);
+
+  if (!record) {
+    return { ok: false, message: "OTP không tồn tại hoặc đã hết hạn" };
+  }
+
+  if (record.expiresAt <= Date.now()) {
+    otpByEmail.delete(normalized);
+    return { ok: false, message: "OTP đã hết hạn, vui lòng yêu cầu mã mới" };
+  }
+
+  if (record.code !== normalizedCode) {
+    record.attemptsLeft -= 1;
+    if (record.attemptsLeft <= 0) {
+      otpByEmail.delete(normalized);
+      return { ok: false, message: "OTP sai quá nhiều lần, vui lòng yêu cầu mã mới" };
+    }
+    otpByEmail.set(normalized, record);
+    return { ok: false, message: `OTP không đúng (còn ${record.attemptsLeft} lần thử)` };
+  }
+
+  // OTP correct — do NOT delete, keep it for the final reset step
+  return { ok: true };
+}
+

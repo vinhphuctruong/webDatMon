@@ -28,6 +28,23 @@ const rejectDriverApplicationBodySchema = z.object({
   adminNote: z.string().trim().min(2).max(300),
 });
 
+const listStoreApplicationsQuerySchema = z.object({
+  status: z.nativeEnum(PartnerApplicationStatus).optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+});
+
+const storeApplicationActionParamsSchema = z.object({
+  applicationId: z.string().min(8).max(100),
+});
+
+const approveStoreApplicationBodySchema = z.object({
+  adminNote: z.string().trim().min(2).max(300).optional(),
+});
+
+const rejectStoreApplicationBodySchema = z.object({
+  adminNote: z.string().trim().min(2).max(300),
+});
+
 adminRouter.get(
   "/overview",
   asyncHandler(async (_req, res) => {
@@ -46,6 +63,7 @@ adminRouter.get(
       cancelledToday,
       revenueToday,
       pendingDriverApplications,
+      pendingStoreApplications,
       statusGroups,
       latestOrders,
     ] = await Promise.all([
@@ -76,6 +94,9 @@ adminRouter.get(
         },
       }),
       prisma.driverApplication.count({
+        where: { status: PartnerApplicationStatus.PENDING },
+      }),
+      prisma.storeApplication.count({
         where: { status: PartnerApplicationStatus.PENDING },
       }),
       prisma.order.groupBy({
@@ -121,6 +142,7 @@ adminRouter.get(
           cancelledToday,
           revenueToday: revenueToday._sum.total ?? 0,
           pendingDriverApplications,
+          pendingStoreApplications,
         },
         orderStatusDistribution: statusGroups.map((item) => ({
           status: item.status,
@@ -306,6 +328,143 @@ adminRouter.post(
     res.json({
       data: reviewed,
       message: "Driver application rejected",
+    });
+  }),
+);
+
+adminRouter.get(
+  "/store-applications",
+  asyncHandler(async (req, res) => {
+    const query = listStoreApplicationsQuerySchema.parse(req.query);
+    const rows = await prisma.storeApplication.findMany({
+      where: query.status ? { status: query.status } : undefined,
+      orderBy: { createdAt: "desc" },
+      take: query.limit,
+      include: {
+        applicant: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            phone: true,
+          },
+        },
+        reviewedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    res.json({ data: rows });
+  }),
+);
+
+adminRouter.post(
+  "/store-applications/:applicationId/approve",
+  asyncHandler(async (req, res) => {
+    const { applicationId } = storeApplicationActionParamsSchema.parse(req.params);
+    const payload = approveStoreApplicationBodySchema.parse(req.body);
+
+    const result = await prisma.$transaction(async (tx) => {
+      const application = await tx.storeApplication.findUnique({
+        where: { id: applicationId },
+      });
+
+      if (!application) {
+        throw new HttpError(StatusCodes.NOT_FOUND, "Store application not found");
+      }
+
+      if (application.status !== PartnerApplicationStatus.PENDING) {
+        throw new HttpError(StatusCodes.CONFLICT, "Store application is not pending");
+      }
+
+      // Check if user already manages a store
+      const existingStore = await tx.store.findFirst({
+        where: { managerId: application.applicantId },
+      });
+
+      if (existingStore) {
+        throw new HttpError(StatusCodes.CONFLICT, "Applicant already manages a store");
+      }
+
+      // Create Store
+      const store = await tx.store.create({
+        data: {
+          name: application.storeName,
+          slug: `${application.storeName.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)+/g, "")}-${Date.now()}`,
+          address: application.storeAddress,
+          latitude: application.storeLatitude,
+          longitude: application.storeLongitude,
+          etaMinutesMin: 20,
+          etaMinutesMax: 35,
+          isOpen: false,
+          managerId: application.applicantId,
+        },
+      });
+
+      // Update User Role
+      await tx.user.update({
+        where: { id: application.applicantId },
+        data: { role: UserRole.STORE_MANAGER },
+      });
+
+      // Update Application Status
+      const reviewed = await tx.storeApplication.update({
+        where: { id: application.id },
+        data: {
+          status: PartnerApplicationStatus.APPROVED,
+          adminNote: payload.adminNote ?? null,
+          reviewedAt: new Date(),
+          reviewedById: req.user!.id,
+        },
+      });
+
+      return { store, application: reviewed };
+    });
+
+    res.json({
+      data: result,
+      message: "Store application approved successfully",
+    });
+  }),
+);
+
+adminRouter.post(
+  "/store-applications/:applicationId/reject",
+  asyncHandler(async (req, res) => {
+    const { applicationId } = storeApplicationActionParamsSchema.parse(req.params);
+    const payload = rejectStoreApplicationBodySchema.parse(req.body);
+
+    const application = await prisma.storeApplication.findUnique({
+      where: { id: applicationId },
+      select: { id: true, status: true },
+    });
+
+    if (!application) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Store application not found");
+    }
+
+    if (application.status !== PartnerApplicationStatus.PENDING) {
+      throw new HttpError(StatusCodes.CONFLICT, "Store application is not pending");
+    }
+
+    const reviewed = await prisma.storeApplication.update({
+      where: { id: applicationId },
+      data: {
+        status: PartnerApplicationStatus.REJECTED,
+        adminNote: payload.adminNote,
+        reviewedAt: new Date(),
+        reviewedById: req.user!.id,
+      },
+    });
+
+    res.json({
+      data: reviewed,
+      message: "Store application rejected",
     });
   }),
 );

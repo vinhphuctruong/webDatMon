@@ -1,0 +1,37 @@
+[
+  {
+    "id": "com",
+    "name": "Cơm",
+    "icon": "https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/category-food.svg"
+  },
+  {
+    "id": "bunpho",
+    "name": "Bún/Phở",
+    "icon": "https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/category-bread.svg"
+  },
+  {
+    "id": "garan",
+    "name": "Gà rán",
+    "icon": "https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/category-coffee.svg"
+  },
+  {
+    "id": "trasua",
+    "name": "Trà sữa",
+    "icon": "https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/category-milktea.svg"
+  },
+  {
+    "id": "douong",
+    "name": "Đồ uống",
+    "icon": "https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/category-drinks.svg"
+  },
+  {
+    "id": "anvat",
+    "name": "Ăn vặt",
+    "icon": "https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/category-matcha.svg"
+  },
+  {
+    "id": "trangmieng",
+    "name": "Tráng miệng",
+    "icon": "https://stc-zmp.zadn.vn/templates/zaui-coffee/dummy/category-juice.svg"
+  }
+]
