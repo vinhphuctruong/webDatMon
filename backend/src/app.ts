@@ -118,11 +118,15 @@ export function createApp() {
     res.sendFile(path.resolve(landingDir, "index.html"));
   });
 
-  const adminDir = path.resolve(webRootDir, "admin");
-  app.use("/admin", express.static(adminDir));
-  app.get("/admin", (_req, res) => {
-    res.redirect("/admin/");
+  app.get("/dang-ky-quan", (_req, res) => {
+    res.sendFile(path.resolve(landingDir, "partner.html"));
   });
+
+  app.get("/tuyen-tai-xe", (_req, res) => {
+    res.sendFile(path.resolve(landingDir, "driver.html"));
+  });
+
+
 
   const partnerDir = path.resolve(webRootDir, "partner");
   app.use("/partner", express.static(partnerDir));

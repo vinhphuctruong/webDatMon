@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZaUI Food – Cửa hàng đối tác</title>
-    <meta name="description" content="Cổng quản lý cửa hàng đối tác ZaUI Food – Dashboard, CRUD món ăn, thống kê doanh thu, ví điện tử." />
+    <title>TM Food – Cửa hàng đối tác</title>
+    <meta name="description" content="Cổng quản lý cửa hàng đối tác TM Food – Dashboard, CRUD món ăn, thống kê doanh thu, ví điện tử." />
     <link rel="stylesheet" href="/shared/theme.css" />
     <link rel="stylesheet" href="/partner/styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
@@ -12,13 +12,13 @@
   <body class="portal-page partner-page">
     <header class="site-topbar">
       <div class="container topbar-inner">
-        <a class="brand" href="/">ZaUI <span>Food</span></a>
+        <a class="brand" href="/">TM <span>Food</span></a>
         <nav class="site-links">
           <a class="site-link" href="/">Trang chủ</a>
           <a class="site-link active" href="/partner">Cửa hàng</a>
           <a class="site-link" href="/customer">Khách hàng</a>
           <a class="site-link" href="/driver">Tài xế</a>
-          <a class="site-link" href="/admin">Admin</a>
+
         </nav>
       </div>
     </header>
@@ -29,14 +29,14 @@
         <!-- ===== AUTH SCREEN ===== -->
         <section id="auth-screen" class="auth-layout">
           <article class="auth-promo">
-            <div class="promo-icon">🍜</div>
-            <h1>Mở cửa hàng trên ZaUI Food</h1>
+            <div class="promo-icon"></div>
+            <h1>Mở cửa hàng trên TM Food</h1>
             <p>Tự đăng ký, tự quản lý menu, gia và tình trạng món theo thời gian thực của quán bạn.</p>
             <div class="promo-badges">
-              <span class="promo-badge">📊 Dashboard doanh thu</span>
-              <span class="promo-badge">🖼️ Upload ảnh món ăn</span>
-              <span class="promo-badge">💵 Ví điện tử nội bộ</span>
-              <span class="promo-badge">📦 Quản lý đơn hàng</span>
+              <span class="promo-badge"> Dashboard doanh thu</span>
+              <span class="promo-badge"> Upload ảnh món ăn</span>
+              <span class="promo-badge"> Ví điện tử nội bộ</span>
+              <span class="promo-badge"> Quản lý đơn hàng</span>
             </div>
           </article>
 
@@ -50,10 +50,10 @@
             </div>
 
             <form id="login-form" class="grid" style="margin-top: 14px;">
-              <input name="email" type="email" placeholder="manager1@zauifood.local" required />
+              <input name="email" type="email" placeholder="manager1@tmfood.local" required />
               <input name="password" type="password" placeholder="Mật khẩu" required />
               <button id="login-btn" type="submit">Đăng nhập</button>
-              <p class="muted">Demo: <code>manager1@zauifood.local / 12345678</code></p>
+              <p class="muted">Demo: <code>manager1@tmfood.local / 12345678</code></p>
             </form>
 
             <form id="register-form" class="grid hidden" style="margin-top: 14px;">
@@ -79,7 +79,7 @@
         <section id="app-screen" class="app-shell hidden">
           <div class="app-header">
             <div class="app-header-info">
-              <div class="store-avatar" id="store-avatar">🏪</div>
+              <div class="store-avatar" id="store-avatar"></div>
               <div>
                 <h2 id="store-name-header">Cửa hàng của tôi</h2>
                 <p class="muted" id="manager-email-header"></p>
@@ -93,40 +93,40 @@
 
           <!-- Tab nav -->
           <nav class="main-tabs">
-            <button class="main-tab active" data-main-tab="dashboard">📊 Dashboard</button>
-            <button class="main-tab" data-main-tab="products">🍽️ Quản lý món</button>
-            <button class="main-tab" data-main-tab="orders">📦 Đơn hàng</button>
-            <button class="main-tab" data-main-tab="wallet">💵 Ví tiền</button>
+            <button class="main-tab active" data-main-tab="dashboard"> Dashboard</button>
+            <button class="main-tab" data-main-tab="products"> Quản lý món</button>
+            <button class="main-tab" data-main-tab="orders"> Đơn hàng</button>
+            <button class="main-tab" data-main-tab="wallet"> Ví tiền</button>
           </nav>
 
           <!-- ── DASHBOARD TAB ── -->
           <section data-main-section="dashboard">
             <div class="section-toolbar">
               <h3>Tổng quan doanh thu</h3>
-              <button id="refresh-dashboard" class="secondary btn-sm">🔄 Làm mới</button>
+              <button id="refresh-dashboard" class="secondary btn-sm">� Làm mới</button>
             </div>
 
             <div class="kpi-grid" id="kpi-grid">
               <div class="kpi-card kpi-today">
-                <div class="kpi-icon">💰</div>
+                <div class="kpi-icon">�</div>
                 <div class="kpi-label">Doanh thu hôm nay</div>
                 <div class="kpi-value" id="kpi-today-revenue">--</div>
                 <div class="kpi-sub" id="kpi-today-orders">-- đơn</div>
               </div>
               <div class="kpi-card kpi-week">
-                <div class="kpi-icon">📅</div>
+                <div class="kpi-icon"></div>
                 <div class="kpi-label">Doanh thu tuần</div>
                 <div class="kpi-value" id="kpi-week-revenue">--</div>
                 <div class="kpi-sub" id="kpi-week-orders">-- đơn</div>
               </div>
               <div class="kpi-card kpi-month">
-                <div class="kpi-icon">📆</div>
+                <div class="kpi-icon"></div>
                 <div class="kpi-label">Doanh thu tháng</div>
                 <div class="kpi-value" id="kpi-month-revenue">--</div>
                 <div class="kpi-sub" id="kpi-month-orders">-- đơn</div>
               </div>
               <div class="kpi-card kpi-total">
-                <div class="kpi-icon">🏆</div>
+                <div class="kpi-icon"></div>
                 <div class="kpi-label">Tổng doanh thu</div>
                 <div class="kpi-value" id="kpi-total-revenue">--</div>
                 <div class="kpi-sub" id="kpi-total-orders">-- đơn tất cả</div>
@@ -149,7 +149,7 @@
             </div>
 
             <div class="card top-products-card">
-              <h4>🔥 Top món bán chạy</h4>
+              <h4> Top món bán chạy</h4>
               <div class="table-wrap" style="margin-top:12px;">
                 <table>
                   <thead>
@@ -166,7 +166,7 @@
             </div>
 
             <div class="card recent-orders-card">
-              <h4>🕒 Đơn hàng gần đây</h4>
+              <h4> Đơn hàng gần đây</h4>
               <div class="table-wrap" style="margin-top:12px;">
                 <table>
                   <thead>
@@ -219,10 +219,10 @@
                   <label>Ảnh món ăn</label>
                   <div class="image-type-toggle">
                     <label class="radio-opt active" id="opt-url-label">
-                      <input type="radio" name="imageType" value="url" checked /> 🔗 URL ảnh
+                      <input type="radio" name="imageType" value="url" checked />  URL ảnh
                     </label>
                     <label class="radio-opt" id="opt-file-label">
-                      <input type="radio" name="imageType" value="file" /> 📁 Upload từ máy
+                      <input type="radio" name="imageType" value="file" />  Upload từ máy
                     </label>
                   </div>
                   <div id="image-url-group">
@@ -282,7 +282,7 @@
                   <option value="DELIVERED">Đã giao</option>
                   <option value="CANCELLED">Đã huỷ</option>
                 </select>
-                <button id="refresh-orders" class="secondary btn-sm">🔄 Làm mới</button>
+                <button id="refresh-orders" class="secondary btn-sm">� Làm mới</button>
               </div>
             </div>
             <div class="card" style="margin-top:16px; padding:20px;">
@@ -309,13 +309,13 @@
           <section data-main-section="wallet" class="hidden">
             <div class="section-toolbar">
               <h3>Ví điện tử cửa hàng</h3>
-              <button id="refresh-wallet" class="secondary btn-sm">🔄 Làm mới</button>
+              <button id="refresh-wallet" class="secondary btn-sm">� Làm mới</button>
             </div>
 
             <div class="wallet-grid">
               <div class="card wallet-card wallet-merchant">
                 <div class="wallet-header">
-                  <span class="wallet-icon">🏦</span>
+                  <span class="wallet-icon">�</span>
                   <span class="wallet-label">Ví Cửa hàng (Merchant)</span>
                 </div>
                 <div class="wallet-balance" id="merchant-balance">--</div>
@@ -324,7 +324,7 @@
               </div>
 
               <div class="card payout-card">
-                <h4>💸 Rút tiền về ngân hàng</h4>
+                <h4> Rút tiền về ngân hàng</h4>
                 <form id="payout-form" class="grid" style="margin-top:12px;">
                   <div class="grid two">
                     <div>
@@ -350,7 +350,7 @@
             </div>
 
             <div class="card" style="margin-top:16px; padding:20px;">
-              <h4>📋 Lịch sử giao dịch</h4>
+              <h4> Lịch sử giao dịch</h4>
               <div class="table-wrap" style="margin-top:12px;">
                 <table>
                   <thead>
@@ -377,7 +377,7 @@
     <div class="modal-overlay hidden" id="edit-modal">
       <div class="modal-box card">
         <div class="modal-header">
-          <h3>✏️ Chỉnh sửa món ăn</h3>
+          <h3> Chỉnh sửa món ăn</h3>
           <button class="modal-close" id="close-edit-modal">✕</button>
         </div>
         <form id="edit-product-form">
@@ -404,10 +404,10 @@
             <label>Ảnh món ăn</label>
             <div class="image-type-toggle">
               <label class="radio-opt active" id="edit-opt-url-label">
-                <input type="radio" name="editImageType" value="url" checked /> 🔗 URL
+                <input type="radio" name="editImageType" value="url" checked />  URL
               </label>
               <label class="radio-opt" id="edit-opt-file-label">
-                <input type="radio" name="editImageType" value="file" /> 📁 Upload
+                <input type="radio" name="editImageType" value="file" />  Upload
               </label>
             </div>
             <div id="edit-image-url-group">
@@ -425,7 +425,7 @@
             <div id="edit-category-container" class="category-checklist"></div>
           </div>
           <div class="form-actions">
-            <button type="submit" class="btn-primary">💾 Lưu thay đổi</button>
+            <button type="submit" class="btn-primary"> Lưu thay đổi</button>
             <button type="button" id="close-edit-modal-2" class="secondary">Huỷ</button>
           </div>
         </form>

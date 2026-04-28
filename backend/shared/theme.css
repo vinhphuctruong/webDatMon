@@ -4,13 +4,13 @@
   --brand: #00b14f;
   --brand-strong: #008a3a;
   --brand-soft: #dff8ea;
-  --bg: #eef2ef;
+  --bg: #f8f8f8;
   --surface: #ffffff;
-  --text: #11321f;
-  --muted: #5d6f63;
-  --border: #d3ddd7;
-  --danger: #dc2626;
-  --shadow: 0 16px 36px rgba(10, 36, 22, 0.12);
+  --text: #222222;
+  --muted: #757575;
+  --border: #e8e8e8;
+  --danger: #ff424e;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 * {
@@ -27,10 +27,7 @@ body {
   min-height: 100vh;
   font-family: "Be Vietnam Pro", "Segoe UI", sans-serif;
   color: var(--text);
-  background:
-    radial-gradient(circle at 10% 0%, #f8fffb 0, transparent 30%),
-    radial-gradient(circle at 90% 8%, #effff5 0, transparent 32%),
-    var(--bg);
+  background: var(--bg);
 }
 
 a {
@@ -47,8 +44,8 @@ a {
   top: 0;
   z-index: 40;
   backdrop-filter: blur(8px);
-  background: rgba(248, 252, 249, 0.88);
-  border-bottom: 1px solid rgba(16, 53, 32, 0.12);
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid var(--border);
 }
 
 .topbar-inner {
@@ -82,20 +79,20 @@ a {
 .site-link {
   text-decoration: none;
   font-weight: 600;
-  color: #2f4738;
+  color: var(--text);
   border-radius: 999px;
   padding: 9px 14px;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 .site-link:hover {
-  background: rgba(0, 177, 79, 0.1);
-  color: #0a5f2f;
+  background: var(--brand-soft);
+  color: var(--brand-strong);
 }
 
 .site-link.active {
   background: var(--brand-soft);
-  color: #0a5f2f;
+  color: var(--brand-strong);
 }
 
 .card {
@@ -137,15 +134,15 @@ button:disabled,
 button,
 .btn.primary {
   color: #fff;
-  background: linear-gradient(135deg, var(--brand) 0%, var(--brand-strong) 100%);
-  box-shadow: 0 10px 24px rgba(0, 138, 58, 0.32);
+  background: var(--brand);
+  box-shadow: 0 4px 10px rgba(0, 177, 79, 0.24);
 }
 
 button.secondary,
 .btn.secondary {
-  color: #1a3024;
-  background: #f2f6f3;
-  border: 1px solid #c9d5cd;
+  color: var(--text);
+  background: #f5f5f5;
+  border: 1px solid #d5d5d5;
   box-shadow: none;
 }
 
@@ -173,8 +170,8 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #62cc93;
-  box-shadow: 0 0 0 4px rgba(0, 177, 79, 0.14);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-soft);
 }
 
 label {
@@ -227,8 +224,8 @@ td {
 }
 
 th {
-  background: #f3f8f5;
-  color: #2d4436;
+  background: #fafafa;
+  color: var(--text);
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.02em;

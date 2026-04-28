@@ -6,7 +6,7 @@
         "type": "object",
         "properties": {
           "template": {
-            "description": "Cấu hình riêng của template ZaUI Coffee",
+            "description": "Cấu hình riêng của template TM Coffee",
             "type": "object",
             "properties": {
               "name": {

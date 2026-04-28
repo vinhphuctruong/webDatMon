@@ -142,6 +142,23 @@ const LoginPage = () => {
                 {showPassword ? "Ẩn" : "Hiện"}
               </button>
             </div>
+            
+            <div style={{ textAlign: "right", marginTop: -4 }}>
+              <button
+                type="button"
+                onClick={() => navigate("/forgot-password")}
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  color: "var(--tm-primary)",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  padding: 0
+                }}
+              >
+                Quên mật khẩu?
+              </button>
+            </div>
 
             <button
               type="submit"

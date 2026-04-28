@@ -1,7 +1,6 @@
-import { PrismaClient, UserRole } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import bcrypt from "bcryptjs";
-
-const prisma = new PrismaClient();
+import { prisma } from "../db/prisma";
 
 async function main() {
   const email = "admin@tmfood.vn";

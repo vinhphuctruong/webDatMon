@@ -5,12 +5,9 @@ import { useNavigate } from "react-router";
 const WelcomePage = () => {
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const session = localStorage.getItem("zaui_food_session");
-    if (session) {
-      navigate("/", { replace: true });
-    }
-  }, [navigate]);
+  // Removed auto-redirect to "/" here because if a CUSTOMER is kicked from "/" to "/welcome" due to 403,
+  // this would bounce them back to "/" causing an infinite loop.
+  // The app starts at "/" by default anyway.
 
   return (
     <Page className="page-with-bg" hideScrollbar>

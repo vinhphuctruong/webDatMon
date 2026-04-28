@@ -133,6 +133,9 @@ model User {
   sepayTopupRequest SePayTopupRequest[]
   storeApplications StoreApplication[] @relation("UserStoreApplications")
   reviewedStoreApplications StoreApplication[] @relation("ReviewedStoreApplications")
+
+  resetPasswordOtp       String?
+  resetPasswordOtpExpiry DateTime?
 }
 
 model Address {

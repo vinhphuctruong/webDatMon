@@ -11,8 +11,6 @@ import {
 } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
-import fs from "node:fs";
-import path from "node:path";
 
 dotenv.config();
 
@@ -63,6 +61,58 @@ interface MockVariant {
 
 const prisma = new PrismaClient();
 
+// ── Inline mock data (replaces missing mock/*.json files) ──────────────────
+
+const MOCK_CATEGORIES: MockCategory[] = [
+  { id: "com", name: "Cơm", icon: "🍚" },
+  { id: "bun-pho", name: "Bún / Phở", icon: "🍜" },
+  { id: "do-uong", name: "Đồ uống", icon: "🥤" },
+  { id: "an-vat", name: "Ăn vặt", icon: "🍿" },
+  { id: "banh-mi", name: "Bánh mì", icon: "🥖" },
+  { id: "mon-chay", name: "Món chay", icon: "🥬" },
+];
+
+const MOCK_VARIANTS: MockVariant[] = [
+  {
+    id: "size",
+    label: "Kích cỡ",
+    type: "single",
+    default: "size-m",
+    options: [
+      { id: "size-s", label: "Nhỏ (S)" },
+      { id: "size-m", label: "Vừa (M)" },
+      { id: "size-l", label: "Lớn (L)", priceChange: { type: "fixed", amount: 10000 } },
+    ],
+  },
+  {
+    id: "topping",
+    label: "Topping",
+    type: "multiple",
+    options: [
+      { id: "top-trung", label: "Trứng", priceChange: { type: "fixed", amount: 5000 } },
+      { id: "top-pho-mai", label: "Phô mai", priceChange: { type: "fixed", amount: 8000 } },
+      { id: "top-rau", label: "Rau thêm" },
+    ],
+  },
+];
+
+const MOCK_PRODUCTS: MockProduct[] = [
+  { id: 1, name: "Cơm sườn bì chả", price: 45000, categoryId: ["com"], storeName: "Quán Cơm Nhà Làm", rating: 4.8, sold: "1.2k", deliveryFee: 15000, description: "Cơm sườn nướng kèm bì, chả, trứng ốp la" },
+  { id: 2, name: "Cơm gà xối mỡ", price: 42000, categoryId: ["com"], storeName: "Quán Cơm Nhà Làm", rating: 4.7, sold: "850", deliveryFee: 15000, description: "Gà xối mỡ giòn rụm, cơm trắng dẻo" },
+  { id: 3, name: "Phở bò tái chín", price: 55000, categoryId: ["bun-pho"], storeName: "Phở Hà Nội", rating: 4.9, sold: "2.5k", deliveryFee: 18000, description: "Phở bò truyền thống, nước dùng ninh xương", variantId: ["size"] },
+  { id: 4, name: "Bún bò Huế", price: 50000, categoryId: ["bun-pho"], storeName: "Phở Hà Nội", rating: 4.6, sold: "1.8k", deliveryFee: 18000, description: "Bún bò Huế cay nồng đặc trưng" },
+  { id: 5, name: "Trà sữa trân châu", price: 35000, categoryId: ["do-uong"], storeName: "Trà Sữa 99", rating: 4.5, sold: "3k", deliveryFee: 12000, variantId: ["size", "topping"], description: "Trà sữa đậm vị kèm trân châu đen" },
+  { id: 6, name: "Cà phê sữa đá", price: 25000, categoryId: ["do-uong"], storeName: "Trà Sữa 99", rating: 4.8, sold: "5k", deliveryFee: 10000, description: "Cà phê phin pha sữa đặc, uống lạnh" },
+  { id: 7, name: "Bánh mì thịt", price: 28000, categoryId: ["banh-mi"], storeName: "Bánh Mì Sài Gòn", rating: 4.7, sold: "4.2k", deliveryFee: 10000, description: "Bánh mì giòn với patê, thịt nguội, rau sống" },
+  { id: 8, name: "Gỏi cuốn tôm thịt", price: 30000, categoryId: ["an-vat"], storeName: "Quán Ăn Vặt 360", rating: 4.4, sold: "600", deliveryFee: 12000, variantId: ["topping"], description: "Gỏi cuốn tươi mát, chấm tương đậu phộng" },
+  { id: 9, name: "Cơm chiên dương châu", price: 40000, categoryId: ["com"], storeName: "Quán Cơm Nhà Làm", rating: 4.5, sold: "900", deliveryFee: 15000, sale: { type: "percent", percent: 0.1 }, description: "Cơm chiên với tôm, lạp xưởng, trứng" },
+  { id: 10, name: "Bún chả Hà Nội", price: 48000, categoryId: ["bun-pho"], storeName: "Phở Hà Nội", rating: 4.7, sold: "1.5k", deliveryFee: 18000, description: "Bún chả kèm nem cua bể" },
+  { id: 11, name: "Cơm chay rau củ", price: 35000, categoryId: ["com", "mon-chay"], storeName: "Chay Tâm An", rating: 4.3, sold: "300", deliveryFee: 15000, description: "Cơm chay với đậu hủ, rau củ xào" },
+  { id: 12, name: "Phở chay nấm", price: 45000, categoryId: ["bun-pho", "mon-chay"], storeName: "Chay Tâm An", rating: 4.4, sold: "250", deliveryFee: 15000, description: "Phở chay nước dùng rau củ, nấm đông cô" },
+];
+
+// ───────────────────────────────────────────────────────────────────────────
+
 function slugify(input: string): string {
   return input
     .normalize("NFD")
@@ -108,10 +158,6 @@ function optionPriceDelta(option: MockVariantOption, basePrice: number): number 
   return Math.round(basePrice * percent);
 }
 
-function readJson<T>(filePath: string): T {
-  return JSON.parse(fs.readFileSync(filePath, "utf-8")) as T;
-}
-
 async function resetDatabase() {
   await prisma.walletTransaction.deleteMany();
   await prisma.walletPayout.deleteMany();
@@ -134,10 +180,9 @@ async function resetDatabase() {
 }
 
 async function main() {
-  const rootDir = path.resolve(__dirname, "..", "..");
-  const categories = readJson<MockCategory[]>(path.join(rootDir, "mock", "categories.json"));
-  const products = readJson<MockProduct[]>(path.join(rootDir, "mock", "products.json"));
-  const variants = readJson<MockVariant[]>(path.join(rootDir, "mock", "variants.json"));
+  const categories = MOCK_CATEGORIES;
+  const products = MOCK_PRODUCTS;
+  const variants = MOCK_VARIANTS;
 
   await resetDatabase();
 
@@ -145,8 +190,8 @@ async function main() {
 
   const admin = await prisma.user.create({
     data: {
-      email: "admin@zauifood.local",
-      name: "ZaUI Food Admin",
+      email: "admin@tmfood.local",
+      name: "TM Food Admin",
       role: UserRole.ADMIN,
       passwordHash,
       phone: "0900000001",
@@ -155,7 +200,7 @@ async function main() {
 
   const customer = await prisma.user.create({
     data: {
-      email: "customer@zauifood.local",
+      email: "customer@tmfood.local",
       name: "Khach Hang Demo",
       role: UserRole.CUSTOMER,
       passwordHash,
@@ -165,7 +210,7 @@ async function main() {
 
   const driver = await prisma.user.create({
     data: {
-      email: "driver1@zauifood.local",
+      email: "driver1@tmfood.local",
       name: "Tai Xe Demo 1",
       role: UserRole.DRIVER,
       passwordHash,
@@ -223,7 +268,7 @@ async function main() {
   const storeIdByName = new Map<string, string>();
 
   for (const [index, storeName] of uniqueStoreNames.entries()) {
-    const managerEmail = `manager${index + 1}@zauifood.local`;
+    const managerEmail = `manager${index + 1}@tmfood.local`;
     const manager = await prisma.user.create({
       data: {
         email: managerEmail,

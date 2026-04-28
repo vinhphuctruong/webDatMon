@@ -70,7 +70,7 @@ function resolveApiBaseUrl() {
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
-const DEMO_EMAIL = import.meta.env.VITE_API_DEMO_EMAIL || "customer@zauifood.local";
+const DEMO_EMAIL = import.meta.env.VITE_API_DEMO_EMAIL || "customer@tmfood.local";
 const DEMO_PASSWORD = import.meta.env.VITE_API_DEMO_PASSWORD || "12345678";
 
 let cachedSession: Session | null = null;

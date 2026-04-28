@@ -17,14 +17,14 @@ const HomePage = () => {
       setData(response.data);
     } catch (error: any) {
       if (error.status === 401 || error.message?.toLowerCase().includes("đăng nhập")) {
-        navigate("/welcome");
+        navigate("/welcome", { replace: true });
       } else if (error.status === 403) {
         // Not a STORE_MANAGER. Check if they have a pending application
         try {
           await fetchMyStoreApplication();
-          navigate("/application-status");
+          navigate("/application-status", { replace: true });
         } catch {
-          navigate("/welcome"); // Or /register
+          navigate("/register", { replace: true }); 
         }
       } else {
         openSnackbar({ text: error.message || "Lỗi tải dữ liệu", type: "error" });

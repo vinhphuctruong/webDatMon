@@ -15,6 +15,7 @@ import WelcomePage from "../pages/welcome";
 import RegisterPage from "../pages/register";
 import RegisterAccountPage from "../pages/register-account";
 import ApplicationStatusPage from "../pages/application-status";
+import ForgotPasswordPage from "../pages/forgot-password";
 import { ScrollRestoration } from "./scroll-restoration";
 import { useSyncBackendState } from "hooks";
 import { ErrorBoundary } from "./error-boundary";
@@ -62,6 +63,7 @@ export const Layout: FC = () => {
               <Route path="/register" element={<RegisterPage />}></Route>
               <Route path="/register-account" element={<RegisterAccountPage />}></Route>
               <Route path="/application-status" element={<ApplicationStatusPage />}></Route>
+              <Route path="/forgot-password" element={<ForgotPasswordPage />}></Route>
             </Routes>
           </Suspense>
         </ErrorBoundary>

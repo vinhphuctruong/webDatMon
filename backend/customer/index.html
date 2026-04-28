@@ -3,8 +3,8 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ZaUI Food – Đặt món trực tuyến</title>
-    <meta name="description" content="Đặt món ăn trực tuyến qua ZaUI Food – thanh toán SePay QR hoặc tiền mặt COD, theo dõi đơn hàng." />
+    <title>TM Food – Đặt món trực tuyến</title>
+    <meta name="description" content="Đặt món ăn trực tuyến qua TM Food – thanh toán SePay QR hoặc tiền mặt COD, theo dõi đơn hàng." />
     <link rel="stylesheet" href="/shared/theme.css" />
     <link rel="stylesheet" href="/customer/styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
@@ -12,13 +12,13 @@
   <body class="portal-page customer-page">
     <header class="site-topbar">
       <div class="container topbar-inner">
-        <a class="brand" href="/">ZaUI <span>Food</span></a>
+        <a class="brand" href="/">TM <span>Food</span></a>
         <nav class="site-links">
           <a class="site-link" href="/">Trang chủ</a>
           <a class="site-link" href="/partner">Cửa hàng</a>
           <a class="site-link active" href="/customer">Khách hàng</a>
           <a class="site-link" href="/driver">Tài xế</a>
-          <a class="site-link" href="/admin">Admin</a>
+
         </nav>
       </div>
     </header>
@@ -29,14 +29,14 @@
         <!-- ===== AUTH ===== -->
         <section id="auth-screen" class="auth-layout">
           <article class="auth-promo">
-            <div class="promo-icon">🍔</div>
+            <div class="promo-icon"></div>
             <h1>Đặt món nhanh, giao tận nơi</h1>
             <p>Đăng ký tài khoản để đặt món yêu thích, thanh toán QR hoặc tiền mặt và theo dõi đơn hàng thời gian thực.</p>
             <div class="promo-badges">
-              <span class="promo-badge">🏪 Nhiều cửa hàng</span>
-              <span class="promo-badge">📱 QR SePay</span>
-              <span class="promo-badge">💵 Tiền mặt COD</span>
-              <span class="promo-badge">📦 Theo dõi đơn</span>
+              <span class="promo-badge"> Nhiều cửa hàng</span>
+              <span class="promo-badge">� QR SePay</span>
+              <span class="promo-badge"> Tiền mặt COD</span>
+              <span class="promo-badge"> Theo dõi đơn</span>
             </div>
           </article>
 
@@ -49,10 +49,10 @@
             </div>
 
             <form id="login-form" class="grid" style="margin-top:14px;">
-              <input name="email" type="email" placeholder="customer@zauifood.local" required />
+              <input name="email" type="email" placeholder="customer@tmfood.local" required />
               <input name="password" type="password" placeholder="Mật khẩu" required />
               <button id="login-btn" type="submit">Đăng nhập</button>
-              <p class="muted">Demo: <code>customer@zauifood.local / 12345678</code></p>
+              <p class="muted">Demo: <code>customer@tmfood.local / 12345678</code></p>
             </form>
 
             <form id="register-form" class="grid hidden" style="margin-top:14px;">
@@ -80,22 +80,22 @@
               </div>
             </div>
             <div class="app-header-actions">
-              <button id="refresh-btn" class="secondary btn-sm">🔄 Làm mới</button>
+              <button id="refresh-btn" class="secondary btn-sm">� Làm mới</button>
               <button id="logout-btn" class="danger btn-sm">Đăng xuất</button>
             </div>
           </div>
 
           <nav class="main-tabs">
-            <button class="main-tab active" data-main-tab="orders">📦 Đơn của tôi</button>
-            <button class="main-tab" data-main-tab="stores">🏪 Cửa hàng</button>
-            <button class="main-tab" data-main-tab="place">🛒 Đặt món</button>
+            <button class="main-tab active" data-main-tab="orders"> Đơn của tôi</button>
+            <button class="main-tab" data-main-tab="stores"> Cửa hàng</button>
+            <button class="main-tab" data-main-tab="place">� Đặt món</button>
           </nav>
 
           <!-- ── MY ORDERS ── -->
           <section data-main-section="orders">
             <div class="section-toolbar">
               <h3>Đơn hàng của tôi</h3>
-              <button id="refresh-orders" class="secondary btn-sm">🔄 Làm mới</button>
+              <button id="refresh-orders" class="secondary btn-sm">� Làm mới</button>
             </div>
             <div id="orders-list" class="order-cards"></div>
           </section>
@@ -105,8 +105,8 @@
             <div class="section-toolbar">
               <h3>Cửa hàng</h3>
               <div style="display:flex;gap:8px;align-items:center;">
-                <input id="store-search" placeholder="🔍 Tìm cửa hàng..." style="width:200px;padding:8px 12px;font-size:13px;" />
-                <button id="refresh-stores" class="secondary btn-sm">🔄</button>
+                <input id="store-search" placeholder="� Tìm cửa hàng..." style="width:200px;padding:8px 12px;font-size:13px;" />
+                <button id="refresh-stores" class="secondary btn-sm">�</button>
               </div>
             </div>
             <div id="stores-grid" class="stores-grid"></div>
@@ -132,7 +132,7 @@
                   <div id="place-products-grid" class="products-grid" style="margin-top:12px;"></div>
                 </div>
                 <div class="card form-panel" id="cart-panel" style="margin-top:12px;display:none;">
-                  <h4>🛒 Giỏ hàng</h4>
+                  <h4>� Giỏ hàng</h4>
                   <div id="cart-items"></div>
                   <div class="cart-total">
                     Tổng: <strong id="cart-total-text">0đ</strong>
@@ -170,7 +170,7 @@
                   <div class="pm-options">
                     <label class="pm-option active" id="pm-qr-label">
                       <input type="radio" name="paymentMethod" value="SEPAY_QR" checked />
-                      <span class="pm-icon">📱</span>
+                      <span class="pm-icon">�</span>
                       <div>
                         <div class="pm-name">Thanh toán QR (SePay)</div>
                         <div class="pm-desc">Quét QR chuyển khoản ngân hàng</div>
@@ -178,7 +178,7 @@
                     </label>
                     <label class="pm-option" id="pm-cod-label">
                       <input type="radio" name="paymentMethod" value="COD" />
-                      <span class="pm-icon">💵</span>
+                      <span class="pm-icon"></span>
                       <div>
                         <div class="pm-name">Tiền mặt (COD)</div>
                         <div class="pm-desc">Trả tiền khi nhận hàng</div>
@@ -205,12 +205,12 @@
                   <p style="font-size:12px;color:#6b7f72;text-align:center;">Chuyển khoản đúng nội dung – hệ thống tự xác nhận</p>
                 </div>
                 <div style="text-align:center;margin-top:16px;">
-                  <button id="check-payment-btn" class="secondary">🔄 Kiểm tra thanh toán</button>
+                  <button id="check-payment-btn" class="secondary">� Kiểm tra thanh toán</button>
                 </div>
               </div>
               <div id="payment-cod-section" class="hidden">
                 <div class="cod-badge">
-                  <div class="cod-icon">💵</div>
+                  <div class="cod-icon"></div>
                   <div>
                     <div class="cod-title">Thanh toán tiền mặt khi nhận hàng</div>
                     <div class="cod-desc">Tài xế sẽ giao và thu tiền tại địa chỉ của bạn.<br>Vui lòng chuẩn bị đúng số tiền.</div>
@@ -219,7 +219,7 @@
                 </div>
               </div>
               <div style="margin-top:16px;">
-                <button id="go-to-orders" class="btn-primary">📦 Xem đơn hàng →</button>
+                <button id="go-to-orders" class="btn-primary"> Xem đơn hàng →</button>
               </div>
             </div>
 
@@ -236,7 +236,7 @@
     <div class="modal-overlay hidden" id="order-detail-modal">
       <div class="modal-box card">
         <div class="modal-header">
-          <h3>📦 Chi tiết đơn hàng</h3>
+          <h3> Chi tiết đơn hàng</h3>
           <button class="modal-close" id="close-order-modal">✕</button>
         </div>
         <div id="order-detail-content"></div>

@@ -223,14 +223,14 @@ appRoot.innerHTML = `
         <h3>Dang nhap admin</h3>
         <label class="field">
           <span>Email</span>
-          <input id="login-email" name="email" type="email" required placeholder="admin@zauifood.local" />
+          <input id="login-email" name="email" type="email" required placeholder="admin@tmfood.local" />
         </label>
         <label class="field">
           <span>Mat khau</span>
           <input id="login-password" name="password" type="password" required placeholder="********" />
         </label>
         <button id="login-button" type="submit">Dang nhap</button>
-        <p class="hint-text">Demo: <code>admin@zauifood.local / 12345678</code></p>
+        <p class="hint-text">Demo: <code>admin@tmfood.local / 12345678</code></p>
         <p id="login-error" class="error-text" role="alert"></p>
       </form>
     </section>
@@ -249,7 +249,7 @@ appRoot.innerHTML = `
           <header class="workspace-head card-surface">
             <div>
               <p class="eyebrow">Nguoi dang nhap</p>
-              <h2 id="current-admin">admin@zauifood.local</h2>
+              <h2 id="current-admin">admin@tmfood.local</h2>
             </div>
             <button id="logout-button" class="btn-danger" type="button">Dang xuat</button>
           </header>
@@ -338,7 +338,7 @@ appRoot.innerHTML = `
                 </label>
                 <label class="field">
                   <span>Email quan ly</span>
-                  <input name="managerEmail" type="email" required placeholder="manager@zauifood.local" />
+                  <input name="managerEmail" type="email" required placeholder="manager@tmfood.local" />
                 </label>
                 <label class="field">
                   <span>Mat khau quan ly</span>
@@ -675,7 +675,7 @@ async function apiRequest<T>(
     const messageFromPayload =
       typeof payload === "object" && payload !== null
         ? (payload as { message?: string; error?: string }).message ??
-          (payload as { message?: string; error?: string }).error
+        (payload as { message?: string; error?: string }).error
         : undefined;
 
     if (response.status === 401 && authRequired) {
@@ -777,11 +777,10 @@ function renderStoresTable() {
             <small>${escapeHtml(store.address)}</small>
           </td>
           <td>
-            ${
-              store.manager
-                ? `${escapeHtml(store.manager.name)}<br /><small>${escapeHtml(store.manager.email)}</small>`
-                : `<small>Chua gan</small>`
-            }
+            ${store.manager
+          ? `${escapeHtml(store.manager.name)}<br /><small>${escapeHtml(store.manager.email)}</small>`
+          : `<small>Chua gan</small>`
+        }
           </td>
           <td>${store.rating.toFixed(1)}</td>
           <td>${store.etaMinutesMin}-${store.etaMinutesMax} phut</td>
@@ -799,6 +798,8 @@ function renderStoresTable() {
   const toggles = Array.from(
     elements.storesBody.querySelectorAll<HTMLInputElement>("input[data-store-toggle]"),
   );
+
+
 
   toggles.forEach((checkbox) => {
     checkbox.addEventListener("change", async () => {
@@ -841,10 +842,10 @@ function documentPreview(label: string, dataUrl: string | null): string {
   }
 
   return `
-    <a class="doc-preview" href="${dataUrl}" target="_blank" rel="noreferrer">
+    <div class="doc-preview" style="cursor: pointer;" onclick="previewImage(this.querySelector('img').src)">
       <span>${escapeHtml(label)}</span>
       <img src="${dataUrl}" alt="${escapeHtml(label)}" loading="lazy" />
-    </a>
+    </div>
   `;
 }
 
@@ -885,16 +886,15 @@ function renderDriverApplicationsTable() {
           <td>
             <span class="${statusClass(application.status)}">${escapeHtml(application.status)}</span><br />
             <small>${escapeHtml(application.adminNote || "-")}</small>
-            ${
-              application.status === "PENDING"
-                ? `
+            ${application.status === "PENDING"
+          ? `
                   <div class="action-row">
                     <button type="button" class="btn-small btn-secondary" data-driver-approve="${escapeHtml(application.id)}">Duyet</button>
                     <button type="button" class="btn-small btn-danger" data-driver-reject="${escapeHtml(application.id)}">Tu choi</button>
                   </div>
                 `
-                : `<small class="review-time">Xu ly: ${formatDateTime(application.reviewedAt)}</small>`
-            }
+          : `<small class="review-time">Xu ly: ${formatDateTime(application.reviewedAt)}</small>`
+        }
           </td>
         </tr>
       `,
@@ -1007,25 +1007,23 @@ function renderStoreApplicationsTable() {
             </div>
           </td>
           <td>
-            ${
-              application.storeLatitude !== null && application.storeLongitude !== null
-                ? `<small>${application.storeLatitude.toFixed(6)}, ${application.storeLongitude.toFixed(6)}</small>`
-                : `<small>Khong co toa do</small>`
-            }
+            ${application.storeLatitude !== null && application.storeLongitude !== null
+          ? `<small>${application.storeLatitude.toFixed(6)}, ${application.storeLongitude.toFixed(6)}</small>`
+          : `<small>Khong co toa do</small>`
+        }
           </td>
           <td>
             <span class="${statusClass(application.status)}">${escapeHtml(application.status)}</span><br />
             <small>${escapeHtml(application.adminNote || "-")}</small>
-            ${
-              application.status === "PENDING"
-                ? `
+            ${application.status === "PENDING"
+          ? `
                   <div class="action-row">
                     <button type="button" class="btn-small btn-secondary" data-store-app-approve="${escapeHtml(application.id)}">Duyet</button>
                     <button type="button" class="btn-small btn-danger" data-store-app-reject="${escapeHtml(application.id)}">Tu choi</button>
                   </div>
                 `
-                : `<small class="review-time">Xu ly: ${formatDateTime(application.reviewedAt)}</small>`
-            }
+          : `<small class="review-time">Xu ly: ${formatDateTime(application.reviewedAt)}</small>`
+        }
           </td>
         </tr>
       `,
@@ -1315,3 +1313,21 @@ async function bootstrap() {
 }
 
 void bootstrap();
+
+// Global function for image preview to safely open large data URIs
+(window as any).previewImage = function(src: string) {
+  const win = window.open("", "_blank");
+  if (win) {
+    win.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head><title>Xem chi tiet hinh anh</title></head>
+      <body style="margin:0; background:#111; display:flex; justify-content:center; align-items:center; min-height:100vh;">
+        <img src="${src}" style="max-width:100%; max-height:100vh; object-fit:contain;" />
+      </body>
+      </html>
+    `);
+    win.document.close();
+  }
+};
+

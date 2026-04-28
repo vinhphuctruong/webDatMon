@@ -1,9 +1,8 @@
 import express from "express";
-import { PrismaClient } from "@prisma/client";
+import { prisma } from "../db/prisma";
 import { requireAuth } from "../middlewares/auth";
 
 const router = express.Router();
-const prisma = new PrismaClient();
 
 // Get current user's store application
 router.get("/me", requireAuth, async (req, res) => {

@@ -1,4 +1,4 @@
-/* ─── ZaUI Food Partner App ─── */
+/* ─── TM Food Partner App ─── */
 const API_BASE          = "/api/v1";
 const STORE_SESSION_KEY = "zaui_food_store_session";
 
