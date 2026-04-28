@@ -122,7 +122,7 @@ cartRouter.post(
     });
 
     if (!product || !product.isAvailable) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Product not available");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Sản phẩm không còn khả dụng");
     }
 
     const { selectedOptions } = calculateUnitPrice(product, payload.selectedOptions);
@@ -193,7 +193,7 @@ cartRouter.patch(
     });
 
     if (!existingItem) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Cart item not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy sản phẩm trong giỏ hàng");
     }
 
     const { selectedOptions } = calculateUnitPrice(
@@ -270,7 +270,7 @@ cartRouter.delete(
     });
 
     if (!existed) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Cart item not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy sản phẩm trong giỏ hàng");
     }
 
     await prisma.cartItem.delete({ where: { id: itemId } });

@@ -52,7 +52,7 @@ driverRouter.get(
     });
 
     if (!profile) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Driver profile not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy hồ sơ tài xế");
     }
 
     res.json({ data: profile });
@@ -138,7 +138,7 @@ driverRouter.post(
     });
 
     if (!profile?.isOnline) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "You must be online to claim order");
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Bạn phải bật trạng thái online để nhận đơn");
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -157,15 +157,15 @@ driverRouter.post(
       });
 
       if (!order) {
-        throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+        throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       }
 
       if (order.driverId && order.driverId !== req.user!.id) {
-        throw new HttpError(StatusCodes.CONFLICT, "Order already claimed by another driver");
+        throw new HttpError(StatusCodes.CONFLICT, "Đơn hàng đã được tài xế khác nhận");
       }
 
       if (!claimableStatuses.includes(order.status)) {
-        throw new HttpError(StatusCodes.BAD_REQUEST, "Order is not available for claiming");
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng không sẵn sàng để nhận");
       }
 
       if (
@@ -240,15 +240,15 @@ driverRouter.post(
     });
 
     if (!order) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
     }
 
     if (order.driverId !== req.user!.id) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "You are not assigned to this order");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Bạn không được giao đơn hàng này");
     }
 
     if (!completableStatuses.includes(order.status)) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "Order is not in deliverable status");
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng không ở trạng thái có thể giao");
     }
 
     const updated = await prisma.$transaction(async (tx) => {

@@ -1,1333 +1,483 @@
 import "./style.css";
+import { LOGIN_HTML, APP_HTML } from "./template";
+import { api, state, saveSession, loadSession, clearSession, setOnUnauthorized } from "./api";
+import { esc, currency, fmtDate, shortId, statusTag, docPreview, flash, setFlashEl, errMsg } from "./helpers";
+import type { TabKey, LoginResponse, ApiListResponse, Store, DriverApplication, StoreApplication, OverviewPayload, Voucher, Category, HeroBanner, AdminUserItem } from "./types";
 
-type UserRole = "CUSTOMER" | "ADMIN" | "STORE_MANAGER" | "DRIVER";
-type PartnerApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
-type TabKey = "overview" | "stores" | "driver-applications" | "store-applications";
+/* ── State ─────────────────────────────────────── */
+const appState: {
+  activeTab: TabKey; overview: OverviewPayload | null;
+  stores: Store[]; driverApps: DriverApplication[];
+  storeApps: StoreApplication[]; vouchers: Voucher[];
+  categories: Category[]; banners: HeroBanner[];
+  users: AdminUserItem[]; userPage: number; userTotalPages: number;
+} = { activeTab: "overview", overview: null, stores: [], driverApps: [], storeApps: [], vouchers: [], categories: [], banners: [], users: [], userPage: 1, userTotalPages: 1 };
 
-interface SessionTokens {
-  accessToken: string;
-  refreshToken: string;
+/* ── Mount ─────────────────────────────────────── */
+const root = document.querySelector<HTMLDivElement>("#app")!;
+root.innerHTML = LOGIN_HTML + APP_HTML;
+
+const $ = <T extends HTMLElement>(s: string) => document.querySelector<T>(s)!;
+const loginView = $("#login-view");
+const appView = $("#app-view");
+const loginForm = $<HTMLFormElement>("#login-form");
+const loginEmail = $<HTMLInputElement>("#login-email");
+const loginPassword = $<HTMLInputElement>("#login-password");
+const loginError = $("#login-error");
+const loginButton = $<HTMLButtonElement>("#login-button");
+const currentAdmin = $("#current-admin");
+const userAvatar = $("#user-avatar");
+
+setFlashEl($("#flash"));
+setOnUnauthorized(() => showLogin());
+
+const navBtns = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-btn"));
+const sections = Array.from(document.querySelectorAll<HTMLElement>("[data-section]"));
+
+/* ── Navigation ────────────────────────────────── */
+function setTab(tab: TabKey) {
+  appState.activeTab = tab;
+  navBtns.forEach(b => b.classList.toggle("active", b.dataset.tab === tab));
+  sections.forEach(s => s.classList.toggle("hidden", s.dataset.section !== tab));
 }
 
-interface AdminUser {
-  id: string;
-  name: string;
-  email: string;
-  role: UserRole;
+function showLogin() { loginView.classList.remove("hidden"); appView.classList.add("hidden"); loginPassword.value = ""; }
+function showApp() {
+  loginView.classList.add("hidden"); appView.classList.remove("hidden");
+  currentAdmin.textContent = state.user?.name || state.user?.email || "Admin";
+  userAvatar.textContent = (state.user?.name || "A").charAt(0).toUpperCase();
 }
 
-interface LoginResponse {
-  user: AdminUser;
-  tokens: SessionTokens;
-}
-
-interface ApiListResponse<T> {
-  data: T;
-  message?: string;
-}
-
-interface Store {
-  id: string;
-  name: string;
-  address: string;
-  rating: number;
-  etaMinutesMin: number;
-  etaMinutesMax: number;
-  isOpen: boolean;
-  manager: {
-    id: string;
-    name: string;
-    email: string;
-  } | null;
-}
-
-interface DriverApplication {
-  id: string;
-  fullName: string;
-  dateOfBirth: string;
-  createdAt: string;
-  email: string;
-  phone: string | null;
-  vehicleType: string;
-  licensePlate: string;
-  portraitImageData: string;
-  idCardImageData: string;
-  driverLicenseImageData: string;
-  portraitQualityScore: number;
-  idCardQualityScore: number;
-  driverLicenseQualityScore: number;
-  status: PartnerApplicationStatus;
-  adminNote: string | null;
-  reviewedAt: string | null;
-}
-
-interface StoreApplication {
-  id: string;
-  storeName: string;
-  storeAddress: string;
-  storePhone: string;
-  storeLatitude: number | null;
-  storeLongitude: number | null;
-  frontStoreImageData: string | null;
-  businessLicenseImageData: string | null;
-  status: PartnerApplicationStatus;
-  adminNote: string | null;
-  reviewedAt: string | null;
-  createdAt: string;
-  applicant: {
-    id: string;
-    name: string;
-    email: string;
-    phone: string | null;
-  };
-}
-
-interface OverviewMetrics {
-  totalUsers: number;
-  totalStores: number;
-  totalProducts: number;
-  totalOrders: number;
-  pendingOrders: number;
-  preparingOrders: number;
-  deliveringOrders: number;
-  deliveredToday: number;
-  cancelledToday: number;
-  revenueToday: number;
-  pendingDriverApplications: number;
-}
-
-interface OverviewOrderStatus {
-  status: string;
-  count: number;
-}
-
-interface OverviewLatestOrder {
-  id: string;
-  status: string;
-  total: number;
-  createdAt: string;
-  store: {
-    id: string;
-    name: string;
-  };
-  user: {
-    id: string;
-    name: string;
-    email: string;
-  };
-}
-
-interface OverviewPayload {
-  metrics: OverviewMetrics;
-  orderStatusDistribution: OverviewOrderStatus[];
-  latestOrders: OverviewLatestOrder[];
-}
-
-interface Elements {
-  loginView: HTMLElement;
-  appView: HTMLElement;
-  loginForm: HTMLFormElement;
-  loginEmail: HTMLInputElement;
-  loginPassword: HTMLInputElement;
-  loginError: HTMLElement;
-  loginButton: HTMLButtonElement;
-  currentAdmin: HTMLElement;
-  logoutButton: HTMLButtonElement;
-  metricsGrid: HTMLElement;
-  orderDistribution: HTMLElement;
-  latestOrdersBody: HTMLElement;
-  storesBody: HTMLElement;
-  createStoreForm: HTMLFormElement;
-  driverStatusFilter: HTMLSelectElement;
-  driverApplicationsBody: HTMLElement;
-  storeStatusFilter: HTMLSelectElement;
-  storeApplicationsBody: HTMLElement;
-  refreshOverview: HTMLButtonElement;
-  refreshStores: HTMLButtonElement;
-  refreshDriverApplications: HTMLButtonElement;
-  refreshStoreApplications: HTMLButtonElement;
-  flash: HTMLElement;
-}
-
-const SESSION_STORAGE_KEY = "zaui_food_admin_portal_session";
-const API_BASE = normalizeApiBase(import.meta.env.VITE_API_BASE_URL);
-const currencyFormatter = new Intl.NumberFormat("vi-VN");
-const dateTimeFormatter = new Intl.DateTimeFormat("vi-VN", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-let flashTimer: number | undefined;
-
-const state: {
-  tokens: SessionTokens | null;
-  user: AdminUser | null;
-  activeTab: TabKey;
-  overview: OverviewPayload | null;
-  stores: Store[];
-  driverApplications: DriverApplication[];
-  storeApplications: StoreApplication[];
-} = {
-  tokens: null,
-  user: null,
-  activeTab: "overview",
-  overview: null,
-  stores: [],
-  driverApplications: [],
-  storeApplications: [],
-};
-
-const appRoot = document.querySelector<HTMLDivElement>("#app");
-if (!appRoot) {
-  throw new Error("Cannot find #app container");
-}
-
-appRoot.innerHTML = `
-  <div class="ambient-bg" aria-hidden="true">
-    <div class="orb orb-a"></div>
-    <div class="orb orb-b"></div>
-    <div class="orb orb-c"></div>
-  </div>
-
-  <div class="portal">
-    <header class="portal-topbar">
-      <div class="brand">
-        <span class="badge-dot"></span>
-        <div>
-          <p class="brand-kicker">TM Food Ops</p>
-          <h1>Admin Command Deck</h1>
-        </div>
-      </div>
-      <p class="topbar-note">Quan ly van hanh cua hang, doi tac va xet duyet ho so</p>
-    </header>
-
-    <section id="login-view" class="login-layout card-surface">
-      <div class="login-copy">
-        <p class="eyebrow">Admin access only</p>
-        <h2>Dang nhap vao trung tam quan tri</h2>
-        <p>
-          Theo doi trang thai don hang, mo/rong cua hang, va duyet doi tac tai xe, doi tac cua hang
-          trong mot dashboard duy nhat.
-        </p>
-        <div class="pill-row">
-          <span class="pill">Dashboard tong quan</span>
-          <span class="pill">Quan ly cua hang</span>
-          <span class="pill">Duyet ho so doi tac</span>
-        </div>
-      </div>
-
-      <form id="login-form" class="login-form">
-        <h3>Dang nhap admin</h3>
-        <label class="field">
-          <span>Email</span>
-          <input id="login-email" name="email" type="email" required placeholder="admin@tmfood.local" />
-        </label>
-        <label class="field">
-          <span>Mat khau</span>
-          <input id="login-password" name="password" type="password" required placeholder="********" />
-        </label>
-        <button id="login-button" type="submit">Dang nhap</button>
-        <p class="hint-text">Demo: <code>admin@tmfood.local / 12345678</code></p>
-        <p id="login-error" class="error-text" role="alert"></p>
-      </form>
-    </section>
-
-    <section id="app-view" class="app-view hidden">
-      <div class="shell-grid">
-        <aside class="sidebar card-surface">
-          <p class="sidebar-label">Dieu huong</p>
-          <button class="nav-button active" type="button" data-tab="overview">Tong quan</button>
-          <button class="nav-button" type="button" data-tab="stores">Cua hang</button>
-          <button class="nav-button" type="button" data-tab="driver-applications">Ho so tai xe</button>
-          <button class="nav-button" type="button" data-tab="store-applications">Ho so cua hang</button>
-        </aside>
-
-        <main class="workspace">
-          <header class="workspace-head card-surface">
-            <div>
-              <p class="eyebrow">Nguoi dang nhap</p>
-              <h2 id="current-admin">admin@tmfood.local</h2>
-            </div>
-            <button id="logout-button" class="btn-danger" type="button">Dang xuat</button>
-          </header>
-
-          <section class="panel card-surface" data-section="overview">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Overview</p>
-                <h3>Toan canh van hanh</h3>
-              </div>
-              <button id="refresh-overview" class="btn-secondary" type="button">Lam moi</button>
-            </div>
-
-            <div id="metrics-grid" class="metrics-grid"></div>
-
-            <div class="split-grid">
-              <article class="sub-panel">
-                <h4>Phan bo trang thai don</h4>
-                <div id="order-distribution" class="status-pills"></div>
-              </article>
-
-              <article class="sub-panel">
-                <h4>Don hang moi nhat</h4>
-                <div class="table-shell">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Ma don</th>
-                        <th>Khach</th>
-                        <th>Cua hang</th>
-                        <th>Tong tien</th>
-                        <th>Trang thai</th>
-                        <th>Thoi gian</th>
-                      </tr>
-                    </thead>
-                    <tbody id="latest-orders-body"></tbody>
-                  </table>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section class="panel card-surface hidden" data-section="stores">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Store Ops</p>
-                <h3>Quan ly cua hang</h3>
-              </div>
-              <button id="refresh-stores" class="btn-secondary" type="button">Lam moi</button>
-            </div>
-
-            <form id="create-store-form" class="create-store-form">
-              <h4>Tao cua hang va tai khoan quan ly</h4>
-              <div class="form-grid">
-                <label class="field">
-                  <span>Ten cua hang</span>
-                  <input name="name" required placeholder="TM Food Thu Duc" />
-                </label>
-                <label class="field">
-                  <span>Dia chi</span>
-                  <input name="address" required placeholder="123 Xa Lo Ha Noi, Thu Duc" />
-                </label>
-                <label class="field">
-                  <span>Rating</span>
-                  <input name="rating" type="number" min="0" max="5" step="0.1" value="4.5" />
-                </label>
-                <label class="field">
-                  <span>ETA toi thieu (phut)</span>
-                  <input name="etaMinutesMin" type="number" min="5" max="120" value="20" required />
-                </label>
-                <label class="field">
-                  <span>ETA toi da (phut)</span>
-                  <input name="etaMinutesMax" type="number" min="5" max="180" value="35" required />
-                </label>
-                <label class="field">
-                  <span>Vi do (tu chon)</span>
-                  <input name="latitude" type="number" step="any" placeholder="10.854" />
-                </label>
-                <label class="field">
-                  <span>Kinh do (tu chon)</span>
-                  <input name="longitude" type="number" step="any" placeholder="106.772" />
-                </label>
-                <label class="field">
-                  <span>Ten quan ly</span>
-                  <input name="managerName" required placeholder="Nguyen Van A" />
-                </label>
-                <label class="field">
-                  <span>Email quan ly</span>
-                  <input name="managerEmail" type="email" required placeholder="manager@tmfood.local" />
-                </label>
-                <label class="field">
-                  <span>Mat khau quan ly</span>
-                  <input name="managerPassword" type="password" minlength="8" required placeholder="it nhat 8 ky tu" />
-                </label>
-              </div>
-              <div class="form-actions">
-                <button type="submit">Tao cua hang</button>
-              </div>
-            </form>
-
-            <div class="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Ma</th>
-                    <th>Cua hang</th>
-                    <th>Quan ly</th>
-                    <th>Rating</th>
-                    <th>ETA</th>
-                    <th>Dang mo</th>
-                  </tr>
-                </thead>
-                <tbody id="stores-body"></tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="panel card-surface hidden" data-section="driver-applications">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Driver Review</p>
-                <h3>Duyet doi tac tai xe</h3>
-              </div>
-              <div class="head-actions">
-                <select id="driver-status-filter">
-                  <option value="PENDING">Dang cho duyet</option>
-                  <option value="">Tat ca</option>
-                  <option value="APPROVED">Da duyet</option>
-                  <option value="REJECTED">Tu choi</option>
-                </select>
-                <button id="refresh-driver-applications" class="btn-secondary" type="button">Lam moi</button>
-              </div>
-            </div>
-
-            <div class="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Ung vien</th>
-                    <th>Thong tin xe</th>
-                    <th>Giay to</th>
-                    <th>Diem chat luong</th>
-                    <th>Trang thai</th>
-                  </tr>
-                </thead>
-                <tbody id="driver-applications-body"></tbody>
-              </table>
-            </div>
-          </section>
-
-          <section class="panel card-surface hidden" data-section="store-applications">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Store Review</p>
-                <h3>Duyet doi tac cua hang</h3>
-              </div>
-              <div class="head-actions">
-                <select id="store-status-filter">
-                  <option value="PENDING">Dang cho duyet</option>
-                  <option value="">Tat ca</option>
-                  <option value="APPROVED">Da duyet</option>
-                  <option value="REJECTED">Tu choi</option>
-                </select>
-                <button id="refresh-store-applications" class="btn-secondary" type="button">Lam moi</button>
-              </div>
-            </div>
-
-            <div class="table-shell">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Thong tin cua hang</th>
-                    <th>Nguoi nop ho so</th>
-                    <th>Giay to</th>
-                    <th>Toa do</th>
-                    <th>Trang thai</th>
-                  </tr>
-                </thead>
-                <tbody id="store-applications-body"></tbody>
-              </table>
-            </div>
-          </section>
-        </main>
-      </div>
-    </section>
-  </div>
-
-  <div id="flash" class="flash hidden" role="status" aria-live="polite"></div>
-`;
-
-const elements: Elements = {
-  loginView: selectElement<HTMLElement>("#login-view"),
-  appView: selectElement<HTMLElement>("#app-view"),
-  loginForm: selectElement<HTMLFormElement>("#login-form"),
-  loginEmail: selectElement<HTMLInputElement>("#login-email"),
-  loginPassword: selectElement<HTMLInputElement>("#login-password"),
-  loginError: selectElement<HTMLElement>("#login-error"),
-  loginButton: selectElement<HTMLButtonElement>("#login-button"),
-  currentAdmin: selectElement<HTMLElement>("#current-admin"),
-  logoutButton: selectElement<HTMLButtonElement>("#logout-button"),
-  metricsGrid: selectElement<HTMLElement>("#metrics-grid"),
-  orderDistribution: selectElement<HTMLElement>("#order-distribution"),
-  latestOrdersBody: selectElement<HTMLElement>("#latest-orders-body"),
-  storesBody: selectElement<HTMLElement>("#stores-body"),
-  createStoreForm: selectElement<HTMLFormElement>("#create-store-form"),
-  driverStatusFilter: selectElement<HTMLSelectElement>("#driver-status-filter"),
-  driverApplicationsBody: selectElement<HTMLElement>("#driver-applications-body"),
-  storeStatusFilter: selectElement<HTMLSelectElement>("#store-status-filter"),
-  storeApplicationsBody: selectElement<HTMLElement>("#store-applications-body"),
-  refreshOverview: selectElement<HTMLButtonElement>("#refresh-overview"),
-  refreshStores: selectElement<HTMLButtonElement>("#refresh-stores"),
-  refreshDriverApplications: selectElement<HTMLButtonElement>("#refresh-driver-applications"),
-  refreshStoreApplications: selectElement<HTMLButtonElement>("#refresh-store-applications"),
-  flash: selectElement<HTMLElement>("#flash"),
-};
-
-const navButtons = Array.from(document.querySelectorAll<HTMLButtonElement>(".nav-button"));
-const tabSections = Array.from(document.querySelectorAll<HTMLElement>("[data-section]"));
-
-function selectElement<T extends Element>(selector: string): T {
-  const element = document.querySelector<T>(selector);
-  if (!element) {
-    throw new Error(`Missing element: ${selector}`);
-  }
-  return element;
-}
-
-function normalizeApiBase(value: unknown): string {
-  if (typeof value !== "string" || value.trim().length === 0) {
-    return "/api/v1";
-  }
-  return value.trim().replace(/\/+$/, "");
-}
-
-function saveSession() {
-  if (!state.tokens || !state.user) {
-    return;
-  }
-
-  const payload = JSON.stringify({
-    tokens: state.tokens,
-    user: state.user,
-  });
-  localStorage.setItem(SESSION_STORAGE_KEY, payload);
-}
-
-function loadSession() {
-  const raw = localStorage.getItem(SESSION_STORAGE_KEY);
-  if (!raw) {
-    return;
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as { tokens: SessionTokens; user: AdminUser };
-    state.tokens = parsed.tokens;
-    state.user = parsed.user;
-  } catch (_error) {
-    localStorage.removeItem(SESSION_STORAGE_KEY);
-  }
-}
-
-function clearSession() {
-  state.tokens = null;
-  state.user = null;
-  localStorage.removeItem(SESSION_STORAGE_KEY);
-}
-
-function setActiveTab(tab: TabKey) {
-  state.activeTab = tab;
-  navButtons.forEach((button) => {
-    const isActive = button.dataset.tab === tab;
-    button.classList.toggle("active", isActive);
-  });
-  tabSections.forEach((section) => {
-    const isActive = section.dataset.section === tab;
-    section.classList.toggle("hidden", !isActive);
-  });
-}
-
-function showLoginView() {
-  elements.loginView.classList.remove("hidden");
-  elements.appView.classList.add("hidden");
-  elements.loginPassword.value = "";
-}
-
-function showAppView() {
-  elements.loginView.classList.add("hidden");
-  elements.appView.classList.remove("hidden");
-  elements.currentAdmin.textContent = state.user?.email ?? "admin";
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;");
-}
-
-function toErrorMessage(error: unknown): string {
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-  return "Co loi xay ra, vui long thu lai";
-}
-
-function showFlash(message: string, type: "success" | "error" | "info" = "info") {
-  elements.flash.className = `flash ${type}`;
-  elements.flash.textContent = message;
-
-  if (flashTimer) {
-    window.clearTimeout(flashTimer);
-  }
-
-  flashTimer = window.setTimeout(() => {
-    elements.flash.className = "flash hidden";
-    elements.flash.textContent = "";
-  }, 4200);
-}
-
-function formatCurrency(value: number | null | undefined): string {
-  return `${currencyFormatter.format(value ?? 0)} VND`;
-}
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) {
-    return "-";
-  }
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "-";
-  }
-  return dateTimeFormatter.format(date);
-}
-
-function shortId(value: string): string {
-  if (!value) {
-    return "-";
-  }
-  return value.slice(0, 8);
-}
-
-function statusClass(status: string): string {
-  switch (status) {
-    case "APPROVED":
-    case "DELIVERED":
-      return "status-tag success";
-    case "REJECTED":
-    case "CANCELLED":
-      return "status-tag danger";
-    case "PENDING":
-    case "CONFIRMED":
-    case "PREPARING":
-    case "PICKED_UP":
-      return "status-tag warning";
-    default:
-      return "status-tag";
-  }
-}
-
-async function refreshAccessToken(): Promise<boolean> {
-  if (!state.tokens?.refreshToken) {
-    return false;
-  }
-
-  const response = await fetch(`${API_BASE}/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken: state.tokens.refreshToken }),
-  });
-
-  if (!response.ok) {
-    clearSession();
-    return false;
-  }
-
-  const payload = (await response.json()) as LoginResponse;
-  state.tokens = payload.tokens;
-  state.user = payload.user;
-  saveSession();
-  return true;
-}
-
-async function apiRequest<T>(
-  path: string,
-  init: RequestInit = {},
-  authRequired = true,
-  allowRetry = true,
-): Promise<T> {
-  const headers = new Headers(init.headers);
-  const body = init.body;
-  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
-
-  if (body && !isFormData && !headers.has("Content-Type")) {
-    headers.set("Content-Type", "application/json");
-  }
-
-  if (authRequired && state.tokens?.accessToken) {
-    headers.set("Authorization", `Bearer ${state.tokens.accessToken}`);
-  }
-
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers,
-  });
-
-  let payload: unknown = null;
-  try {
-    payload = await response.json();
-  } catch (_error) {
-    payload = null;
-  }
-
-  if (response.status === 401 && authRequired && allowRetry) {
-    const refreshed = await refreshAccessToken();
-    if (refreshed) {
-      return apiRequest<T>(path, init, authRequired, false);
-    }
-  }
-
-  if (!response.ok) {
-    const messageFromPayload =
-      typeof payload === "object" && payload !== null
-        ? (payload as { message?: string; error?: string }).message ??
-        (payload as { message?: string; error?: string }).error
-        : undefined;
-
-    if (response.status === 401 && authRequired) {
-      clearSession();
-      showLoginView();
-    }
-
-    throw new Error(messageFromPayload || `Request failed (${response.status})`);
-  }
-
-  return payload as T;
-}
-
+/* ── Render: Overview ──────────────────────────── */
 function renderOverview() {
-  const overview = state.overview;
-  if (!overview) {
-    elements.metricsGrid.innerHTML = `<p class="muted-empty">Chua co du lieu dashboard.</p>`;
-    elements.orderDistribution.innerHTML = "";
-    elements.latestOrdersBody.innerHTML = "";
-    return;
-  }
+  const o = appState.overview;
+  const mg = $("#metrics-grid");
+  const od = $("#order-distribution");
+  const lo = $("#latest-orders-body");
+  if (!o) { mg.innerHTML = `<p class="muted-empty">Chưa có dữ liệu.</p>`; od.innerHTML = ""; lo.innerHTML = ""; return; }
 
-  const openStores = state.stores.filter((store) => store.isOpen).length;
-
+  const openStores = appState.stores.filter(s => s.isOpen).length;
+  const colors = ["","green","cyan","purple","","orange","purple","cyan","green","red","","orange"];
   const metrics = [
-    { label: "Tong nguoi dung", value: `${overview.metrics.totalUsers}` },
-    { label: "Tong cua hang", value: `${overview.metrics.totalStores}` },
-    { label: "Cua hang dang mo", value: `${openStores}` },
-    { label: "Tong san pham", value: `${overview.metrics.totalProducts}` },
-    { label: "Tong don hang", value: `${overview.metrics.totalOrders}` },
-    { label: "Don cho xac nhan", value: `${overview.metrics.pendingOrders}` },
-    { label: "Don dang chuan bi", value: `${overview.metrics.preparingOrders}` },
-    { label: "Don dang giao", value: `${overview.metrics.deliveringOrders}` },
-    { label: "Don da giao hom nay", value: `${overview.metrics.deliveredToday}` },
-    { label: "Don huy hom nay", value: `${overview.metrics.cancelledToday}` },
-    { label: "Doanh thu hom nay", value: formatCurrency(overview.metrics.revenueToday) },
-    {
-      label: "Ho so tai xe cho duyet",
-      value: `${overview.metrics.pendingDriverApplications}`,
-    },
+    "Tổng người dùng", "Tổng cửa hàng", "Đang mở cửa", "Tổng sản phẩm",
+    "Tổng đơn hàng", "Chờ xác nhận", "Đang chuẩn bị", "Đang giao",
+    "Giao hôm nay", "Huỷ hôm nay", "Doanh thu hôm nay", "Tài xế chờ duyệt"
+  ];
+  const values = [
+    o.metrics.totalUsers, o.metrics.totalStores, openStores, o.metrics.totalProducts,
+    o.metrics.totalOrders, o.metrics.pendingOrders, o.metrics.preparingOrders, o.metrics.deliveringOrders,
+    o.metrics.deliveredToday, o.metrics.cancelledToday, -1, o.metrics.pendingDriverApplications
   ];
 
-  elements.metricsGrid.innerHTML = metrics
-    .map(
-      (entry) => `
-        <article class="metric-card">
-          <p>${escapeHtml(entry.label)}</p>
-          <strong>${escapeHtml(entry.value)}</strong>
-        </article>
-      `,
-    )
-    .join("");
+  mg.innerHTML = metrics.map((label, i) => {
+    const val = values[i] === -1 ? currency(o.metrics.revenueToday) : String(values[i]);
+    return `<article class="metric-card ${colors[i]}"><span class="mc-label">${label}</span><span class="mc-value">${val}</span></article>`;
+  }).join("");
 
-  elements.orderDistribution.innerHTML = overview.orderStatusDistribution
-    .map(
-      (item) => `
-        <span class="${statusClass(item.status)}">${escapeHtml(item.status)}: ${item.count}</span>
-      `,
-    )
-    .join("");
+  od.innerHTML = o.orderStatusDistribution.map(s => `<span class="${statusTag(s.status)}">${esc(s.status)}: ${s.count}</span>`).join("");
 
-  if (overview.latestOrders.length === 0) {
-    elements.latestOrdersBody.innerHTML = `<tr><td colspan="6" class="muted-empty">Chua co don hang nao.</td></tr>`;
-    return;
-  }
-
-  elements.latestOrdersBody.innerHTML = overview.latestOrders
-    .map(
-      (order) => `
-        <tr>
-          <td><code>${escapeHtml(shortId(order.id))}</code></td>
-          <td>
-            ${escapeHtml(order.user.name)}<br />
-            <small>${escapeHtml(order.user.email)}</small>
-          </td>
-          <td>${escapeHtml(order.store.name)}</td>
-          <td>${formatCurrency(order.total)}</td>
-          <td><span class="${statusClass(order.status)}">${escapeHtml(order.status)}</span></td>
-          <td>${formatDateTime(order.createdAt)}</td>
-        </tr>
-      `,
-    )
-    .join("");
+  if (!o.latestOrders.length) { lo.innerHTML = `<tr><td colspan="6" class="muted-empty">Chưa có đơn.</td></tr>`; return; }
+  lo.innerHTML = o.latestOrders.map(order => `<tr>
+    <td><code>${esc(shortId(order.id))}</code></td>
+    <td>${esc(order.user.name)}<br><small>${esc(order.user.email)}</small></td>
+    <td>${esc(order.store.name)}</td><td>${currency(order.total)}</td>
+    <td><span class="${statusTag(order.status)}">${esc(order.status)}</span></td>
+    <td>${fmtDate(order.createdAt)}</td></tr>`).join("");
 }
 
-function renderStoresTable() {
-  if (state.stores.length === 0) {
-    elements.storesBody.innerHTML = `<tr><td colspan="6" class="muted-empty">Chua co cua hang nao.</td></tr>`;
-    return;
-  }
+/* ── Render: Stores ────────────────────────────── */
+function renderStores() {
+  const tb = $("#stores-body");
+  if (!appState.stores.length) { tb.innerHTML = `<tr><td colspan="6" class="muted-empty">Chưa có cửa hàng.</td></tr>`; return; }
+  tb.innerHTML = appState.stores.map(s => `<tr>
+    <td><code>${esc(shortId(s.id))}</code></td>
+    <td>${esc(s.name)}<br><small>${esc(s.address)}</small></td>
+    <td>${s.manager ? `${esc(s.manager.name)}<br><small>${esc(s.manager.email)}</small>` : "<small>Chưa gán</small>"}</td>
+    <td>${s.rating.toFixed(1)}</td><td>${s.etaMinutesMin}-${s.etaMinutesMax} phút</td>
+    <td><label class="switch"><input type="checkbox" data-store-toggle="${esc(s.id)}" ${s.isOpen?"checked":""}><span>${s.isOpen?"Mở":"Đóng"}</span></label></td></tr>`).join("");
 
-  elements.storesBody.innerHTML = state.stores
-    .map(
-      (store) => `
-        <tr>
-          <td><code>${escapeHtml(shortId(store.id))}</code></td>
-          <td>
-            ${escapeHtml(store.name)}<br />
-            <small>${escapeHtml(store.address)}</small>
-          </td>
-          <td>
-            ${store.manager
-          ? `${escapeHtml(store.manager.name)}<br /><small>${escapeHtml(store.manager.email)}</small>`
-          : `<small>Chua gan</small>`
-        }
-          </td>
-          <td>${store.rating.toFixed(1)}</td>
-          <td>${store.etaMinutesMin}-${store.etaMinutesMax} phut</td>
-          <td>
-            <label class="switch">
-              <input type="checkbox" data-store-toggle="${escapeHtml(store.id)}" ${store.isOpen ? "checked" : ""} />
-              <span>${store.isOpen ? "Mo" : "Dong"}</span>
-            </label>
-          </td>
-        </tr>
-      `,
-    )
-    .join("");
-
-  const toggles = Array.from(
-    elements.storesBody.querySelectorAll<HTMLInputElement>("input[data-store-toggle]"),
-  );
-
-
-
-  toggles.forEach((checkbox) => {
-    checkbox.addEventListener("change", async () => {
-      const storeId = checkbox.dataset.storeToggle;
-      if (!storeId) {
-        return;
-      }
-
-      checkbox.disabled = true;
-      const newValue = checkbox.checked;
-
+  tb.querySelectorAll<HTMLInputElement>("input[data-store-toggle]").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      const id = cb.dataset.storeToggle!; cb.disabled = true;
       try {
-        await apiRequest<ApiListResponse<Store>>(`/stores/${storeId}`, {
-          method: "PATCH",
-          body: JSON.stringify({ isOpen: newValue }),
-        });
-        const targetStore = state.stores.find((store) => store.id === storeId);
-        if (targetStore) {
-          targetStore.isOpen = newValue;
-        }
+        await api(`/stores/${id}`, { method: "PATCH", body: JSON.stringify({ isOpen: cb.checked }) });
+        const st = appState.stores.find(x => x.id === id); if (st) st.isOpen = cb.checked;
         renderOverview();
-      } catch (error) {
-        checkbox.checked = !newValue;
-        showFlash(`Khong cap nhat duoc trang thai cua hang: ${toErrorMessage(error)}`, "error");
-      } finally {
-        checkbox.disabled = false;
-      }
+      } catch (e) { cb.checked = !cb.checked; flash(errMsg(e), "error"); }
+      finally { cb.disabled = false; }
     });
   });
 }
 
-function documentPreview(label: string, dataUrl: string | null): string {
-  if (!dataUrl) {
-    return `
-      <div class="doc-preview">
-        <span>${escapeHtml(label)}</span>
-        <small>Khong co</small>
+/* ── Render: Driver Apps ───────────────────────── */
+function renderDriverApps() {
+  const tb = $("#driver-applications-body");
+  if (!appState.driverApps.length) { tb.innerHTML = `<tr><td colspan="5" class="muted-empty">Không có hồ sơ.</td></tr>`; return; }
+  tb.innerHTML = appState.driverApps.map(a => `<tr>
+    <td><strong>${esc(a.fullName)}</strong><br><small>${esc(a.email)}</small><br><small>${esc(a.phone||"Không SĐT")}</small><br><small>Nộp: ${fmtDate(a.createdAt)}</small></td>
+    <td><small>${esc(a.vehicleType)}</small><br><small>BS: <strong>${esc(a.licensePlate)}</strong></small></td>
+    <td><div class="doc-grid">${docPreview("Chân dung",a.portraitImageData)}${docPreview("CCCD",a.idCardImageData)}${docPreview("Bằng lái",a.driverLicenseImageData)}</div></td>
+    <td><small>Chân dung: ${a.portraitQualityScore.toFixed(1)}</small><br><small>CCCD: ${a.idCardQualityScore.toFixed(1)}</small><br><small>Bằng lái: ${a.driverLicenseQualityScore.toFixed(1)}</small></td>
+    <td><span class="${statusTag(a.status)}">${esc(a.status)}</span><br><small>${esc(a.adminNote||"-")}</small>
+    ${a.status==="PENDING"?`<div class="action-row"><button class="btn btn-sm btn-success" data-da="${esc(a.id)}">Duyệt</button><button class="btn btn-sm btn-danger-solid" data-dr="${esc(a.id)}">Từ chối</button></div>`:`<span class="review-time">Xử lý: ${fmtDate(a.reviewedAt)}</span>`}</td></tr>`).join("");
+
+  bindApproveReject(tb, "da", "dr", "/admin/driver-applications", loadDriverApps);
+}
+
+/* ── Render: Store Apps ────────────────────────── */
+function renderStoreApps() {
+  const tb = $("#store-applications-body");
+  if (!appState.storeApps.length) { tb.innerHTML = `<tr><td colspan="5" class="muted-empty">Không có hồ sơ.</td></tr>`; return; }
+  tb.innerHTML = appState.storeApps.map(a => `<tr>
+    <td><strong>${esc(a.storeName)}</strong><br><small>${esc(a.storeAddress)}</small><br><small>SĐT: ${esc(a.storePhone)}</small></td>
+    <td><strong>${esc(a.applicant.name)}</strong><br><small>${esc(a.applicant.email)}</small><br><small>${esc(a.applicant.phone||"Không SĐT")}</small></td>
+    <td><div class="doc-grid">${docPreview("Mặt tiền",a.frontStoreImageData)}${docPreview("GPKD",a.businessLicenseImageData)}</div></td>
+    <td>${a.storeLatitude!=null&&a.storeLongitude!=null?`<small>${a.storeLatitude.toFixed(6)}, ${a.storeLongitude.toFixed(6)}</small>`:"<small>Không có</small>"}</td>
+    <td><span class="${statusTag(a.status)}">${esc(a.status)}</span><br><small>${esc(a.adminNote||"-")}</small>
+    ${a.status==="PENDING"?`<div class="action-row"><button class="btn btn-sm btn-success" data-sa="${esc(a.id)}">Duyệt</button><button class="btn btn-sm btn-danger-solid" data-sr="${esc(a.id)}">Từ chối</button></div>`:`<span class="review-time">Xử lý: ${fmtDate(a.reviewedAt)}</span>`}</td></tr>`).join("");
+
+  bindApproveReject(tb, "sa", "sr", "/admin/store-applications", async () => { await Promise.all([loadStoreApps(), loadStores()]); });
+}
+
+function bindApproveReject(tb: HTMLElement, approveAttr: string, rejectAttr: string, basePath: string, reload: () => Promise<void>) {
+  tb.querySelectorAll<HTMLButtonElement>(`button[data-${approveAttr}]`).forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset[approveAttr]; if (!id) return;
+      const note = prompt("Ghi chú duyệt (bỏ trống được):", ""); if (note === null) return;
+      btn.disabled = true;
+      try { await api(`${basePath}/${id}/approve`, { method: "POST", body: JSON.stringify(note.trim() ? { adminNote: note.trim() } : {}) }); flash("Đã duyệt", "success"); await Promise.all([reload(), loadOverview()]); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+  tb.querySelectorAll<HTMLButtonElement>(`button[data-${rejectAttr}]`).forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset[rejectAttr]; if (!id) return;
+      const note = prompt("Lý do từ chối:", "Thông tin chưa hợp lệ"); if (note === null || note.trim().length < 2) { flash("Lý do cần tối thiểu 2 ký tự", "error"); return; }
+      btn.disabled = true;
+      try { await api(`${basePath}/${id}/reject`, { method: "POST", body: JSON.stringify({ adminNote: note.trim() }) }); flash("Đã từ chối", "success"); await Promise.all([reload(), loadOverview()]); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+}
+
+/* ── Render: Vouchers ──────────────────────────── */
+function renderVouchers() {
+  const tb = $("#vouchers-body");
+  if (!appState.vouchers.length) { tb.innerHTML = `<tr><td colspan="8" class="muted-empty">Chưa có voucher.</td></tr>`; return; }
+  tb.innerHTML = appState.vouchers.map(v => {
+    const discountText = v.discountType === "FIXED" ? currency(v.discountValue) : `${v.discountValue}%` + (v.maxDiscount ? ` (max ${currency(v.maxDiscount)})` : "");
+    const usageText = v.maxUsageTotal ? `${v.usedCount}/${v.maxUsageTotal}` : `${v.usedCount}/∞`;
+    const isExpired = new Date(v.expiresAt) < new Date();
+    const activeTag = !v.isActive ? '<span class="tag tag-danger">Tắt</span>' : isExpired ? '<span class="tag tag-warning">Hết hạn</span>' : '<span class="tag tag-success">Hoạt động</span>';
+    return `<tr>
+      <td><code>${esc(v.code)}</code></td><td>${esc(v.description)}</td>
+      <td>${discountText}</td><td>${currency(v.minOrderValue)}</td>
+      <td>${usageText}</td><td>${fmtDate(v.expiresAt)}</td><td>${activeTag}</td>
+      <td><div class="action-row">
+        <button class="btn btn-sm ${v.isActive?'btn-secondary':'btn-success'}" data-vtoggle="${v.id}">${v.isActive?"Tắt":"Bật"}</button>
+        <button class="btn btn-sm btn-danger-solid" data-vdelete="${v.id}">Xóa</button>
+      </div></td></tr>`;
+  }).join("");
+
+  tb.querySelectorAll<HTMLButtonElement>("button[data-vtoggle]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try { await api(`/vouchers/${btn.dataset.vtoggle}/toggle`, { method: "PATCH" }); await loadVouchers(); flash("Đã cập nhật", "success"); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+  tb.querySelectorAll<HTMLButtonElement>("button[data-vdelete]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Xóa voucher này?")) return;
+      btn.disabled = true;
+      try { await api(`/vouchers/${btn.dataset.vdelete}`, { method: "DELETE" }); await loadVouchers(); flash("Đã xóa", "success"); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+}
+
+/* ── Data Loading ──────────────────────────────── */
+async function loadOverview() { const r = await api<ApiListResponse<OverviewPayload>>("/admin/overview"); appState.overview = r.data; renderOverview(); }
+async function loadStores() { const r = await api<ApiListResponse<Store[]>>("/stores?limit=100"); appState.stores = r.data; renderStores(); if (appState.overview) renderOverview(); }
+async function loadDriverApps() {
+  const s = $<HTMLSelectElement>("#driver-status-filter").value.trim();
+  const q = s ? `?status=${encodeURIComponent(s)}&limit=100` : "?limit=100";
+  const r = await api<ApiListResponse<DriverApplication[]>>(`/admin/driver-applications${q}`);
+  appState.driverApps = r.data; renderDriverApps();
+}
+async function loadStoreApps() {
+  const s = $<HTMLSelectElement>("#store-status-filter").value.trim();
+  const q = s ? `?status=${encodeURIComponent(s)}&limit=100` : "?limit=100";
+  const r = await api<ApiListResponse<StoreApplication[]>>(`/admin/store-applications${q}`);
+  appState.storeApps = r.data; renderStoreApps();
+}
+async function loadVouchers() { const r = await api<ApiListResponse<Voucher[]>>("/vouchers/admin"); appState.vouchers = r.data; renderVouchers(); }
+async function loadCategories() { const r = await api<ApiListResponse<Category[]>>("/categories"); appState.categories = r.data; renderCategories(); }
+async function loadBanners() { const r = await api<ApiListResponse<HeroBanner[]>>("/banners?all=true"); appState.banners = r.data; renderBanners(); }
+async function loadUsers(page = 1) {
+  const role = $<HTMLSelectElement>("#user-role-filter").value.trim();
+  const q = $<HTMLInputElement>("#user-search").value.trim();
+  let url = `/admin/users?limit=20&page=${page}`;
+  if (role) url += `&role=${encodeURIComponent(role)}`;
+  if (q) url += `&q=${encodeURIComponent(q)}`;
+  const r = await api<{ data: AdminUserItem[]; pagination: { page: number; totalPages: number } }>(url);
+  appState.users = r.data; appState.userPage = r.pagination.page; appState.userTotalPages = r.pagination.totalPages;
+  renderUsers();
+}
+async function loadAll() { await Promise.all([loadStores(), loadDriverApps(), loadStoreApps(), loadOverview(), loadVouchers(), loadCategories(), loadBanners(), loadUsers()]); }
+
+/* ── Render: Categories ───────────────────────── */
+function renderCategories() {
+  const tb = $("#categories-body");
+  if (!appState.categories.length) { tb.innerHTML = `<tr><td colspan="4" class="muted-empty">Chưa có danh mục.</td></tr>`; return; }
+  tb.innerHTML = appState.categories.map(c => `<tr>
+    <td><code>${esc(c.key)}</code></td>
+    <td><span class="cat-name" data-catid="${esc(c.id)}" contenteditable="false">${esc(c.name)}</span></td>
+    <td>${c.iconUrl ? `<img src="${esc(c.iconUrl)}" style="width:28px;height:28px;border-radius:6px;object-fit:cover" onerror="this.outerHTML='—'"/>` : '—'}</td>
+    <td><div class="action-row">
+      <button class="btn btn-sm btn-secondary" data-cat-edit="${esc(c.id)}">✏️ Sửa tên</button>
+      <button class="btn btn-sm btn-danger-solid" data-cat-delete="${esc(c.id)}">🗑️ Xóa</button>
+    </div></td></tr>`).join("");
+
+  tb.querySelectorAll<HTMLButtonElement>("button[data-cat-edit]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.catEdit!;
+      const cat = appState.categories.find(c => c.id === id);
+      const newName = prompt("Tên danh mục mới:", cat?.name || "");
+      if (!newName || newName.trim() === cat?.name) return;
+      btn.disabled = true;
+      try { await api(`/categories/${id}`, { method: "PATCH", body: JSON.stringify({ name: newName.trim() }) }); await loadCategories(); flash("Đã cập nhật", "success"); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+  tb.querySelectorAll<HTMLButtonElement>("button[data-cat-delete]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Xóa danh mục này?")) return;
+      btn.disabled = true;
+      try { await api(`/categories/${btn.dataset.catDelete}`, { method: "DELETE" }); await loadCategories(); flash("Đã xóa", "success"); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+}
+
+/* ── Render: Banners ──────────────────────────── */
+function renderBanners() {
+  const grid = $("#banners-grid");
+  if (!appState.banners.length) { grid.innerHTML = `<p class="muted-empty">Chưa có banner.</p>`; return; }
+  grid.innerHTML = appState.banners.map(b => `<div class="banner-card" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#fff">
+    <img src="${esc(b.imageUrl)}" style="width:100%;height:140px;object-fit:cover" onerror="this.style.background='#f1f5f9';this.alt='Lỗi ảnh'"/>
+    <div style="padding:10px 12px">
+      <div style="font-weight:600;font-size:13px;margin-bottom:4px">${esc(b.title || "(Không có tiêu đề)")}</div>
+      <div style="font-size:11px;color:var(--text-light);margin-bottom:6px">Thứ tự: ${b.sortOrder} · ${b.isActive ? '<span style="color:#22c55e">Hiển thị</span>' : '<span style="color:#ef4444">Ẩn</span>'}</div>
+      <div class="action-row" style="gap:6px">
+        <label class="switch" style="margin-right:auto"><input type="checkbox" data-banner-toggle="${esc(b.id)}" ${b.isActive ? "checked" : ""}><span>${b.isActive ? "Bật" : "Tắt"}</span></label>
+        <button class="btn btn-sm btn-secondary" data-banner-img="${esc(b.id)}">🖼️ Đổi ảnh</button>
+        <button class="btn btn-sm btn-danger-solid" data-banner-del="${esc(b.id)}">🗑️</button>
       </div>
-    `;
-  }
-
-  return `
-    <div class="doc-preview" style="cursor: pointer;" onclick="previewImage(this.querySelector('img').src)">
-      <span>${escapeHtml(label)}</span>
-      <img src="${dataUrl}" alt="${escapeHtml(label)}" loading="lazy" />
     </div>
-  `;
+  </div>`).join("");
+
+  grid.querySelectorAll<HTMLInputElement>("input[data-banner-toggle]").forEach(cb => {
+    cb.addEventListener("change", async () => {
+      cb.disabled = true;
+      try { await api(`/banners/${cb.dataset.bannerToggle}`, { method: "PATCH", body: JSON.stringify({ isActive: cb.checked }) }); await loadBanners(); }
+      catch (e) { cb.checked = !cb.checked; flash(errMsg(e), "error"); } finally { cb.disabled = false; }
+    });
+  });
+  grid.querySelectorAll<HTMLButtonElement>("button[data-banner-del]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Xóa banner này?")) return;
+      btn.disabled = true;
+      try { await api(`/banners/${btn.dataset.bannerDel}`, { method: "DELETE" }); await loadBanners(); flash("Đã xóa", "success"); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+  grid.querySelectorAll<HTMLButtonElement>("button[data-banner-img]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const input = document.createElement("input"); input.type = "file"; input.accept = "image/*";
+      input.addEventListener("change", async () => {
+        const file = input.files?.[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async () => {
+          btn.disabled = true;
+          try { await api(`/banners/${btn.dataset.bannerImg}`, { method: "PATCH", body: JSON.stringify({ imageUrl: reader.result }) }); await loadBanners(); flash("Đã cập nhật ảnh", "success"); }
+          catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+        };
+        reader.readAsDataURL(file);
+      });
+      input.click();
+    });
+  });
 }
 
-function renderDriverApplicationsTable() {
-  if (state.driverApplications.length === 0) {
-    elements.driverApplicationsBody.innerHTML =
-      `<tr><td colspan="5" class="muted-empty">Khong co ho so tai xe nao theo bo loc hien tai.</td></tr>`;
-    return;
+/* ── Render: Users ───────────────────────────── */
+const ROLE_LABELS: Record<string, string> = { CUSTOMER: "Khách hàng", ADMIN: "Admin", STORE_MANAGER: "QL Cửa hàng", DRIVER: "Tài xế" };
+
+function renderUsers() {
+  const tb = $("#users-body");
+  if (!appState.users.length) { tb.innerHTML = `<tr><td colspan="7" class="muted-empty">Không có người dùng.</td></tr>`; return; }
+  tb.innerHTML = appState.users.map(u => {
+    const roleOpts = ["CUSTOMER", "ADMIN", "STORE_MANAGER", "DRIVER"].map(r =>
+      `<option value="${r}" ${u.role === r ? "selected" : ""}>${ROLE_LABELS[r]}</option>`
+    ).join("");
+    return `<tr>
+      <td><strong>${esc(u.name)}</strong></td>
+      <td><small>${esc(u.email)}</small></td>
+      <td><small>${esc(u.phone || "—")}</small></td>
+      <td><select class="filter-select" data-user-role="${esc(u.id)}" style="min-width:110px;font-size:12px">${roleOpts}</select></td>
+      <td>${u._count.orders}</td>
+      <td><small>${fmtDate(u.createdAt)}</small></td>
+      <td>${u.role !== "ADMIN" ? `<button class="btn btn-sm btn-danger-solid" data-user-del="${esc(u.id)}">🗑️</button>` : ''}</td>
+    </tr>`;
+  }).join("");
+
+  // Role change
+  tb.querySelectorAll<HTMLSelectElement>("select[data-user-role]").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      sel.disabled = true;
+      try { await api(`/admin/users/${sel.dataset.userRole}`, { method: "PATCH", body: JSON.stringify({ role: sel.value }) }); flash("Đã cập nhật vai trò", "success"); await loadUsers(appState.userPage); }
+      catch (e) { flash(errMsg(e), "error"); await loadUsers(appState.userPage); } finally { sel.disabled = false; }
+    });
+  });
+  // Delete
+  tb.querySelectorAll<HTMLButtonElement>("button[data-user-del]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      if (!confirm("Xóa người dùng này?")) return;
+      btn.disabled = true;
+      try { await api(`/admin/users/${btn.dataset.userDel}`, { method: "DELETE" }); flash("Đã xóa", "success"); await loadUsers(appState.userPage); }
+      catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+
+  // Pagination
+  const pg = $("#users-pagination");
+  if (appState.userTotalPages <= 1) { pg.innerHTML = ""; return; }
+  let html = "";
+  for (let i = 1; i <= appState.userTotalPages; i++) {
+    html += `<button class="btn btn-sm ${i === appState.userPage ? 'btn-primary' : 'btn-secondary'}" data-user-page="${i}">${i}</button>`;
   }
-
-  elements.driverApplicationsBody.innerHTML = state.driverApplications
-    .map(
-      (application) => `
-        <tr>
-          <td>
-            <strong>${escapeHtml(application.fullName)}</strong><br />
-            <small>${escapeHtml(application.email)}</small><br />
-            <small>${escapeHtml(application.phone || "Khong co SDT")}</small><br />
-            <small>Sinh ngay: ${formatDateTime(application.dateOfBirth)}</small><br />
-            <small>Nop luc: ${formatDateTime(application.createdAt)}</small>
-          </td>
-          <td>
-            <small>Loai xe: ${escapeHtml(application.vehicleType)}</small><br />
-            <small>Bien so: <strong>${escapeHtml(application.licensePlate)}</strong></small>
-          </td>
-          <td>
-            <div class="doc-grid">
-              ${documentPreview("Chan dung", application.portraitImageData)}
-              ${documentPreview("CCCD", application.idCardImageData)}
-              ${documentPreview("Bang lai", application.driverLicenseImageData)}
-            </div>
-          </td>
-          <td>
-            <small>Chan dung: ${application.portraitQualityScore.toFixed(1)}</small><br />
-            <small>CCCD: ${application.idCardQualityScore.toFixed(1)}</small><br />
-            <small>Bang lai: ${application.driverLicenseQualityScore.toFixed(1)}</small>
-          </td>
-          <td>
-            <span class="${statusClass(application.status)}">${escapeHtml(application.status)}</span><br />
-            <small>${escapeHtml(application.adminNote || "-")}</small>
-            ${application.status === "PENDING"
-          ? `
-                  <div class="action-row">
-                    <button type="button" class="btn-small btn-secondary" data-driver-approve="${escapeHtml(application.id)}">Duyet</button>
-                    <button type="button" class="btn-small btn-danger" data-driver-reject="${escapeHtml(application.id)}">Tu choi</button>
-                  </div>
-                `
-          : `<small class="review-time">Xu ly: ${formatDateTime(application.reviewedAt)}</small>`
-        }
-          </td>
-        </tr>
-      `,
-    )
-    .join("");
-
-  const approveButtons = Array.from(
-    elements.driverApplicationsBody.querySelectorAll<HTMLButtonElement>("button[data-driver-approve]"),
-  );
-  const rejectButtons = Array.from(
-    elements.driverApplicationsBody.querySelectorAll<HTMLButtonElement>("button[data-driver-reject]"),
-  );
-
-  approveButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const applicationId = button.dataset.driverApprove;
-      if (!applicationId) {
-        return;
-      }
-
-      const adminNoteRaw = window.prompt(
-        "Ghi chu duyet (co the bo trong). Neu de trong he thong se luu null.",
-        "",
-      );
-      if (adminNoteRaw === null) {
-        return;
-      }
-      const adminNote = adminNoteRaw.trim();
-      if (adminNote.length > 0 && adminNote.length < 2) {
-        showFlash("Ghi chu duyet can tu 2 ky tu tro len", "error");
-        return;
-      }
-
-      button.disabled = true;
-      try {
-        await apiRequest(`/admin/driver-applications/${applicationId}/approve`, {
-          method: "POST",
-          body: JSON.stringify(adminNote ? { adminNote } : {}),
-        });
-        showFlash("Da duyet ho so tai xe", "success");
-        await Promise.all([loadDriverApplications(), loadOverview()]);
-      } catch (error) {
-        showFlash(`Duyet ho so that bai: ${toErrorMessage(error)}`, "error");
-      } finally {
-        button.disabled = false;
-      }
-    });
-  });
-
-  rejectButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const applicationId = button.dataset.driverReject;
-      if (!applicationId) {
-        return;
-      }
-
-      const adminNoteRaw = window.prompt("Nhap ly do tu choi ho so tai xe:", "Thong tin ho so chua hop le");
-      if (adminNoteRaw === null) {
-        return;
-      }
-      const adminNote = adminNoteRaw.trim();
-      if (adminNote.length < 2) {
-        showFlash("Ly do tu choi can toi thieu 2 ky tu", "error");
-        return;
-      }
-
-      button.disabled = true;
-      try {
-        await apiRequest(`/admin/driver-applications/${applicationId}/reject`, {
-          method: "POST",
-          body: JSON.stringify({ adminNote }),
-        });
-        showFlash("Da tu choi ho so tai xe", "success");
-        await Promise.all([loadDriverApplications(), loadOverview()]);
-      } catch (error) {
-        showFlash(`Tu choi ho so that bai: ${toErrorMessage(error)}`, "error");
-      } finally {
-        button.disabled = false;
-      }
-    });
+  pg.innerHTML = html;
+  pg.querySelectorAll<HTMLButtonElement>("button[data-user-page]").forEach(btn => {
+    btn.addEventListener("click", () => void loadUsers(Number(btn.dataset.userPage)).catch(e => flash(errMsg(e), "error")));
   });
 }
 
-function renderStoreApplicationsTable() {
-  if (state.storeApplications.length === 0) {
-    elements.storeApplicationsBody.innerHTML =
-      `<tr><td colspan="5" class="muted-empty">Khong co ho so cua hang nao theo bo loc hien tai.</td></tr>`;
-    return;
-  }
-
-  elements.storeApplicationsBody.innerHTML = state.storeApplications
-    .map(
-      (application) => `
-        <tr>
-          <td>
-            <strong>${escapeHtml(application.storeName)}</strong><br />
-            <small>${escapeHtml(application.storeAddress)}</small><br />
-            <small>SDT: ${escapeHtml(application.storePhone)}</small><br />
-            <small>Tao luc: ${formatDateTime(application.createdAt)}</small>
-          </td>
-          <td>
-            <strong>${escapeHtml(application.applicant.name)}</strong><br />
-            <small>${escapeHtml(application.applicant.email)}</small><br />
-            <small>${escapeHtml(application.applicant.phone || "Khong co SDT")}</small>
-          </td>
-          <td>
-            <div class="doc-grid">
-              ${documentPreview("Mat tien", application.frontStoreImageData)}
-              ${documentPreview("GPKD", application.businessLicenseImageData)}
-            </div>
-          </td>
-          <td>
-            ${application.storeLatitude !== null && application.storeLongitude !== null
-          ? `<small>${application.storeLatitude.toFixed(6)}, ${application.storeLongitude.toFixed(6)}</small>`
-          : `<small>Khong co toa do</small>`
-        }
-          </td>
-          <td>
-            <span class="${statusClass(application.status)}">${escapeHtml(application.status)}</span><br />
-            <small>${escapeHtml(application.adminNote || "-")}</small>
-            ${application.status === "PENDING"
-          ? `
-                  <div class="action-row">
-                    <button type="button" class="btn-small btn-secondary" data-store-app-approve="${escapeHtml(application.id)}">Duyet</button>
-                    <button type="button" class="btn-small btn-danger" data-store-app-reject="${escapeHtml(application.id)}">Tu choi</button>
-                  </div>
-                `
-          : `<small class="review-time">Xu ly: ${formatDateTime(application.reviewedAt)}</small>`
-        }
-          </td>
-        </tr>
-      `,
-    )
-    .join("");
-
-  const approveButtons = Array.from(
-    elements.storeApplicationsBody.querySelectorAll<HTMLButtonElement>("button[data-store-app-approve]"),
-  );
-  const rejectButtons = Array.from(
-    elements.storeApplicationsBody.querySelectorAll<HTMLButtonElement>("button[data-store-app-reject]"),
-  );
-
-  approveButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const applicationId = button.dataset.storeAppApprove;
-      if (!applicationId) {
-        return;
-      }
-
-      const adminNoteRaw = window.prompt(
-        "Ghi chu duyet (co the bo trong). Khi duyet, he thong tu tao store va gan vai tro chu quan.",
-        "",
-      );
-      if (adminNoteRaw === null) {
-        return;
-      }
-      const adminNote = adminNoteRaw.trim();
-      if (adminNote.length > 0 && adminNote.length < 2) {
-        showFlash("Ghi chu duyet can toi thieu 2 ky tu neu co nhap", "error");
-        return;
-      }
-
-      button.disabled = true;
-      try {
-        await apiRequest(`/admin/store-applications/${applicationId}/approve`, {
-          method: "POST",
-          body: JSON.stringify(adminNote ? { adminNote } : {}),
-        });
-        showFlash("Da duyet ho so cua hang", "success");
-        await Promise.all([loadStoreApplications(), loadStores(), loadOverview()]);
-      } catch (error) {
-        showFlash(`Duyet ho so that bai: ${toErrorMessage(error)}`, "error");
-      } finally {
-        button.disabled = false;
-      }
-    });
-  });
-
-  rejectButtons.forEach((button) => {
-    button.addEventListener("click", async () => {
-      const applicationId = button.dataset.storeAppReject;
-      if (!applicationId) {
-        return;
-      }
-
-      const adminNoteRaw = window.prompt("Nhap ly do tu choi ho so cua hang:", "Thong tin ho so chua day du");
-      if (adminNoteRaw === null) {
-        return;
-      }
-      const adminNote = adminNoteRaw.trim();
-      if (adminNote.length < 2) {
-        showFlash("Ly do tu choi can toi thieu 2 ky tu", "error");
-        return;
-      }
-
-      button.disabled = true;
-      try {
-        await apiRequest(`/admin/store-applications/${applicationId}/reject`, {
-          method: "POST",
-          body: JSON.stringify({ adminNote }),
-        });
-        showFlash("Da tu choi ho so cua hang", "success");
-        await Promise.all([loadStoreApplications(), loadOverview()]);
-      } catch (error) {
-        showFlash(`Tu choi ho so that bai: ${toErrorMessage(error)}`, "error");
-      } finally {
-        button.disabled = false;
-      }
-    });
-  });
-}
-
-async function loadOverview() {
-  const response = await apiRequest<ApiListResponse<OverviewPayload>>("/admin/overview");
-  state.overview = response.data;
-  renderOverview();
-}
-
-async function loadStores() {
-  const response = await apiRequest<ApiListResponse<Store[]>>("/stores?limit=100");
-  state.stores = response.data;
-  renderStoresTable();
-  if (state.overview) {
-    renderOverview();
-  }
-}
-
-async function loadDriverApplications() {
-  const selectedStatus = elements.driverStatusFilter.value.trim();
-  const query = selectedStatus ? `?status=${encodeURIComponent(selectedStatus)}&limit=100` : "?limit=100";
-  const response = await apiRequest<ApiListResponse<DriverApplication[]>>(`/admin/driver-applications${query}`);
-  state.driverApplications = response.data;
-  renderDriverApplicationsTable();
-}
-
-async function loadStoreApplications() {
-  const selectedStatus = elements.storeStatusFilter.value.trim();
-  const query = selectedStatus ? `?status=${encodeURIComponent(selectedStatus)}&limit=100` : "?limit=100";
-  const response = await apiRequest<ApiListResponse<StoreApplication[]>>(`/admin/store-applications${query}`);
-  state.storeApplications = response.data;
-  renderStoreApplicationsTable();
-}
-
-async function loadDashboardData() {
-  await Promise.all([loadStores(), loadDriverApplications(), loadStoreApplications(), loadOverview()]);
-}
-
-async function handleLogin(event: SubmitEvent) {
-  event.preventDefault();
-  elements.loginError.textContent = "";
-  elements.loginButton.disabled = true;
-
-  const email = elements.loginEmail.value.trim().toLowerCase();
-  const password = elements.loginPassword.value;
-
+/* ── Event Handlers ────────────────────────────── */
+async function handleLogin(e: SubmitEvent) {
+  e.preventDefault(); loginError.textContent = ""; loginButton.disabled = true;
   try {
-    const response = await apiRequest<LoginResponse>(
-      "/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      },
-      false,
-    );
-
-    if (response.user.role !== "ADMIN") {
-      throw new Error("Tai khoan nay khong co quyen admin");
-    }
-
-    state.tokens = response.tokens;
-    state.user = response.user;
-    saveSession();
-    showAppView();
-    setActiveTab(state.activeTab);
-    await loadDashboardData();
-    showFlash("Dang nhap thanh cong", "success");
-  } catch (error) {
-    elements.loginError.textContent = toErrorMessage(error);
-  } finally {
-    elements.loginButton.disabled = false;
-  }
+    const r = await api<LoginResponse>("/auth/login", { method: "POST", body: JSON.stringify({ email: loginEmail.value.trim().toLowerCase(), password: loginPassword.value, role: "ADMIN" }) }, false);
+    if (r.user.role !== "ADMIN") throw new Error("Không có quyền admin");
+    state.tokens = r.tokens; state.user = r.user; saveSession(); showApp(); setTab(appState.activeTab);
+    await loadAll(); flash("Đăng nhập thành công", "success");
+  } catch (e: any) { loginError.textContent = errMsg(e); } finally { loginButton.disabled = false; }
 }
 
 async function handleLogout() {
-  try {
-    if (state.tokens?.refreshToken) {
-      await apiRequest(
-        "/auth/logout",
-        {
-          method: "POST",
-          body: JSON.stringify({ refreshToken: state.tokens.refreshToken }),
-        },
-        false,
-      );
-    }
-  } catch (_error) {
-    // ignore network/logout errors, local session still gets cleared.
-  } finally {
-    clearSession();
-    showLoginView();
-    showFlash("Da dang xuat khoi he thong", "info");
-  }
+  try { if (state.tokens?.refreshToken) await api("/auth/logout", { method: "POST", body: JSON.stringify({ refreshToken: state.tokens.refreshToken }) }, false); }
+  catch {} finally { clearSession(); showLogin(); flash("Đã đăng xuất", "info"); }
 }
 
-async function handleCreateStore(event: SubmitEvent) {
-  event.preventDefault();
-  const formData = new FormData(elements.createStoreForm);
+async function handleCreateStore(e: SubmitEvent) {
+  e.preventDefault(); const form = $<HTMLFormElement>("#create-store-form"); const fd = new FormData(form);
+  const etaMin = Number(fd.get("etaMinutesMin")); const etaMax = Number(fd.get("etaMinutesMax"));
+  if (etaMin > etaMax) { flash("ETA tối thiểu > tối đa", "error"); return; }
+  const p: Record<string, unknown> = { name: String(fd.get("name")??"").trim(), address: String(fd.get("address")??"").trim(), rating: Number(fd.get("rating")??4.5), etaMinutesMin: etaMin, etaMinutesMax: etaMax, managerName: String(fd.get("managerName")??"").trim(), managerEmail: String(fd.get("managerEmail")??"").trim().toLowerCase(), managerPassword: String(fd.get("managerPassword")??""), isOpen: true };
+  const lat = String(fd.get("latitude")??"").trim(); const lng = String(fd.get("longitude")??"").trim();
+  if (lat) p.latitude = Number(lat); if (lng) p.longitude = Number(lng);
+  try { await api("/stores", { method: "POST", body: JSON.stringify(p) }); form.reset(); flash("Đã tạo cửa hàng", "success"); await Promise.all([loadStores(), loadOverview()]); }
+  catch (e: any) { flash(errMsg(e), "error"); }
+}
 
-  const etaMinutesMin = Number(formData.get("etaMinutesMin"));
-  const etaMinutesMax = Number(formData.get("etaMinutesMax"));
-  if (etaMinutesMin > etaMinutesMax) {
-    showFlash("ETA toi thieu khong duoc lon hon ETA toi da", "error");
-    return;
-  }
-
-  const payload: Record<string, unknown> = {
-    name: String(formData.get("name") ?? "").trim(),
-    address: String(formData.get("address") ?? "").trim(),
-    rating: Number(formData.get("rating") ?? 4.5),
-    etaMinutesMin,
-    etaMinutesMax,
-    managerName: String(formData.get("managerName") ?? "").trim(),
-    managerEmail: String(formData.get("managerEmail") ?? "").trim().toLowerCase(),
-    managerPassword: String(formData.get("managerPassword") ?? ""),
-    isOpen: true,
+async function handleCreateVoucher(e: SubmitEvent) {
+  e.preventDefault(); const form = $<HTMLFormElement>("#create-voucher-form"); const fd = new FormData(form);
+  const p: Record<string, unknown> = {
+    code: String(fd.get("code")??"").trim(),
+    description: String(fd.get("description")??"").trim(),
+    discountType: String(fd.get("discountType")??"FIXED"),
+    discountValue: Number(fd.get("discountValue")??0),
+    minOrderValue: Number(fd.get("minOrderValue")??0),
+    maxUsagePerUser: Number(fd.get("maxUsagePerUser")??1),
+    expiresAt: String(fd.get("expiresAt")??""),
   };
-
-  const latitudeRaw = String(formData.get("latitude") ?? "").trim();
-  const longitudeRaw = String(formData.get("longitude") ?? "").trim();
-  if (latitudeRaw) {
-    payload.latitude = Number(latitudeRaw);
-  }
-  if (longitudeRaw) {
-    payload.longitude = Number(longitudeRaw);
-  }
-
-  try {
-    await apiRequest("/stores", {
-      method: "POST",
-      body: JSON.stringify(payload),
-    });
-    elements.createStoreForm.reset();
-    showFlash("Da tao cua hang va tai khoan quan ly", "success");
-    await Promise.all([loadStores(), loadOverview()]);
-  } catch (error) {
-    showFlash(`Tao cua hang that bai: ${toErrorMessage(error)}`, "error");
-  }
+  const maxD = String(fd.get("maxDiscount")??"").trim(); if (maxD) p.maxDiscount = Number(maxD);
+  const maxU = String(fd.get("maxUsageTotal")??"").trim(); if (maxU) p.maxUsageTotal = Number(maxU);
+  try { await api("/vouchers", { method: "POST", body: JSON.stringify(p) }); form.reset(); flash("Đã tạo voucher", "success"); await loadVouchers(); }
+  catch (e: any) { flash(errMsg(e), "error"); }
 }
 
+/* ── Bind Events ───────────────────────────────── */
 function bindEvents() {
-  elements.loginForm.addEventListener("submit", (event) => {
-    void handleLogin(event);
-  });
-  elements.logoutButton.addEventListener("click", () => {
-    void handleLogout();
-  });
-  elements.createStoreForm.addEventListener("submit", (event) => {
-    void handleCreateStore(event);
+  loginForm.addEventListener("submit", e => void handleLogin(e));
+  $("#logout-button").addEventListener("click", () => void handleLogout());
+  $<HTMLFormElement>("#create-store-form").addEventListener("submit", e => void handleCreateStore(e));
+  $<HTMLFormElement>("#create-voucher-form").addEventListener("submit", e => void handleCreateVoucher(e));
+  $("#refresh-overview").addEventListener("click", () => void loadOverview().catch(e => flash(errMsg(e), "error")));
+  $("#refresh-stores").addEventListener("click", () => void loadStores().catch(e => flash(errMsg(e), "error")));
+  $("#refresh-driver-applications").addEventListener("click", () => void loadDriverApps().catch(e => flash(errMsg(e), "error")));
+  $("#refresh-store-applications").addEventListener("click", () => void loadStoreApps().catch(e => flash(errMsg(e), "error")));
+  $("#refresh-vouchers").addEventListener("click", () => void loadVouchers().catch(e => flash(errMsg(e), "error")));
+  $<HTMLSelectElement>("#driver-status-filter").addEventListener("change", () => void loadDriverApps().catch(e => flash(errMsg(e), "error")));
+  $<HTMLSelectElement>("#store-status-filter").addEventListener("change", () => void loadStoreApps().catch(e => flash(errMsg(e), "error")));
+  navBtns.forEach(b => b.addEventListener("click", () => { const t = b.dataset.tab as TabKey|undefined; if (t) setTab(t); }));
+
+  // Category create
+  $<HTMLFormElement>("#create-category-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const form = $<HTMLFormElement>("#create-category-form"); const fd = new FormData(form);
+    const p: Record<string, unknown> = { key: String(fd.get("key")??"").trim(), name: String(fd.get("name")??"").trim() };
+    const icon = String(fd.get("iconUrl")??"").trim(); if (icon) p.iconUrl = icon;
+    try { await api("/categories", { method: "POST", body: JSON.stringify(p) }); form.reset(); flash("Đã thêm danh mục", "success"); await loadCategories(); }
+    catch (e: any) { flash(errMsg(e), "error"); }
   });
 
-  elements.refreshOverview.addEventListener("click", () => {
-    void loadOverview().catch((error) => showFlash(toErrorMessage(error), "error"));
-  });
-  elements.refreshStores.addEventListener("click", () => {
-    void Promise.all([loadStores(), loadOverview()]).catch((error) => showFlash(toErrorMessage(error), "error"));
-  });
-  elements.refreshDriverApplications.addEventListener("click", () => {
-    void Promise.all([loadDriverApplications(), loadOverview()]).catch((error) =>
-      showFlash(toErrorMessage(error), "error"),
-    );
-  });
-  elements.refreshStoreApplications.addEventListener("click", () => {
-    void Promise.all([loadStoreApplications(), loadOverview()]).catch((error) =>
-      showFlash(toErrorMessage(error), "error"),
-    );
+  // Banner create with file upload
+  const bannerFileInput = $<HTMLInputElement>("#banner-file-input");
+  const bannerImageData = $<HTMLInputElement>("#banner-image-data");
+  const bannerPreview = $("#banner-preview");
+  bannerFileInput.addEventListener("change", () => {
+    const file = bannerFileInput.files?.[0]; if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      bannerImageData.value = reader.result as string;
+      bannerPreview.innerHTML = `<img src="${reader.result}" style="max-height:120px;border-radius:8px;border:1px solid var(--border)"/>`;
+    };
+    reader.readAsDataURL(file);
   });
 
-  elements.driverStatusFilter.addEventListener("change", () => {
-    void loadDriverApplications().catch((error) => showFlash(toErrorMessage(error), "error"));
-  });
-  elements.storeStatusFilter.addEventListener("change", () => {
-    void loadStoreApplications().catch((error) => showFlash(toErrorMessage(error), "error"));
+  $<HTMLFormElement>("#create-banner-form").addEventListener("submit", async (e) => {
+    e.preventDefault(); const form = $<HTMLFormElement>("#create-banner-form"); const fd = new FormData(form);
+    const imageUrl = bannerImageData.value;
+    if (!imageUrl) { flash("Vui lòng chọn ảnh banner", "error"); return; }
+    const p: Record<string, unknown> = { imageUrl, sortOrder: Number(fd.get("sortOrder")??0) };
+    const title = String(fd.get("title")??"").trim(); if (title) p.title = title;
+    const link = String(fd.get("link")??"").trim(); if (link) p.link = link;
+    try { await api("/banners", { method: "POST", body: JSON.stringify(p) }); form.reset(); bannerPreview.innerHTML = ""; bannerImageData.value = ""; flash("Đã thêm banner", "success"); await loadBanners(); }
+    catch (e: any) { flash(errMsg(e), "error"); }
   });
 
-  navButtons.forEach((button) => {
-    button.addEventListener("click", () => {
-      const tab = button.dataset.tab as TabKey | undefined;
-      if (!tab) {
-        return;
-      }
-      setActiveTab(tab);
-    });
-  });
+  $("#refresh-categories").addEventListener("click", () => void loadCategories().catch(e => flash(errMsg(e), "error")));
+  $("#refresh-banners").addEventListener("click", () => void loadBanners().catch(e => flash(errMsg(e), "error")));
+  $("#refresh-users").addEventListener("click", () => void loadUsers().catch(e => flash(errMsg(e), "error")));
+
+  let userSearchTimer: ReturnType<typeof setTimeout>;
+  $("#user-search").addEventListener("input", () => { clearTimeout(userSearchTimer); userSearchTimer = setTimeout(() => void loadUsers().catch(e => flash(errMsg(e), "error")), 400); });
+  $<HTMLSelectElement>("#user-role-filter").addEventListener("change", () => void loadUsers().catch(e => flash(errMsg(e), "error")));
 }
 
+/* ── Bootstrap ─────────────────────────────────── */
 async function bootstrap() {
-  bindEvents();
-  setActiveTab(state.activeTab);
-  loadSession();
-
+  bindEvents(); setTab(appState.activeTab); loadSession();
   if (state.tokens?.accessToken && state.user?.role === "ADMIN") {
-    showAppView();
-    try {
-      await loadDashboardData();
-      showFlash("Da khoi phuc phien lam viec admin", "info");
-      return;
-    } catch (error) {
-      clearSession();
-      showLoginView();
-      showFlash(`Phien dang nhap het han: ${toErrorMessage(error)}`, "error");
-      return;
-    }
+    showApp();
+    try { await loadAll(); flash("Đã khôi phục phiên", "info"); return; }
+    catch (e) { clearSession(); showLogin(); flash(errMsg(e), "error"); return; }
   }
-
-  showLoginView();
+  showLogin();
 }
 
 void bootstrap();
 
-// Global function for image preview to safely open large data URIs
 (window as any).previewImage = function(src: string) {
-  const win = window.open("", "_blank");
-  if (win) {
-    win.document.write(`
-      <!DOCTYPE html>
-      <html>
-      <head><title>Xem chi tiet hinh anh</title></head>
-      <body style="margin:0; background:#111; display:flex; justify-content:center; align-items:center; min-height:100vh;">
-        <img src="${src}" style="max-width:100%; max-height:100vh; object-fit:contain;" />
-      </body>
-      </html>
-    `);
-    win.document.close();
-  }
+  const w = window.open("", "_blank");
+  if (w) { w.document.write(`<!DOCTYPE html><html><head><title>Xem ảnh</title></head><body style="margin:0;background:#111;display:flex;justify-content:center;align-items:center;min-height:100vh"><img src="${src}" style="max-width:100%;max-height:100vh;object-fit:contain"/></body></html>`); w.document.close(); }
 };
-

@@ -1,7 +1,7 @@
 import React, { FC, Suspense } from "react";
 import { useRecoilValue } from "recoil";
 import { productsState } from "state";
-import { Box, Text } from "zmp-ui";
+import { Box, Text, useNavigate } from "zmp-ui";
 import { ProductSlideSkeleton } from "components/skeletons";
 import { ProductPicker } from "components/product/picker";
 import { FinalPrice } from "components/display/final-price";
@@ -68,6 +68,7 @@ const FavoriteButton: FC<{ productId: number }> = ({ productId }) => {
 export const ProductListContent: FC = () => {
   const products = useRecoilValue(productsState);
   const activeFilter = useRecoilValue(activeFilterState);
+  const navigate = useNavigate();
   const filtered = filterProducts(products, activeFilter);
 
   const filterLabel = activeFilter
@@ -115,18 +116,20 @@ export const ProductListContent: FC = () => {
                       Giảm {product.sale.type === "percent" ? `${product.sale.percent * 100}%` : `${(product.sale.amount / 1000).toFixed(0)}K`}
                     </span>
                   )}
-                  <div style={{
-                    position: 'absolute', bottom: 6, left: 6,
-                    background: 'rgba(0,0,0,0.55)',
-                    borderRadius: 12, padding: '2px 6px',
-                    display: 'flex', alignItems: 'center', gap: 2,
-                    backdropFilter: 'blur(4px)',
-                  }}>
-                    <span style={{ color: '#ffb800', fontSize: 10 }}>★</span>
-                    <span style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>
-                      {product.rating ?? 4.7}
-                    </span>
-                  </div>
+                  {product.rating ? (
+                    <div style={{
+                      position: 'absolute', bottom: 6, left: 6,
+                      background: 'rgba(0,0,0,0.55)',
+                      borderRadius: 12, padding: '2px 6px',
+                      display: 'flex', alignItems: 'center', gap: 2,
+                      backdropFilter: 'blur(4px)',
+                    }}>
+                      <span style={{ color: '#ffb800', fontSize: 10 }}>★</span>
+                      <span style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>
+                        {product.rating}
+                      </span>
+                    </div>
+                  ) : null}
                   <FavoriteButton productId={typeof product.id === "number" ? product.id : 0} />
                   <button
                     className="tm-add-btn"
@@ -135,14 +138,20 @@ export const ProductListContent: FC = () => {
                   >+</button>
                 </div>
                 <Box style={{ padding: '8px 10px 10px' }}>
-                  <Text style={{
-                    fontWeight: 600, color: 'var(--tm-text-primary)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    marginBottom: 2, fontSize: 13,
-                  }}>
+                  <Text
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(`/product?id=${product.backendId || product.id}`); }}
+                    style={{
+                      fontWeight: 600, color: 'var(--tm-text-primary)',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      marginBottom: 2, fontSize: 13, cursor: 'pointer',
+                    }}>
                     {product.name}
                   </Text>
-                  <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)', fontSize: 11, marginBottom: 4 }}>
+                  <Text
+                    size="xxxSmall"
+                    onClick={(e: React.MouseEvent) => { e.stopPropagation(); if (product.storeId) navigate(`/store?id=${product.storeId}`); }}
+                    style={{ color: 'var(--tm-primary)', fontSize: 11, marginBottom: 4, cursor: product.storeId ? 'pointer' : 'default', textDecoration: product.storeId ? 'underline' : 'none' }}
+                  >
                     {product.storeName ?? "Quán đối tác"}
                   </Text>
                   <Text style={{ color: 'var(--tm-primary)', fontWeight: 700, fontSize: 14 }}>

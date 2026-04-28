@@ -12,21 +12,37 @@ export function errorHandler(
 ) {
   if (err instanceof ZodError) {
     return res.status(StatusCodes.BAD_REQUEST).json({
-      message: "Validation failed",
+      message: "Dữ liệu không hợp lệ",
       errors: err.flatten(),
     });
   }
 
   if (err instanceof Prisma.PrismaClientKnownRequestError) {
     if (err.code === "P2002") {
+      const target = (err.meta?.target as string[]) ?? [];
+      const fieldMap: Record<string, string> = {
+        email: "Email",
+        phone: "Số điện thoại",
+        licensePlate: "Biển số xe",
+        name: "Tên",
+        slug: "Đường dẫn",
+        key: "Mã danh mục",
+        externalId: "Mã ngoài",
+      };
+      const duplicatedFields = target
+        .map((f) => fieldMap[f] || f)
+        .join(", ");
+      const message = duplicatedFields
+        ? `Trùng dữ liệu: ${duplicatedFields} đã tồn tại`
+        : "Dữ liệu đã tồn tại trong hệ thống";
       return res.status(StatusCodes.CONFLICT).json({
-        message: "Resource already exists",
+        message,
         meta: err.meta,
       });
     }
 
     return res.status(StatusCodes.BAD_REQUEST).json({
-      message: "Database request failed",
+      message: "Yêu cầu cơ sở dữ liệu thất bại",
       code: err.code,
     });
   }
@@ -41,6 +57,6 @@ export function errorHandler(
   console.error(err);
 
   return res.status(StatusCodes.INTERNAL_SERVER_ERROR).json({
-    message: "Internal server error",
+    message: "Lỗi máy chủ nội bộ",
   });
 }

@@ -61,9 +61,9 @@ const imageDataUrlSchema = z
   .refine(
     (value) =>
       /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/i.test(value),
-    "Image must be JPEG, PNG or WEBP data URL",
+    "Ảnh phải là định dạng JPEG, PNG hoặc WEBP",
   )
-  .refine((value) => value.length >= 12_000, "Image quality is too low or file is invalid");
+  .refine((value) => value.length >= 12_000, "Chất lượng ảnh quá thấp hoặc file không hợp lệ");
 
 const registerDriverApplicationSchema = z.object({
   fullName: z.string().min(2).max(120),
@@ -84,6 +84,7 @@ const registerDriverApplicationSchema = z.object({
 const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8).max(64),
+  role: z.nativeEnum(UserRole).optional(),
 });
 
 const refreshSchema = z.object({
@@ -102,7 +103,7 @@ const updateProfileSchema = z.object({
     .string()
     .refine(
       (value) => /^data:image\/(?:jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/i.test(value),
-      "Avatar must be an uploaded JPEG, PNG or WEBP image",
+      "Ảnh đại diện phải là JPEG, PNG hoặc WEBP",
     )
     .optional()
     .nullable(),
@@ -153,17 +154,12 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = registerSchema.parse(req.body);
 
-    const [existedEmail, existedPhone] = await Promise.all([
-      prisma.user.findUnique({ where: { email: payload.email } }),
-      payload.phone ? prisma.user.findUnique({ where: { phone: payload.phone } }) : Promise.resolve(null),
+    const [existedEmail] = await Promise.all([
+      prisma.user.findFirst({ where: { email: payload.email, role: UserRole.CUSTOMER } }),
     ]);
 
     if (existedEmail) {
-      throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
-    }
-
-    if (existedPhone) {
-      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại đã có người đăng ký");
+      throw new HttpError(StatusCodes.CONFLICT, "Email đã được đăng ký với vai trò khách hàng");
     }
 
     const passwordHash = await hashPassword(payload.password);
@@ -200,17 +196,12 @@ authRouter.post(
     const normalizedEmail = payload.email.trim().toLowerCase();
     const normalizedPhone = payload.phone.trim();
 
-    const [existedEmail, existedPhone] = await Promise.all([
-      prisma.user.findUnique({ where: { email: normalizedEmail } }),
-      prisma.user.findUnique({ where: { phone: normalizedPhone } }),
-    ]);
+    const existedEmail = await prisma.user.findFirst({
+      where: { email: normalizedEmail, role: UserRole.CUSTOMER },
+    });
 
     if (existedEmail) {
-      throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
-    }
-
-    if (existedPhone) {
-      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại đã có người đăng ký");
+      throw new HttpError(StatusCodes.CONFLICT, "Email đã được đăng ký với vai trò khách hàng");
     }
 
     const verified = verifyEmailOtp(normalizedEmail, payload.otpCode);
@@ -252,7 +243,7 @@ authRouter.post(
     const payload = requestEmailOtpSchema.parse(req.body);
     const normalizedEmail = payload.email.trim().toLowerCase();
 
-    const existed = await prisma.user.findUnique({
+    const existed = await prisma.user.findFirst({
       where: { email: normalizedEmail },
       select: { id: true },
     });
@@ -308,6 +299,74 @@ authRouter.post(
   }),
 );
 
+// OTP for driver/partner application — does NOT require email to be registered or unregistered
+authRouter.post(
+  "/email-otp/request-any",
+  asyncHandler(async (req, res) => {
+    const payload = requestEmailOtpSchema.parse(req.body);
+    const normalizedEmail = payload.email.trim().toLowerCase();
+
+    const otp = issueEmailOtp(normalizedEmail);
+
+    let sentByEmail = false;
+    let emailDeliveryError: unknown;
+    try {
+      const result = await sendOtpEmail({
+        toEmail: normalizedEmail,
+        otpCode: otp.code,
+        expiresInSeconds: otp.expiresInSeconds,
+      });
+      sentByEmail = result.sent;
+    } catch (error) {
+      emailDeliveryError = error;
+      console.error("[auth][email-otp-any] Failed to send OTP email", error);
+      if (env.NODE_ENV === "production") {
+        throw new HttpError(
+          StatusCodes.INTERNAL_SERVER_ERROR,
+          "Không gửi được OTP qua email. Vui lòng thử lại sau.",
+        );
+      }
+    }
+
+    if (!sentByEmail && env.NODE_ENV === "production") {
+      throw new HttpError(StatusCodes.INTERNAL_SERVER_ERROR, "Hệ thống OTP email chưa được cấu hình.");
+    }
+
+    if (!sentByEmail) {
+      console.log(
+        `[auth][email-otp-any][dev-fallback] ${normalizedEmail} => ${otp.code} (expires in ${otp.expiresInSeconds}s)`,
+      );
+    }
+
+    res.json({
+      message: sentByEmail
+        ? "Đã gửi mã OTP đến email."
+        : "OTP đã được tạo (chế độ local). Vui lòng dùng debugOtp để test.",
+      expiresInSeconds: otp.expiresInSeconds,
+      retryAfterSeconds: otp.retryAfterSeconds,
+      ...(env.NODE_ENV === "production" ? {} : { debugOtp: otp.code }),
+    });
+  }),
+);
+
+// Verify OTP without requiring the user to exist
+authRouter.post(
+  "/email-otp/verify-any",
+  asyncHandler(async (req, res) => {
+    const payload = z.object({
+      email: z.string().email(),
+      otpCode: z.string().regex(/^\d{6}$/, "OTP phải gồm 6 chữ số"),
+    }).parse(req.body);
+
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    const result = peekEmailOtp(normalizedEmail, payload.otpCode);
+    if (!result) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Mã OTP không hợp lệ hoặc đã hết hạn");
+    }
+    res.json({ verified: true, message: "OTP hợp lệ." });
+  }),
+);
+
 authRouter.post(
   "/register/store",
   asyncHandler(async (req, res) => {
@@ -320,17 +379,12 @@ authRouter.post(
       );
     }
 
-    const [existedEmail, existedPhone] = await Promise.all([
-      prisma.user.findUnique({ where: { email: payload.managerEmail } }),
-      payload.managerPhone ? prisma.user.findUnique({ where: { phone: payload.managerPhone } }) : Promise.resolve(null),
-    ]);
+    const existedEmail = await prisma.user.findFirst({
+      where: { email: payload.managerEmail, role: UserRole.STORE_MANAGER },
+    });
 
     if (existedEmail) {
-      throw new HttpError(StatusCodes.CONFLICT, "Manager email already exists");
-    }
-
-    if (existedPhone) {
-      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại quản lý đã có người đăng ký");
+      throw new HttpError(StatusCodes.CONFLICT, "Email đã được đăng ký với vai trò quản lý cửa hàng");
     }
 
     const passwordHash = await hashPassword(payload.managerPassword);
@@ -391,26 +445,21 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = registerDriverSchema.parse(req.body);
 
-    const [emailExisted, plateExisted, phoneExisted] = await Promise.all([
-      prisma.user.findUnique({
-        where: { email: payload.email },
+    const [emailExisted, plateExisted] = await Promise.all([
+      prisma.user.findFirst({
+        where: { email: payload.email, role: UserRole.DRIVER },
       }),
       prisma.driverProfile.findUnique({
         where: { licensePlate: payload.licensePlate },
       }),
-      payload.phone ? prisma.user.findUnique({ where: { phone: payload.phone } }) : Promise.resolve(null),
     ]);
 
     if (emailExisted) {
-      throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
-    }
-
-    if (phoneExisted) {
-      throw new HttpError(StatusCodes.CONFLICT, "Số điện thoại đã có người đăng ký");
+      throw new HttpError(StatusCodes.CONFLICT, "Email đã được đăng ký với vai trò tài xế");
     }
 
     if (plateExisted) {
-      throw new HttpError(StatusCodes.CONFLICT, "License plate already exists");
+      throw new HttpError(StatusCodes.CONFLICT, "Biển số xe đã tồn tại");
     }
 
     const passwordHash = await hashPassword(payload.password);
@@ -459,12 +508,12 @@ authRouter.post(
     const ageMs = Date.now() - payload.dateOfBirth.getTime();
     const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000);
     if (ageYears < minAdultAge) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "Driver applicant must be at least 18 years old");
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Người đăng ký phải đủ 18 tuổi trở lên");
     }
 
     const [emailExisted, plateExisted, pendingByEmail, pendingByPlate] = await Promise.all([
-      prisma.user.findUnique({
-        where: { email: normalizedEmail },
+      prisma.user.findFirst({
+        where: { email: normalizedEmail, role: UserRole.DRIVER },
         select: { id: true },
       }),
       prisma.driverProfile.findUnique({
@@ -488,11 +537,11 @@ authRouter.post(
     ]);
 
     if (emailExisted || pendingByEmail) {
-      throw new HttpError(StatusCodes.CONFLICT, "Email already exists or has pending application");
+      throw new HttpError(StatusCodes.CONFLICT, "Email đã tồn tại hoặc đang có đơn chờ duyệt");
     }
 
     if (plateExisted || pendingByPlate) {
-      throw new HttpError(StatusCodes.CONFLICT, "License plate already exists or is pending review");
+      throw new HttpError(StatusCodes.CONFLICT, "Biển số xe đã tồn tại hoặc đang chờ duyệt");
     }
 
     const passwordHash = await hashPassword(payload.password);
@@ -523,7 +572,7 @@ authRouter.post(
 
     res.status(StatusCodes.CREATED).json({
       data: application,
-      message: "Driver application submitted and waiting for admin approval",
+      message: "Đơn ứng tuyển tài xế đã được gửi và đang chờ Admin duyệt",
     });
   }),
 );
@@ -545,7 +594,7 @@ authRouter.post(
     const payload = forgotPasswordRequestSchema.parse(req.body);
     const normalizedEmail = payload.email.trim().toLowerCase();
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: normalizedEmail },
       select: { id: true },
     });
@@ -623,7 +672,7 @@ authRouter.post(
     const payload = forgotPasswordResetSchema.parse(req.body);
     const normalizedEmail = payload.email.trim().toLowerCase();
 
-    const user = await prisma.user.findUnique({
+    const user = await prisma.user.findFirst({
       where: { email: normalizedEmail },
       select: { id: true },
     });
@@ -666,17 +715,20 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const payload = loginSchema.parse(req.body);
 
-    const user = await prisma.user.findUnique({
-      where: { email: payload.email },
+    const user = await prisma.user.findFirst({
+      where: {
+        email: payload.email,
+        ...(payload.role ? { role: payload.role } : {}),
+      },
     });
 
     if (!user) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Invalid email or password");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Email hoặc mật khẩu không đúng");
     }
 
     const isMatched = await comparePassword(payload.password, user.passwordHash);
     if (!isMatched) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Invalid email or password");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Email hoặc mật khẩu không đúng");
     }
 
     const tokens = await issueTokens({
@@ -703,7 +755,7 @@ authRouter.get(
   asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Unauthorized");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
     }
 
     const user = await prisma.user.findUnique({
@@ -720,7 +772,7 @@ authRouter.get(
     });
 
     if (!user) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "User not found");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Không tìm thấy tài khoản");
     }
 
     res.json(user);
@@ -733,7 +785,7 @@ authRouter.patch(
   asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Unauthorized");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
     }
 
     const payload = updateProfileSchema.parse(req.body);
@@ -744,26 +796,18 @@ authRouter.patch(
       payload.phone === undefined &&
       payload.avatarUrl === undefined
     ) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "No profile fields provided");
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Vui lòng cung cấp ít nhất một trường thông tin");
     }
 
     const nextEmail = payload.email?.trim().toLowerCase();
     const nextPhone = payload.phone === undefined ? undefined : payload.phone?.trim() || null;
 
-    const [emailExisted, phoneExisted] = await Promise.all([
+    const [emailExisted] = await Promise.all([
       nextEmail
         ? prisma.user.findFirst({
             where: {
               email: nextEmail,
-              id: { not: userId },
-            },
-            select: { id: true },
-          })
-        : Promise.resolve(null),
-      nextPhone
-        ? prisma.user.findFirst({
-            where: {
-              phone: nextPhone,
+              role: req.user!.role as UserRole,
               id: { not: userId },
             },
             select: { id: true },
@@ -772,11 +816,7 @@ authRouter.patch(
     ]);
 
     if (emailExisted) {
-      throw new HttpError(StatusCodes.CONFLICT, "Email already exists");
-    }
-
-    if (phoneExisted) {
-      throw new HttpError(StatusCodes.CONFLICT, "Phone already exists");
+      throw new HttpError(StatusCodes.CONFLICT, "Email đã được sử dụng bởi tài khoản khác cùng vai trò");
     }
 
     const updated = await prisma.user.update({
@@ -802,7 +842,7 @@ authRouter.patch(
 
     res.json({
       data: updated,
-      message: "Profile updated successfully",
+      message: "Cập nhật thông tin thành công",
     });
   }),
 );
@@ -813,7 +853,7 @@ authRouter.patch(
   asyncHandler(async (req, res) => {
     const userId = req.user?.id;
     if (!userId) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Unauthorized");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Phiên đăng nhập không hợp lệ");
     }
 
     const payload = changePasswordSchema.parse(req.body);
@@ -830,12 +870,12 @@ authRouter.patch(
     });
 
     if (!user) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "User not found");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Không tìm thấy tài khoản");
     }
 
     const matched = await comparePassword(payload.currentPassword, user.passwordHash);
     if (!matched) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Current password is incorrect");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Mật khẩu hiện tại không đúng");
     }
 
     const newHash = await hashPassword(payload.newPassword);
@@ -857,7 +897,7 @@ authRouter.patch(
     ]);
 
     res.json({
-      message: "Password changed successfully. Please login again.",
+      message: "Đổi mật khẩu thành công. Vui lòng đăng nhập lại.",
     });
   }),
 );
@@ -871,7 +911,7 @@ authRouter.post(
     try {
       decoded = verifyRefreshToken(payload.refreshToken);
     } catch (_error) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Invalid refresh token");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Refresh token không hợp lệ");
     }
 
     const tokenHash = hashToken(payload.refreshToken);
@@ -892,11 +932,11 @@ authRouter.post(
     });
 
     if (!persisted || persisted.revokedAt || persisted.expiresAt < new Date()) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Refresh token is expired or revoked");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Phiên đăng nhập đã hết hạn");
     }
 
     if (persisted.userId !== decoded.sub) {
-      throw new HttpError(StatusCodes.UNAUTHORIZED, "Refresh token mismatch");
+      throw new HttpError(StatusCodes.UNAUTHORIZED, "Refresh token không khớp");
     }
 
     await prisma.refreshToken.update({

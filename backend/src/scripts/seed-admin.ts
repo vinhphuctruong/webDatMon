@@ -7,7 +7,7 @@ async function main() {
   const password = "admin";
   const passwordHash = await bcrypt.hash(password, 10);
 
-  const existing = await prisma.user.findUnique({ where: { email } });
+  const existing = await prisma.user.findFirst({ where: { email, role: UserRole.ADMIN } });
   if (existing) {
     console.log("Admin user already exists");
     return;

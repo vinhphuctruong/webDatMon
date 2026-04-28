@@ -225,6 +225,7 @@ async function loginDemo(): Promise<Session> {
     body: JSON.stringify({
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
+      role: "CUSTOMER",
     }),
   });
 
@@ -304,7 +305,7 @@ export async function loginWithCredentials(payload: LoginPayload): Promise<AuthU
     tokens: Session;
   }>("/auth/login", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, role: "CUSTOMER" }),
   });
 
   setAutoDemoLoginBlocked(false);
@@ -427,4 +428,91 @@ export async function resetPasswordWithOtp(payload: {
     },
   );
   return response;
+}
+
+export async function submitReview(orderId: string, payload: { rating: number; comment?: string }) {
+  return apiFetch<{ data: any; message?: string }>(
+    `/orders/${orderId}/reviews`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    { auth: true },
+  );
+}
+
+export interface DeliveryFeeEstimate {
+  storeId: string;
+  storeName: string;
+  fee: number;
+  straightLineKm: number;
+  roadDistanceKm: number;
+  breakdown: {
+    baseFee: number;
+    midTierFee: number;
+    farTierFee: number;
+    rawTotal: number;
+  };
+}
+
+export async function estimateDeliveryFee(params: {
+  storeId: string;
+  addressId?: string;
+  latitude?: number;
+  longitude?: number;
+}): Promise<DeliveryFeeEstimate> {
+  const query = new URLSearchParams({ storeId: params.storeId });
+  if (params.addressId) query.set("addressId", params.addressId);
+  if (params.latitude != null) query.set("latitude", String(params.latitude));
+  if (params.longitude != null) query.set("longitude", String(params.longitude));
+
+  const response = await request<{ data: DeliveryFeeEstimate }>(
+    `/orders/estimate-delivery-fee?${query.toString()}`,
+  );
+  return response.data;
+}
+
+/* ── Voucher APIs ───────────────────────────────── */
+
+export interface VoucherInfo {
+  id: string;
+  code: string;
+  description: string;
+  discountType: "FIXED" | "PERCENT";
+  discountValue: number;
+  maxDiscount?: number | null;
+  minOrderValue: number;
+  maxUsagePerUser: number;
+  expiresAt: string;
+}
+
+export interface VoucherValidation {
+  code: string;
+  description: string;
+  discountType: "FIXED" | "PERCENT";
+  discountValue: number;
+  maxDiscount?: number | null;
+  minOrderValue: number;
+  discount: number;
+  expiresAt: string;
+}
+
+export async function fetchVouchers(): Promise<VoucherInfo[]> {
+  const res = await apiFetch<{ data: VoucherInfo[] }>("/vouchers");
+  return res.data;
+}
+
+export async function validateVoucherApi(
+  code: string,
+  subtotal: number,
+): Promise<VoucherValidation> {
+  const res = await apiFetch<{ data: VoucherValidation }>(
+    "/vouchers/validate",
+    {
+      method: "POST",
+      body: JSON.stringify({ code, subtotal }),
+    },
+    { auth: true },
+  );
+  return res.data;
 }

@@ -111,9 +111,9 @@ enum SePayTopupStatus {
 
 model User {
   id                String            @id @default(uuid())
-  email             String            @unique
+  email             String
   name              String
-  phone             String?           @unique
+  phone             String?
   avatarUrl         String?
   passwordHash      String
   role              UserRole          @default(CUSTOMER)
@@ -136,6 +136,11 @@ model User {
 
   resetPasswordOtp       String?
   resetPasswordOtpExpiry DateTime?
+
+  reviews                  Review[]
+  productReviews           ProductReview[]
+
+  @@unique([email, role])
 }
 
 model Address {
@@ -178,6 +183,8 @@ model Store {
   manager       User?     @relation("StoreManager", fields: [managerId], references: [id], onDelete: SetNull)
   wallets       Wallet[]  @relation("StoreWallets")
 
+  reviews       Review[]
+
   @@index([name])
 }
 
@@ -204,7 +211,7 @@ model Product {
   discountType  DiscountType?
   discountValue Int?
   deliveryFee   Int               @default(15000)
-  rating        Float             @default(4.5)
+  rating        Float             @default(0)
   soldCount     Int               @default(0)
   isAvailable   Boolean           @default(true)
   createdAt     DateTime          @default(now())
@@ -214,6 +221,8 @@ model Product {
   optionGroups  OptionGroup[]
   cartItems     CartItem[]
   orderItems    OrderItem[]
+
+  reviews       ProductReview[]
 
   @@index([storeId])
   @@index([name])
@@ -287,6 +296,8 @@ model Order {
   subtotal            Int
   deliveryFee         Int
   platformFee         Int
+  discount            Int                 @default(0)
+  voucherCode         String?
   total               Int
   merchantCommission  Int                 @default(0)
   driverCommission    Int                 @default(0)
@@ -309,6 +320,9 @@ model Order {
   items               OrderItem[]
   payment             OrderPayment?
   walletTransactions  WalletTransaction[]
+
+  review              Review?
+  productReviews      ProductReview[]
 
   @@index([userId, createdAt])
   @@index([status])
@@ -526,4 +540,89 @@ model SePayTopupRequest {
 
   @@index([userId, createdAt])
   @@index([walletId, status])
+}
+
+model Review {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  userId    String
+  storeId   String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@index([storeId])
+  @@index([userId])
+}
+
+model ProductReview {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  userId    String
+  rating    Int
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, productId])
+  @@index([productId])
+}
+
+// ── Hero Banner System ──────────────────────────
+model HeroBanner {
+  id        String   @id @default(uuid())
+  title     String?
+  imageUrl  String   /// base64 hoặc URL
+  link      String?  /// URL khi click vào banner
+  sortOrder Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ── Voucher System ──────────────────────────
+
+model Voucher {
+  id              String        @id @default(uuid())
+  code            String        @unique
+  description     String
+  discountType    DiscountType  @default(FIXED)
+  discountValue   Int           /// Giá trị giảm (VNĐ nếu FIXED, % nếu PERCENT)
+  maxDiscount     Int?          /// Giảm tối đa (chỉ dùng cho PERCENT)
+  minOrderValue   Int           @default(0) /// Đơn tối thiểu để áp dụng
+  maxUsageTotal   Int?          /// Tổng lượt dùng tối đa (null = không giới hạn)
+  maxUsagePerUser Int           @default(1) /// Mỗi user dùng tối đa mấy lần
+  usedCount       Int           @default(0) /// Tổng lượt đã dùng
+  isActive        Boolean       @default(true)
+  startsAt        DateTime      @default(now())
+  expiresAt       DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  usages          VoucherUsage[]
+
+  @@index([code])
+  @@index([isActive, startsAt, expiresAt])
+}
+
+model VoucherUsage {
+  id          String   @id @default(uuid())
+  voucherId   String
+  userId      String
+  orderId     String
+  discount    Int      /// Số tiền đã giảm thực tế
+  usedAt      DateTime @default(now())
+
+  voucher     Voucher  @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+
+  @@index([voucherId])
+  @@index([userId, voucherId])
 }

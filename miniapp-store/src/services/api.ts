@@ -225,6 +225,7 @@ async function loginDemo(): Promise<Session> {
     body: JSON.stringify({
       email: DEMO_EMAIL,
       password: DEMO_PASSWORD,
+      role: "STORE_MANAGER",
     }),
   });
 
@@ -304,7 +305,7 @@ export async function loginWithCredentials(payload: LoginPayload): Promise<AuthU
     tokens: Session;
   }>("/auth/login", {
     method: "POST",
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...payload, role: "STORE_MANAGER" }),
   });
 
   setAutoDemoLoginBlocked(false);
@@ -505,4 +506,8 @@ export async function submitStoreApplication(payload: any) {
     method: 'POST',
     body: JSON.stringify(payload),
   }, { auth: true });
+}
+
+export async function fetchCategories() {
+  return apiFetch<any>('/categories');
 }

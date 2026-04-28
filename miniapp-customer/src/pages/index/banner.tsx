@@ -1,8 +1,31 @@
 import React, { FC, useEffect, useState } from "react";
-import { Pagination } from "swiper";
+import { Autoplay, Pagination } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { getDummyImage } from "utils/product";
 import { Box, Text } from "zmp-ui";
+import { apiFetch } from "services/api";
+
+interface BannerItem {
+  id: string;
+  title: string | null;
+  imageUrl: string;
+  link: string | null;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+const FALLBACK_BANNERS: BannerItem[] = [
+  { id: "f1", title: "Giảm 50% cho đơn đầu tiên 🎉", imageUrl: "", link: null, sortOrder: 0, isActive: true },
+  { id: "f2", title: "Freeship đơn từ 49K 🚚", imageUrl: "", link: null, sortOrder: 1, isActive: true },
+  { id: "f3", title: "Combo trưa chỉ từ 39K 🍱", imageUrl: "", link: null, sortOrder: 2, isActive: true },
+];
+
+const GRADIENT_COLORS = [
+  "linear-gradient(135deg, #00a96d 0%, #00c97d 60%, #34d399 100%)",
+  "linear-gradient(135deg, #f59e0b 0%, #f97316 60%, #fb923c 100%)",
+  "linear-gradient(135deg, #6366f1 0%, #8b5cf6 60%, #a78bfa 100%)",
+  "linear-gradient(135deg, #ec4899 0%, #f43f5e 60%, #fb7185 100%)",
+  "linear-gradient(135deg, #0ea5e9 0%, #3b82f6 60%, #60a5fa 100%)",
+];
 
 const FlashDealTimer: FC = () => {
   const [timeLeft, setTimeLeft] = useState({ h: 2, m: 45, s: 30 });
@@ -42,45 +65,62 @@ const FlashDealTimer: FC = () => {
 };
 
 export const Banner: FC = () => {
-  const promoTexts = [
-    "Giảm 50% cho đơn đầu tiên 🎉",
-    "Freeship đơn từ 49K 🚚",
-    "Combo trưa chỉ từ 39K 🍱",
-    "Mã TMFOOD giảm 30K 🎁",
-    "Deal cuối tuần giảm sốc 🔥",
-  ];
+  const [banners, setBanners] = useState<BannerItem[]>([]);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ data: BannerItem[] }>("/banners")
+      .then((res) => {
+        const active = (res.data || []).filter((b) => b.isActive);
+        setBanners(active.length > 0 ? active : FALLBACK_BANNERS);
+      })
+      .catch(() => setBanners(FALLBACK_BANNERS))
+      .finally(() => setLoaded(true));
+  }, []);
+
+  if (!loaded) return null;
 
   return (
     <Box className="bg-white">
       <Swiper
-        modules={[Pagination]}
+        modules={[Pagination, Autoplay]}
         pagination={{ clickable: true }}
-        autoplay
-        loop
-        cssMode
+        autoplay={{ delay: 3500, disableOnInteraction: false }}
+        loop={banners.length > 1}
+        cssMode={false}
+        style={{ paddingBottom: 6 }}
       >
-        {[1, 2, 3, 4, 5]
-          .map((i) => getDummyImage(`banner-${i}.webp`))
-          .map((banner, i) => (
-            <SwiperSlide key={i} className="px-4">
-              <Box
-                className="w-full rounded-2xl aspect-[2/1] bg-cover bg-center bg-skeleton relative overflow-hidden"
-                style={{ backgroundImage: `url(${banner})`, borderRadius: 16 }}
-              >
-                {/* Gradient overlay with promo text */}
-                <div style={{
-                  position: 'absolute', bottom: 0, left: 0, right: 0,
-                  background: 'linear-gradient(transparent, rgba(0,0,0,0.6))',
-                  padding: '24px 14px 12px',
-                  borderRadius: '0 0 16px 16px',
-                }}>
-                  <Text size="small" style={{ color: '#fff', fontWeight: 600, fontSize: 13 }}>
-                    {promoTexts[i]}
+        {banners.map((banner, i) => (
+          <SwiperSlide key={banner.id} className="px-4">
+            <div style={{
+              position: 'relative', borderRadius: 16, overflow: 'hidden',
+              width: '100%', aspectRatio: '2/1', minHeight: 140,
+              background: banner.imageUrl ? '#f1f5f9' : GRADIENT_COLORS[i % GRADIENT_COLORS.length],
+            }}>
+              {banner.imageUrl && (
+                <img
+                  src={banner.imageUrl}
+                  alt={banner.title || "Banner"}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                />
+              )}
+              {/* Gradient overlay with title */}
+              <div style={{
+                position: 'absolute', bottom: 0, left: 0, right: 0,
+                background: banner.imageUrl
+                  ? 'linear-gradient(transparent, rgba(0,0,0,0.55))'
+                  : 'linear-gradient(transparent, rgba(0,0,0,0.15))',
+                padding: '28px 14px 12px',
+              }}>
+                {banner.title && (
+                  <Text size="small" style={{ color: '#fff', fontWeight: 700, fontSize: 14, textShadow: '0 1px 3px rgba(0,0,0,0.3)' }}>
+                    {banner.title}
                   </Text>
-                </div>
-              </Box>
-            </SwiperSlide>
-          ))}
+                )}
+              </div>
+            </div>
+          </SwiperSlide>
+        ))}
       </Swiper>
       {/* Flash Deal Timer */}
       <Box style={{ padding: '12px 16px 0' }}>

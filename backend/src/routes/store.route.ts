@@ -7,6 +7,7 @@ import { asyncHandler } from "../lib/async-handler";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { HttpError } from "../lib/http-error";
 import { StatusCodes } from "http-status-codes";
+import { toProductResponse } from "../utils/mapper";
 
 const storeRouter = Router();
 
@@ -416,6 +417,42 @@ storeRouter.get(
   }),
 );
 
+// ── GET /stores/:storeId — Chi tiết cửa hàng + menu sản phẩm ──
+storeRouter.get(
+  "/:storeId",
+  asyncHandler(async (req, res) => {
+    const { storeId } = req.params;
+    const store = await prisma.store.findUnique({
+      where: { id: storeId },
+      select: {
+        id: true, name: true, address: true,
+        rating: true, isOpen: true,
+        etaMinutesMin: true, etaMinutesMax: true,
+        latitude: true, longitude: true,
+      },
+    });
+    if (!store) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy cửa hàng");
+    }
+    const products = await prisma.product.findMany({
+      where: { storeId, isAvailable: true },
+      orderBy: [{ soldCount: "desc" }, { rating: "desc" }],
+      include: {
+        store: true,
+        categories: { include: { category: true } },
+        optionGroups: { include: { options: true } },
+      },
+    });
+
+    res.json({
+      data: {
+        ...store,
+        products: products.map(toProductResponse),
+      },
+    });
+  }),
+);
+
 storeRouter.post(
   "/",
   requireAuth,
@@ -430,13 +467,13 @@ storeRouter.post(
       );
     }
 
-    const emailExisted = await prisma.user.findUnique({
-      where: { email: payload.managerEmail },
+    const emailExisted = await prisma.user.findFirst({
+      where: { email: payload.managerEmail, role: "STORE_MANAGER" },
       select: { id: true },
     });
 
     if (emailExisted) {
-      throw new HttpError(StatusCodes.CONFLICT, "Manager email already exists");
+      throw new HttpError(StatusCodes.CONFLICT, "Email quản lý đã tồn tại");
     }
 
     const created = await prisma.$transaction(async (tx) => {

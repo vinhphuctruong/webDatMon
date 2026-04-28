@@ -156,7 +156,7 @@ walletRouter.get(
     }
 
     if (query.walletId && !accessibleWalletIds.includes(query.walletId)) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to access this wallet");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền truy cập ví này");
     }
 
     const rows = await prisma.walletTransaction.findMany({
@@ -175,7 +175,7 @@ walletRouter.get(
   "/topups",
   asyncHandler(async (req, res) => {
     if (req.user!.role !== UserRole.DRIVER) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Only drivers can access topups");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Chỉ tài xế mới có thể xem lịch sử nạp");
     }
 
     const rows = await prisma.sePayTopupRequest.findMany({
@@ -192,7 +192,7 @@ walletRouter.post(
   "/topups/sepay",
   asyncHandler(async (req, res) => {
     if (req.user!.role !== UserRole.DRIVER) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Only drivers can top up credit wallet");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Chỉ tài xế mới có thể nạp ví tín dụng");
     }
 
     const payload = topupSchema.parse(req.body);
@@ -234,11 +234,11 @@ walletRouter.post(
       });
 
       if (!topup) {
-        throw new HttpError(StatusCodes.NOT_FOUND, "Topup request not found");
+        throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy yêu cầu nạp tiền");
       }
 
       if (req.user!.role !== UserRole.ADMIN && topup.userId !== req.user!.id) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to confirm this topup");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xác nhận lệnh nạp này");
       }
 
       if (topup.status === SePayTopupStatus.CONFIRMED) {

@@ -56,11 +56,20 @@ export const Categories: FC = () => {
             }}
           >
             <div className={`tm-category-icon ${pastelColors[i % pastelColors.length]}`}>
-              <img
-                src={category.icon}
-                style={{ width: 28, height: 28 }}
-                alt={category.name}
-              />
+              {category.icon && category.icon.length <= 5 && !category.icon.startsWith('http') && !category.icon.startsWith('/') && !category.icon.startsWith('data:') ? (
+                <span style={{ fontSize: 24, lineHeight: 1 }}>{category.icon}</span>
+              ) : category.icon ? (
+                <img
+                  src={category.icon}
+                  style={{ width: 28, height: 28, objectFit: 'contain' }}
+                  alt={category.name}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              ) : (
+                <span style={{ fontSize: 16, fontWeight: 'bold', color: 'rgba(0,0,0,0.3)' }}>{category.name.charAt(0)}</span>
+              )}
             </div>
             <Text
               size="xxSmall"

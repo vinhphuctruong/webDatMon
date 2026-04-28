@@ -46,6 +46,7 @@ export interface Product {
   sale?: Sale;
   variants?: Variant[];
   storeName?: string;
+  storeId?: string;
   rating?: number;
   sold?: string;
   eta?: string;

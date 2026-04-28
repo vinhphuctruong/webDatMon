@@ -1,0 +1,30 @@
+{
+  "app": {
+    "title": "TM Food Tài xế",
+    "textColor": "black",
+    "leftButton": "none",
+    "statusBar": "transparent",
+    "selfControlLoading": false,
+    "hideAndroidBottomNavigationBar": false,
+    "hideIOSSafeAreaBottom": false,
+    "actionBarHidden": true
+  },
+  "listCSS": [],
+  "listSyncJS": [],
+  "listAsyncJS": [],
+  "pages": [
+    "/",
+    "/available",
+    "/delivering",
+    "/orders",
+    "/wallet",
+    "/profile"
+  ],
+  "template": {
+    "name": "tm-food-driver",
+    "primaryColor": "#3b82f6",
+    "prefixCurrencySymbol": false,
+    "currencySymbol": "đ",
+    "headerLogo": ""
+  }
+}

@@ -11,6 +11,8 @@ import driverRouter from "./driver.route";
 import walletRouter from "./wallet.route";
 import paymentRouter from "./payment.route";
 import storeApplicationRoutes from "./store-applications";
+import { voucherRouter } from "./voucher.route";
+import bannerRouter from "./banner.route";
 
 const apiRouter = Router();
 
@@ -26,5 +28,7 @@ apiRouter.use("/drivers", driverRouter);
 apiRouter.use("/wallets", walletRouter);
 apiRouter.use("/payments", paymentRouter);
 apiRouter.use("/store-applications", storeApplicationRoutes);
+apiRouter.use("/vouchers", voucherRouter);
+apiRouter.use("/banners", bannerRouter);
 
 export default apiRouter;

@@ -104,7 +104,7 @@ export function createApp() {
     }),
   );
   app.use(morgan(env.NODE_ENV === "production" ? "combined" : "dev"));
-  app.use(express.json({ limit: "2mb" }));
+  app.use(express.json({ limit: "20mb" }));
   app.use(express.urlencoded({ extended: false }));
 
   app.use(env.API_PREFIX, apiRouter);

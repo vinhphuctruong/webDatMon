@@ -17,23 +17,18 @@ import {
   locationState,
   manualCustomerContactState,
   orderNoteState,
-  payableTotalState,
-  platformFeeState,
   selectedStoreState,
   totalPriceState,
   totalQuantityState,
   userState,
-  voucherDiscountState,
   refreshActiveOrdersAtom,
 } from "state";
 import { Text, useNavigate, useSnackbar } from "zmp-ui";
 import {
-  appliedVoucherCodeState,
-  appliedVoucherState,
-  vouchersState,
   addOrderToHistory,
   orderHistoryState,
 } from "services/features";
+import { validateVoucherApi } from "services/api";
 import { THU_DAU_MOT_CENTER } from "utils/location";
 
 export const CartPreview: FC = () => {
@@ -44,13 +39,14 @@ export const CartPreview: FC = () => {
   const deliveryFeeLoadable = useRecoilValueLoadable(deliveryFeeState);
   const deliveryFee =
     deliveryFeeLoadable.state === "hasValue" ? deliveryFeeLoadable.contents : 18000;
-  const platformFee = useRecoilValue(platformFeeState);
-  const payableTotalLoadable = useRecoilValueLoadable(payableTotalState);
-  const payableTotal =
-    payableTotalLoadable.state === "hasValue"
-      ? payableTotalLoadable.contents
-      : Math.max(0, itemsTotal + deliveryFee + platformFee);
-  const voucherDiscount = useRecoilValue(voucherDiscountState);
+
+  // Voucher state — backend validated
+  const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | null>(null);
+  const [appliedVoucherDesc, setAppliedVoucherDesc] = useState("");
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [validatingVoucher, setValidatingVoucher] = useState(false);
+
+  const payableTotal = Math.max(0, itemsTotal + deliveryFee - voucherDiscount);
   const note = useRecoilValue(orderNoteState);
   const user = useRecoilValueLoadable(userState);
   const manualCustomerContactLoadable = useRecoilValueLoadable(manualCustomerContactState);
@@ -74,9 +70,6 @@ export const CartPreview: FC = () => {
       : "Vị trí GPS, Bình Dương";
   const cart = useRecoilValue(cartState);
   const resetCart = useResetRecoilState(cartState);
-  const vouchers = useRecoilValue(vouchersState);
-  const appliedVoucher = useRecoilValue(appliedVoucherState);
-  const [appliedCode, setAppliedCode] = useRecoilState(appliedVoucherCodeState);
   const setOrders = useSetRecoilState(orderHistoryState);
   const setRefreshActiveOrders = useSetRecoilState(refreshActiveOrdersAtom);
   const selectedStore = useRecoilValueLoadable(selectedStoreState);
@@ -85,26 +78,33 @@ export const CartPreview: FC = () => {
   const [voucherInput, setVoucherInput] = useState("");
   const [showVoucher, setShowVoucher] = useState(false);
 
-  const applyVoucher = () => {
+  const applyVoucher = async () => {
     const code = voucherInput.trim().toUpperCase();
-    const voucher = vouchers.find((v) => v.code === code && !v.used);
+    if (!code) return;
 
-    if (!voucher) {
-      snackbar.openSnackbar({ type: "error", text: "Mã voucher không hợp lệ hoặc đã sử dụng" });
-      return;
-    }
-
-    if (itemsTotal < voucher.minOrderValue) {
+    setValidatingVoucher(true);
+    try {
+      const result = await validateVoucherApi(code, itemsTotal);
+      setAppliedVoucherCode(code);
+      setAppliedVoucherDesc(result.description);
+      setVoucherDiscount(result.discount);
+      setShowVoucher(false);
       snackbar.openSnackbar({
-        type: "error",
-        text: `Đơn tối thiểu ${(voucher.minOrderValue / 1000).toFixed(0)}K để dùng mã này`,
+        type: "success",
+        text: `Áp dụng mã ${code} — Giảm ${(result.discount / 1000).toFixed(0)}K 🎉`,
       });
-      return;
+    } catch (err: any) {
+      const msg = err?.message || "Mã voucher không hợp lệ";
+      snackbar.openSnackbar({ type: "error", text: msg });
+    } finally {
+      setValidatingVoucher(false);
     }
+  };
 
-    setAppliedCode(code);
-    setShowVoucher(false);
-    snackbar.openSnackbar({ type: "success", text: `Áp dụng mã ${code} thành công! 🎉` });
+  const removeVoucher = () => {
+    setAppliedVoucherCode(null);
+    setAppliedVoucherDesc("");
+    setVoucherDiscount(0);
   };
 
   const placeOrder = async () => {
@@ -144,6 +144,7 @@ export const CartPreview: FC = () => {
       try {
         const order = await createOrder({
           ...(note.trim() ? { note: note.trim() } : {}),
+          ...(appliedVoucherCode ? { voucherCode: appliedVoucherCode } : {}),
           deliveryAddress: {
             receiverName: customerName,
             phone: customerPhone,
@@ -272,9 +273,9 @@ export const CartPreview: FC = () => {
       zIndex: 100,
       flexShrink: 0,
     }}>
-      {/* Voucher section — compact */}
+      {/* Voucher section — backend validated */}
       <div style={{ marginBottom: 8 }}>
-        {appliedVoucher ? (
+        {appliedVoucherCode ? (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '6px 10px', borderRadius: 8,
@@ -284,11 +285,11 @@ export const CartPreview: FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ fontSize: 12 }}>🎫</span>
               <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>
-                {appliedVoucher.code} · Giảm <DisplayPrice>{voucherDiscount}</DisplayPrice>
+                {appliedVoucherCode} · Giảm <DisplayPrice>{voucherDiscount}</DisplayPrice>
               </Text>
             </div>
             <button
-              onClick={() => setAppliedCode(null)}
+              onClick={removeVoucher}
               style={{
                 background: 'none', border: 'none', color: 'var(--tm-danger)',
                 fontSize: 11, fontWeight: 600, cursor: 'pointer', padding: '2px 4px',
@@ -305,6 +306,7 @@ export const CartPreview: FC = () => {
                   value={voucherInput}
                   onChange={(e) => setVoucherInput(e.target.value)}
                   placeholder="Nhập mã voucher..."
+                  disabled={validatingVoucher}
                   style={{
                     flex: 1, padding: '6px 10px', borderRadius: 8,
                     border: '1px solid var(--tm-border)', fontSize: 12,
@@ -314,14 +316,15 @@ export const CartPreview: FC = () => {
                 />
                 <button
                   onClick={applyVoucher}
+                  disabled={validatingVoucher}
                   style={{
                     padding: '6px 12px', borderRadius: 8, border: 'none',
-                    background: 'var(--tm-primary)', color: '#fff',
-                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    background: validatingVoucher ? '#ccc' : 'var(--tm-primary)', color: '#fff',
+                    fontSize: 12, fontWeight: 600, cursor: validatingVoucher ? 'wait' : 'pointer',
                     fontFamily: 'Inter, sans-serif',
                   }}
                 >
-                  Áp dụng
+                  {validatingVoucher ? "..." : "Áp dụng"}
                 </button>
               </div>
             ) : (
@@ -354,12 +357,6 @@ export const CartPreview: FC = () => {
           <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)' }}>Phí giao hàng</Text>
           <Text size="xxxSmall" style={{ color: 'var(--tm-text-primary)', fontWeight: 500 }}>
             <DisplayPrice>{deliveryFee}</DisplayPrice>
-          </Text>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-          <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)' }}>Phí nền tảng</Text>
-          <Text size="xxxSmall" style={{ color: 'var(--tm-text-primary)', fontWeight: 500 }}>
-            <DisplayPrice>{platformFee}</DisplayPrice>
           </Text>
         </div>
         {voucherDiscount > 0 && (

@@ -216,8 +216,14 @@ export const ProductPicker: FC<ProductPickerProps> = ({
                       <FinalPrice options={options}>{product}</FinalPrice>
                     </Text>
                     <div className="tm-stats-row">
-                      <span style={{ color: '#ffb800' }}>★</span>
-                      <span style={{ fontWeight: 600 }}>{product.rating ?? 4.7}</span>
+                      {product.rating ? (
+                        <>
+                          <span style={{ color: '#ffb800' }}>★</span>
+                          <span style={{ fontWeight: 600 }}>{product.rating}</span>
+                        </>
+                      ) : (
+                        <span style={{ fontWeight: 500, color: 'var(--tm-text-secondary)' }}>Chưa có đánh giá</span>
+                      )}
                       <span className="tm-dot" />
                       <span>{product.sold ? `${product.sold} đã bán` : "Mới"}</span>
                     </div>

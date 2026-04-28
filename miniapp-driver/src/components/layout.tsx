@@ -1,0 +1,61 @@
+import React, { FC, Suspense } from "react";
+import { Route, Routes } from "react-router";
+import { Box, Text } from "zmp-ui";
+import { Navigation } from "./navigation";
+import { ScrollRestoration } from "./scroll-restoration";
+import { ErrorBoundary } from "./error-boundary";
+import HomePage from "../pages/index";
+import AvailableOrdersPage from "../pages/available-orders";
+import ActiveDeliveryPage from "../pages/active-delivery";
+import OrdersPage from "../pages/orders";
+import WalletPage from "../pages/wallet";
+import ProfilePage from "../pages/profile";
+import LoginPage from "../pages/login";
+import RegisterPage from "../pages/register";
+import ForgotPasswordPage from "../pages/forgot-password";
+
+const statusBarHeight = window.ZaloJavaScriptInterface?.getStatusBarHeight?.() ?? 0;
+const safeAreaTopFromSdk = Math.max(
+  0,
+  Math.round(statusBarHeight / Math.max(window.devicePixelRatio || 1, 1))
+);
+const defaultSafeTop = import.meta.env.DEV ? 24 : 0;
+const resolvedSafeTop = Math.max(safeAreaTopFromSdk, defaultSafeTop);
+
+document.body.style.setProperty("--zaui-safe-area-inset-top", `${resolvedSafeTop}px`);
+document.body.style.setProperty("--tm-safe-area-inset-top", `${resolvedSafeTop}px`);
+
+export const Layout: FC = () => {
+  return (
+    <Box flex flexDirection="column" className="h-screen">
+      <ScrollRestoration />
+      <Box className="flex-1 flex flex-col overflow-hidden">
+        <ErrorBoundary>
+          <Suspense
+            fallback={
+              <Box
+                className="flex-1 flex items-center justify-center"
+                style={{ background: "var(--tm-bg)" }}
+              >
+                <Text style={{ color: "var(--tm-text-secondary)" }}>Đang tải...</Text>
+              </Box>
+            }
+          >
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route path="/available" element={<AvailableOrdersPage />} />
+              <Route path="/delivering" element={<ActiveDeliveryPage />} />
+              <Route path="/orders" element={<OrdersPage />} />
+              <Route path="/wallet" element={<WalletPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
+      </Box>
+      <Navigation />
+    </Box>
+  );
+};

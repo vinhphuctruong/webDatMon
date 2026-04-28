@@ -221,8 +221,8 @@ adminRouter.post(
       }
 
       const [emailExisted, plateExisted] = await Promise.all([
-        tx.user.findUnique({
-          where: { email: application.email },
+        tx.user.findFirst({
+          where: { email: application.email, role: "DRIVER" },
           select: { id: true },
         }),
         tx.driverProfile.findUnique({
@@ -285,7 +285,7 @@ adminRouter.post(
 
     res.json({
       data: result,
-      message: "Driver application approved successfully",
+      message: "Duyệt đơn ứng tuyển tài xế thành công",
     });
   }),
 );
@@ -327,7 +327,7 @@ adminRouter.post(
 
     res.json({
       data: reviewed,
-      message: "Driver application rejected",
+      message: "Đơn ứng tuyển tài xế đã bị từ chối",
     });
   }),
 );
@@ -375,11 +375,11 @@ adminRouter.post(
       });
 
       if (!application) {
-        throw new HttpError(StatusCodes.NOT_FOUND, "Store application not found");
+        throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn đăng ký cửa hàng");
       }
 
       if (application.status !== PartnerApplicationStatus.PENDING) {
-        throw new HttpError(StatusCodes.CONFLICT, "Store application is not pending");
+        throw new HttpError(StatusCodes.CONFLICT, "Đơn đăng ký không ở trạng thái chờ duyệt");
       }
 
       // Check if user already manages a store
@@ -388,7 +388,7 @@ adminRouter.post(
       });
 
       if (existingStore) {
-        throw new HttpError(StatusCodes.CONFLICT, "Applicant already manages a store");
+        throw new HttpError(StatusCodes.CONFLICT, "Người nộp đơn đã quản lý một cửa hàng khác");
       }
 
       // Create Store
@@ -445,11 +445,11 @@ adminRouter.post(
     });
 
     if (!application) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Store application not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn đăng ký cửa hàng");
     }
 
     if (application.status !== PartnerApplicationStatus.PENDING) {
-      throw new HttpError(StatusCodes.CONFLICT, "Store application is not pending");
+      throw new HttpError(StatusCodes.CONFLICT, "Đơn đăng ký không ở trạng thái chờ duyệt");
     }
 
     const reviewed = await prisma.storeApplication.update({
@@ -466,6 +466,97 @@ adminRouter.post(
       data: reviewed,
       message: "Store application rejected",
     });
+  }),
+);
+
+// ── User Management ────────────────────────────
+
+const listUsersQuerySchema = z.object({
+  role: z.nativeEnum(UserRole).optional(),
+  q: z.string().trim().optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional().default(50),
+  page: z.coerce.number().int().min(1).optional().default(1),
+});
+
+adminRouter.get(
+  "/users",
+  asyncHandler(async (req, res) => {
+    const query = listUsersQuerySchema.parse(req.query);
+    const skip = (query.page - 1) * query.limit;
+
+    const where = {
+      ...(query.role ? { role: query.role } : {}),
+      ...(query.q
+        ? {
+            OR: [
+              { name: { contains: query.q, mode: "insensitive" as const } },
+              { email: { contains: query.q, mode: "insensitive" as const } },
+              { phone: { contains: query.q } },
+            ],
+          }
+        : {}),
+    };
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: query.limit,
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          role: true,
+          createdAt: true,
+          _count: { select: { orders: true } },
+        },
+      }),
+      prisma.user.count({ where }),
+    ]);
+
+    res.json({
+      data: users,
+      pagination: { page: query.page, limit: query.limit, total, totalPages: Math.ceil(total / query.limit) },
+    });
+  }),
+);
+
+const updateUserBodySchema = z.object({
+  role: z.nativeEnum(UserRole).optional(),
+  name: z.string().trim().min(1).max(100).optional(),
+});
+
+adminRouter.patch(
+  "/users/:id",
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const body = updateUserBodySchema.parse(req.body);
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy người dùng");
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: body,
+      select: { id: true, email: true, name: true, phone: true, role: true, createdAt: true },
+    });
+
+    res.json({ data: updated, message: "Đã cập nhật" });
+  }),
+);
+
+adminRouter.delete(
+  "/users/:id",
+  asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy người dùng");
+    if (user.role === UserRole.ADMIN) throw new HttpError(StatusCodes.FORBIDDEN, "Không thể xóa tài khoản admin");
+
+    await prisma.user.delete({ where: { id } });
+    res.json({ message: "Đã xóa người dùng" });
   }),
 );
 

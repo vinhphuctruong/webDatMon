@@ -225,7 +225,7 @@ productRouter.post(
     });
 
     if (categories.length !== payload.categoryKeys.length) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "One or more categories do not exist");
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Một hoặc nhiều danh mục không tồn tại");
     }
 
     const created = await prisma.product.create({
@@ -308,7 +308,7 @@ productRouter.patch(
         select: { id: true },
       });
       if (categories.length !== payload.categoryKeys.length) {
-        throw new HttpError(StatusCodes.BAD_REQUEST, "One or more categories do not exist");
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Một hoặc nhiều danh mục không tồn tại");
       }
     }
 
@@ -433,7 +433,39 @@ productRouter.get(
       throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy sản phẩm");
     }
 
-    res.json({ data: toProductResponse(product) });
+    // Fetch product reviews
+    const reviews = await prisma.productReview.findMany({
+      where: { productId: product.id },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+      include: {
+        user: { select: { id: true, name: true } },
+      },
+    });
+
+    const reviewStats = {
+      totalReviews: reviews.length,
+      averageRating: reviews.length > 0
+        ? Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10
+        : 0,
+      distribution: [5, 4, 3, 2, 1].map((star) => ({
+        star,
+        count: reviews.filter((r) => r.rating === star).length,
+      })),
+    };
+
+    res.json({
+      data: {
+        ...toProductResponse(product),
+        reviews: reviews.map((r) => ({
+          id: r.id,
+          rating: r.rating,
+          userName: r.user.name,
+          createdAt: r.createdAt,
+        })),
+        reviewStats,
+      },
+    });
   }),
 );
 

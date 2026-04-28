@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { createManagedStoreProduct } from "services/api";
+import { createManagedStoreProduct, fetchCategories } from "services/api";
 
 const ProductFormPage = () => {
   const [saving, setSaving] = useState(false);
@@ -17,6 +17,33 @@ const ProductFormPage = () => {
 
   const { openSnackbar } = useSnackbar();
   const navigate = useNavigate();
+
+  const [categories, setCategories] = useState<any[]>([]);
+  
+  useEffect(() => {
+    fetchCategories().then(res => {
+      if (res.data) setCategories(res.data);
+    }).catch(err => {
+      console.error(err);
+    });
+  }, []);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) {
+        openSnackbar({ text: "Ảnh quá lớn, vui lòng chọn ảnh < 1MB", type: "error" });
+        e.target.value = '';
+        return;
+      }
+      
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, imageUrl: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,15 +101,41 @@ const ProductFormPage = () => {
             </div>
 
             <div>
-              <Text style={{ fontWeight: 600, marginBottom: 8 }}>Mã Danh mục <span style={{color: "red"}}>*</span></Text>
-              <input
-                type="text"
-                value={formData.categoryKeys.join(", ")}
-                onChange={(e) => setFormData({ ...formData, categoryKeys: e.target.value.split(",").map(k => k.trim()).filter(Boolean) })}
-                style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid var(--tm-border)" }}
-                placeholder="VD: drinks, coffee"
-              />
-              <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 4 }}>Nhập các mã danh mục, cách nhau bởi dấu phẩy</Text>
+              <Text style={{ fontWeight: 600, marginBottom: 8 }}>Danh mục <span style={{color: "red"}}>*</span></Text>
+              {categories.length > 0 ? (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {categories.map((cat) => {
+                    const isSelected = formData.categoryKeys.includes(cat.key);
+                    return (
+                      <div 
+                        key={cat.key}
+                        onClick={() => {
+                          const keys = formData.categoryKeys;
+                          if (isSelected) {
+                            setFormData({...formData, categoryKeys: keys.filter(k => k !== cat.key)});
+                          } else {
+                            setFormData({...formData, categoryKeys: [...keys, cat.key]});
+                          }
+                        }}
+                        style={{ 
+                          padding: "8px 12px", 
+                          borderRadius: 20, 
+                          border: isSelected ? "1px solid var(--tm-primary)" : "1px solid var(--tm-border)",
+                          background: isSelected ? "#f1fdf7" : "#fff",
+                          color: isSelected ? "var(--tm-primary)" : "var(--tm-text-secondary)",
+                          fontSize: 14,
+                          cursor: "pointer",
+                          fontWeight: isSelected ? 600 : 400
+                        }}
+                      >
+                        {cat.name}
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <Text size="small" style={{ color: "var(--tm-text-secondary)" }}>Đang tải danh mục...</Text>
+              )}
             </div>
 
             <div>
@@ -96,13 +149,24 @@ const ProductFormPage = () => {
             </div>
             
             <div>
-              <Text style={{ fontWeight: 600, marginBottom: 8 }}>Link Ảnh</Text>
-              <input
-                type="text"
-                value={formData.imageUrl}
-                onChange={(e) => setFormData({ ...formData, imageUrl: e.target.value })}
-                style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid var(--tm-border)" }}
-              />
+              <Text style={{ fontWeight: 600, marginBottom: 8 }}>Hình ảnh món ăn</Text>
+              {formData.imageUrl && (
+                <div style={{ marginBottom: 8, borderRadius: 8, overflow: 'hidden', width: '100%', height: 160, border: "1px solid var(--tm-border)", background: "#f9f9f9" }}>
+                  <img src={formData.imageUrl} alt="Ảnh món" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                </div>
+              )}
+              
+              <div style={{ position: "relative", width: "100%", padding: 12, borderRadius: 8, border: "1px dashed var(--tm-primary)", textAlign: "center", background: "#f1fdf7" }}>
+                <Text style={{ color: "var(--tm-primary)", fontWeight: 600 }}>
+                  {formData.imageUrl ? "Chọn ảnh khác" : "📸 Tải ảnh từ máy"}
+                </Text>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageUpload}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", opacity: 0, cursor: "pointer" }}
+                />
+              </div>
             </div>
 
             <button

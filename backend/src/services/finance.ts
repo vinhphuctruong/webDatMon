@@ -22,7 +22,8 @@ import { HttpError } from "../lib/http-error";
 export const FINANCE_POLICY = {
   merchantCommissionRate: 0.2,
   driverAppFeeRate: 0.2,
-  platformFeeDefault: 3000,
+  /** Phí nền tảng thu từ khách = 0 (giống Shopee Food / Grab Food) */
+  platformFeeDefault: 0,
 };
 
 export type PrismaTx = Prisma.TransactionClient;

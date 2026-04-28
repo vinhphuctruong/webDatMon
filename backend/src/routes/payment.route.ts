@@ -62,7 +62,7 @@ paymentRouter.post(
       });
 
       if (!topup) {
-        throw new HttpError(StatusCodes.NOT_FOUND, "SePay reference code not found");
+        throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy mã tham chiếu SePay");
       }
 
       if (payload.status === "FAILED") {
@@ -119,7 +119,7 @@ paymentRouter.get(
     });
 
     if (!order) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
     }
 
     if (req.user!.role === UserRole.STORE_MANAGER) {
@@ -129,14 +129,14 @@ paymentRouter.get(
       });
 
       if (!managedStore || managedStore.id !== order.storeId) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to view this payment");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xem thanh toán này");
       }
     } else if (req.user!.role === UserRole.DRIVER) {
       if (order.driverId !== req.user!.id) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to view this payment");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xem thanh toán này");
       }
     } else if (req.user!.role !== UserRole.ADMIN && order.userId !== req.user!.id) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to view this payment");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xem thanh toán này");
     }
 
     const payment = await prisma.orderPayment.findUnique({
@@ -144,7 +144,7 @@ paymentRouter.get(
     });
 
     if (!payment) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Payment record not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy bản ghi thanh toán");
     }
 
     res.json({ data: payment });
@@ -165,11 +165,11 @@ paymentRouter.post(
     });
 
     if (!order) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Order not found");
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
     }
 
     if (req.user!.role !== UserRole.ADMIN && order.userId !== req.user!.id) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to confirm this payment");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xác nhận thanh toán này");
     }
 
     const updatedOrder = await prisma.$transaction(async (tx) => {

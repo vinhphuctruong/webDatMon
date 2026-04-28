@@ -1,0 +1,352 @@
+/* ========================================
+   TM Food Driver — Premium Design System
+   ======================================== */
+
+:root {
+  --tm-primary: #3b82f6;
+  --tm-primary-dark: #2563eb;
+  --tm-primary-light: #eff6ff;
+  --tm-accent: #f59e0b;
+  --tm-accent-light: #fffbeb;
+  --tm-warning: #ffb800;
+  --tm-danger: #ff4757;
+  --tm-success: #10b981;
+  --tm-success-light: #ecfdf5;
+  --tm-bg: #f5f6f8;
+  --tm-bg-card: #ffffff;
+  --tm-text-primary: #1a1a2e;
+  --tm-text-secondary: #6b7280;
+  --tm-text-tertiary: #9ca3af;
+  --tm-border: #e5e7eb;
+  --tm-shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --tm-shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --tm-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --tm-radius-sm: 8px;
+  --tm-radius-md: 12px;
+  --tm-radius-lg: 16px;
+  --tm-radius-xl: 20px;
+  --tm-radius-full: 9999px;
+  --tm-safe-area-inset-top: 0px;
+  --tm-safe-area-top: max(
+    max(var(--tm-safe-area-inset-top, 0px), var(--zaui-safe-area-inset-top, 0px)),
+    env(safe-area-inset-top, 0px)
+  );
+  --tm-safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --tm-page-horizontal: clamp(12px, 4vw, 16px);
+}
+
+/* ── Base ────────────────────────────── */
+body {
+  background-color: var(--tm-bg);
+  user-select: none;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--tm-text-primary);
+}
+
+* { box-sizing: border-box; }
+
+.zaui-routes { height: 100%; }
+.zaui-page { min-height: unset; }
+.page-with-bg { background: var(--tm-bg); }
+
+.tm-page-safe-top {
+  padding-top: calc(var(--tm-safe-area-top) + 10px) !important;
+}
+
+.tm-page-safe-bottom {
+  padding-bottom: calc(12px + var(--tm-safe-area-bottom)) !important;
+}
+
+.tm-content-pad {
+  padding-left: var(--tm-page-horizontal) !important;
+  padding-right: var(--tm-page-horizontal) !important;
+}
+
+.tm-page-topbar {
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-left: var(--tm-page-horizontal);
+  padding-right: var(--tm-page-horizontal);
+  padding-bottom: 12px;
+}
+
+.tm-page-topbar-title {
+  margin: 0;
+  line-height: 1.25;
+  font-size: clamp(19px, 5.6vw, 22px);
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.tm-link-back {
+  padding: 8px 0;
+  cursor: pointer;
+  color: var(--tm-text-primary);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* ── Header ──────────────────────────── */
+.zaui-header {
+  position: sticky;
+  height: auto;
+  margin-bottom: 0;
+  flex: none;
+  &::after { display: none; }
+}
+
+/* ── Inputs ──────────────────────────── */
+.zaui-input-affix-wrapper {
+  margin: 0;
+  border-radius: var(--tm-radius-full) !important;
+  background: var(--tm-bg) !important;
+  border: none !important;
+  transition: all 0.2s ease;
+  &:focus-within {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+    background: #fff !important;
+  }
+}
+
+/* ── Buttons ─────────────────────────── */
+.zaui-btn-tertiary,
+.zaui-btn-tertiary.zaui-btn-highlight,
+.zaui-bottom-navigation-item-active {
+  color: var(--zmp-primary-color);
+}
+
+.zaui-btn-primary,
+.zaui-btn-primary.zaui-btn-highlight,
+.zaui-btn-primary:active {
+  background: linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%);
+  border: none;
+  border-radius: var(--tm-radius-md);
+  font-weight: 600;
+}
+
+.zaui-btn-primary:active {
+  opacity: 0.9;
+  transform: scale(0.98);
+}
+
+/* ── Bottom Navigation ───────────────── */
+.zaui-bottom-navigation {
+  background: #fff !important;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.06) !important;
+  border-top: none !important;
+  padding-bottom: var(--tm-safe-area-bottom) !important;
+
+  .zaui-bottom-navigation-item {
+    transition: all 0.2s ease;
+    &-active .zaui-bottom-navigation-item-label {
+      font-weight: 600;
+    }
+  }
+}
+
+/* ── Animations ──────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.3); }
+}
+
+.animate-slide-up { animation: slideUp 0.4s ease-out; }
+.animate-fade-in { animation: fadeIn 0.3s ease-out; }
+
+/* ── Card System ─────────────────────── */
+.tm-card {
+  background: var(--tm-bg-card);
+  border-radius: var(--tm-radius-lg);
+  box-shadow: var(--tm-shadow-sm);
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  &:active {
+    transform: scale(0.98);
+    box-shadow: var(--tm-shadow-md);
+  }
+}
+
+/* ── Driver Header Gradient ──────────── */
+.tm-header-gradient {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 50%, #1d4ed8 100%);
+  color: #fff;
+  padding: 16px;
+  padding-top: calc(var(--tm-safe-area-top) + 12px);
+}
+
+/* ── Status Dot (online indicator) ───── */
+.tm-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.tm-status-dot-online {
+  background: #10b981;
+  animation: pulse-dot 2s infinite;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
+}
+
+.tm-status-dot-offline {
+  background: var(--tm-text-tertiary);
+}
+
+/* ── Toggle Switch ───────────────────── */
+.tm-toggle {
+  width: 52px;
+  height: 28px;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+  position: relative;
+  border: none;
+  outline: none;
+}
+
+.tm-toggle-on {
+  background: linear-gradient(135deg, #10b981, #059669);
+}
+
+.tm-toggle-off {
+  background: #d1d5db;
+}
+
+.tm-toggle-knob {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  position: absolute;
+  top: 3px;
+  transition: left 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.tm-toggle-on .tm-toggle-knob {
+  left: 27px;
+}
+
+.tm-toggle-off .tm-toggle-knob {
+  left: 3px;
+}
+
+/* ── Stats Card ──────────────────────── */
+.tm-stat-card {
+  background: var(--tm-bg-card);
+  border-radius: var(--tm-radius-lg);
+  padding: 16px;
+  box-shadow: var(--tm-shadow-sm);
+  text-align: center;
+}
+
+.tm-stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--tm-text-primary);
+  line-height: 1.2;
+}
+
+.tm-stat-label {
+  font-size: 12px;
+  color: var(--tm-text-secondary);
+  margin-top: 4px;
+}
+
+/* ── Order Card (driver-specific) ────── */
+.tm-order-card {
+  background: var(--tm-bg-card);
+  border-radius: var(--tm-radius-lg);
+  box-shadow: var(--tm-shadow-sm);
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: transform 0.2s ease;
+  &:active { transform: scale(0.98); }
+}
+
+/* ── Empty State ─────────────────────── */
+.tm-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--tm-text-secondary);
+}
+
+.tm-empty-icon {
+  font-size: 48px;
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+/* ── Skeleton ────────────────────────── */
+.bg-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%) !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 1.5s infinite !important;
+}
+
+/* ── Section Header ──────────────────── */
+.tm-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 8px;
+}
+
+.tm-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--tm-text-primary);
+}
+
+/* ── Sticky Bottom ───────────────────── */
+.tm-sticky-bottom {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  box-shadow: 0 -4px 16px rgba(0,0,0,0.08);
+  padding: 12px 16px;
+  padding-bottom: calc(12px + var(--tm-safe-area-bottom));
+  z-index: 50;
+}
+
+/* ── Product Sheet ───────────────────── */
+.zaui-sheet {
+  border-radius: var(--tm-radius-xl) var(--tm-radius-xl) 0 0 !important;
+}
+
+@media (max-width: 390px) {
+  .tm-page-topbar {
+    gap: 8px;
+    padding-bottom: 10px;
+  }
+
+  .zaui-bottom-navigation .zaui-bottom-navigation-item .zaui-bottom-navigation-item-label {
+    font-size: 11px !important;
+  }
+}

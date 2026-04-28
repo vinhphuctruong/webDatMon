@@ -146,6 +146,7 @@ export function mapApiProductToAppProduct(product: ApiProduct): Product {
     categoryId: product.categories.map((category) => category.key),
     variants: product.optionGroups.map(mapOptionGroupToVariant),
     storeName: product.store.name,
+    storeId: product.store.id,
     rating: product.rating,
     sold: String(product.soldCount),
     eta: `${product.store.etaMinutesMin}-${product.store.etaMinutesMax} phút`,
@@ -188,6 +189,34 @@ export async function fetchProducts(): Promise<Product[]> {
   return response.data.map(mapApiProductToAppProduct);
 }
 
+export interface ProductReviewItem {
+  id: string;
+  rating: number;
+  userName: string;
+  createdAt: string;
+}
+
+export interface ProductReviewStats {
+  totalReviews: number;
+  averageRating: number;
+  distribution: { star: number; count: number }[];
+}
+
+export interface ProductDetailResponse {
+  product: Product;
+  reviews: ProductReviewItem[];
+  reviewStats: ProductReviewStats;
+}
+
+export async function fetchProductDetail(productId: string): Promise<ProductDetailResponse> {
+  const response = await apiFetch<{ data: ApiProduct & { reviews: ProductReviewItem[]; reviewStats: ProductReviewStats } }>(`/products/${productId}`);
+  return {
+    product: mapApiProductToAppProduct(response.data),
+    reviews: response.data.reviews ?? [],
+    reviewStats: response.data.reviewStats ?? { totalReviews: 0, averageRating: 0, distribution: [] },
+  };
+}
+
 export async function fetchStores() {
   const response = await apiFetch<{ data: ApiStore[] }>("/stores?limit=50");
 
@@ -202,6 +231,28 @@ export async function fetchStores() {
     rating: store.rating,
     eta: `${store.etaMinutesMin}-${store.etaMinutesMax} phút`,
   }));
+}
+
+export interface StoreDetail {
+  id: string;
+  name: string;
+  address: string;
+  rating: number;
+  isOpen: boolean;
+  etaMinutesMin: number;
+  etaMinutesMax: number;
+  latitude: number | null;
+  longitude: number | null;
+  products: ApiProduct[];
+}
+
+export async function fetchStoreDetail(storeId: string): Promise<{ store: StoreDetail; products: Product[] }> {
+  const response = await apiFetch<{ data: StoreDetail }>(`/stores/${storeId}`);
+  const detail = response.data;
+  return {
+    store: detail,
+    products: detail.products.map(mapApiProductToAppProduct),
+  };
 }
 
 export async function fetchCart() {

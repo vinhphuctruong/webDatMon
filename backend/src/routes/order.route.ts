@@ -21,6 +21,8 @@ import {
   settleDeliveredOrder,
 } from "../services/finance";
 import { calculateUnitPrice } from "../utils/pricing";
+import { estimateDeliveryFee } from "../services/delivery-fee";
+import { validateVoucher } from "./voucher.route";
 
 const orderRouter = Router();
 
@@ -41,6 +43,7 @@ const createOrderSchema = z.object({
   deliveryAddress: deliveryAddressSchema.optional(),
   paymentMethod: z.nativeEnum(PaymentMethod).default(PaymentMethod.SEPAY_QR),
   autoConfirmPayment: z.boolean().optional().default(true),
+  voucherCode: z.string().max(30).optional(),
 });
 
 const listOrderQuerySchema = z.object({
@@ -62,6 +65,8 @@ function toOrderResponse(order: {
   subtotal: number;
   deliveryFee: number;
   platformFee: number;
+  discount: number;
+  voucherCode: string | null;
   total: number;
   merchantCommission: number;
   driverCommission: number;
@@ -114,6 +119,8 @@ function toOrderResponse(order: {
     subtotal: order.subtotal,
     deliveryFee: order.deliveryFee,
     platformFee: order.platformFee,
+    discount: order.discount,
+    voucherCode: order.voucherCode,
     total: order.total,
     settlement: {
       merchantCommission: order.merchantCommission,
@@ -152,6 +159,75 @@ function toOrderResponse(order: {
 
 orderRouter.use(requireAuth);
 
+/* ── Estimate delivery fee (preview before checkout) ─── */
+
+const estimateFeeQuerySchema = z.object({
+  storeId: z.string().min(1),
+  addressId: z.string().optional(),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
+});
+
+orderRouter.get(
+  "/estimate-delivery-fee",
+  requireAuth,
+  asyncHandler(async (req, res) => {
+    const query = estimateFeeQuerySchema.parse(req.query);
+    const userId = req.user!.id;
+
+    const store = await prisma.store.findUnique({
+      where: { id: query.storeId },
+      select: { id: true, name: true, latitude: true, longitude: true },
+    });
+
+    if (!store) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy cửa hàng");
+    }
+
+    let customerLat = query.latitude;
+    let customerLon = query.longitude;
+
+    // Nếu client truyền addressId thì lấy tọa độ từ DB
+    if (query.addressId && (customerLat == null || customerLon == null)) {
+      const address = await prisma.address.findFirst({
+        where: { id: query.addressId, userId },
+        select: { latitude: true, longitude: true },
+      });
+      if (address) {
+        customerLat = address.latitude ?? undefined;
+        customerLon = address.longitude ?? undefined;
+      }
+    }
+
+    // Nếu vẫn chưa có tọa độ → lấy từ default address
+    if (customerLat == null || customerLon == null) {
+      const defaultAddress = await prisma.address.findFirst({
+        where: { userId, isDefault: true },
+        select: { latitude: true, longitude: true },
+      });
+      if (defaultAddress) {
+        customerLat = defaultAddress.latitude ?? undefined;
+        customerLon = defaultAddress.longitude ?? undefined;
+      }
+    }
+
+    const estimate = estimateDeliveryFee(
+      { latitude: store.latitude, longitude: store.longitude },
+      { latitude: customerLat, longitude: customerLon },
+    );
+
+    res.json({
+      data: {
+        storeId: store.id,
+        storeName: store.name,
+        ...estimate,
+      },
+    });
+  }),
+);
+
+/* ── Create order ──────────────────────────────────────── */
+
 orderRouter.post(
   "/",
   asyncHandler(async (req, res) => {
@@ -176,7 +252,7 @@ orderRouter.post(
     });
 
     if (cartItems.length === 0) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "Cart is empty");
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Giỏ hàng đang trống");
     }
 
     const storeIds = new Set(cartItems.map((item) => item.product.storeId));
@@ -202,16 +278,8 @@ orderRouter.post(
     });
 
     const subtotal = lineItems.reduce((sum, item) => sum + item.lineTotal, 0);
-    const deliveryFee = Math.max(...cartItems.map((item) => item.product.deliveryFee));
-    const platformFee = FINANCE_POLICY.platformFeeDefault;
-    const total = subtotal + deliveryFee + platformFee;
 
-    const settlement = calculateSettlementBreakdown({
-      subtotal,
-      deliveryFee,
-      platformFee,
-    });
-
+    // ── Resolve delivery address trước ────────────────────
     let deliveryAddress = payload.deliveryAddress;
     let addressId: string | undefined;
 
@@ -224,7 +292,7 @@ orderRouter.post(
       });
 
       if (!address) {
-        throw new HttpError(StatusCodes.NOT_FOUND, "Address not found");
+        throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy địa chỉ");
       }
 
       addressId = address.id;
@@ -266,9 +334,37 @@ orderRouter.post(
     if (!deliveryAddress) {
       throw new HttpError(
         StatusCodes.BAD_REQUEST,
-        "deliveryAddress is required when no default address exists",
+        "Vui lòng cung cấp địa chỉ giao hàng",
       );
     }
+
+    // ── Tính phí ship theo khoảng cách (giống Shopee Food / Grab Food) ──
+    const feeEstimate = estimateDeliveryFee(
+      { latitude: selectedStore.latitude, longitude: selectedStore.longitude },
+      { latitude: deliveryAddress.latitude, longitude: deliveryAddress.longitude },
+    );
+    const deliveryFee = feeEstimate.fee;
+    const platformFee = FINANCE_POLICY.platformFeeDefault;
+
+    // ── Voucher discount ──
+    let discount = 0;
+    let voucherCode: string | undefined;
+    let voucherId: string | undefined;
+    if (payload.voucherCode) {
+      const code = payload.voucherCode.trim().toUpperCase();
+      const result = await validateVoucher(code, userId, subtotal);
+      discount = result.discount;
+      voucherCode = result.voucher.code;
+      voucherId = result.voucher.id;
+    }
+
+    const total = subtotal + deliveryFee + platformFee - discount;
+
+    const settlement = calculateSettlementBreakdown({
+      subtotal,
+      deliveryFee,
+      platformFee,
+    });
 
     const estimatedDeliveryAt = new Date(
       Date.now() + selectedStore.etaMinutesMax * 60_000,
@@ -293,6 +389,8 @@ orderRouter.post(
           subtotal,
           deliveryFee,
           platformFee,
+          discount,
+          voucherCode: voucherCode ?? null,
           total,
           merchantCommission: settlement.merchantCommission,
           driverCommission: settlement.driverCommission,
@@ -333,6 +431,22 @@ orderRouter.post(
 
       await tx.cartItem.deleteMany({ where: { userId } });
 
+      // Ghi nhận voucher usage
+      if (voucherId && voucherCode) {
+        await tx.voucherUsage.create({
+          data: {
+            voucherId,
+            userId,
+            orderId: order.id,
+            discount,
+          },
+        });
+        await tx.voucher.update({
+          where: { id: voucherId },
+          data: { usedCount: { increment: 1 } },
+        });
+      }
+
       return tx.order.findUniqueOrThrow({
         where: { id: order.id },
         include: {
@@ -367,7 +481,7 @@ orderRouter.post(
     }
 
     if (req.user!.role !== UserRole.ADMIN && existing.userId !== req.user!.id) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to confirm payment for this order");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xác nhận thanh toán đơn hàng này");
     }
 
     const updated = await prisma.$transaction(async (tx) => {
@@ -432,6 +546,7 @@ orderRouter.get(
           store: true,
           items: true,
           payment: true,
+          review: true,
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -480,7 +595,7 @@ orderRouter.get(
       });
 
       if (!managedStore || managedStore.id !== order.storeId) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to view this order");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xem đơn hàng này");
       }
 
       return res.json({ data: toOrderResponse(order) });
@@ -488,14 +603,14 @@ orderRouter.get(
 
     if (role === UserRole.DRIVER) {
       if (order.driverId !== req.user!.id) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to view this order");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xem đơn hàng này");
       }
 
       return res.json({ data: toOrderResponse(order) });
     }
 
     if (order.userId !== req.user!.id) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Not allowed to view this order");
+      throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền xem đơn hàng này");
     }
 
     res.json({ data: toOrderResponse(order) });
@@ -562,11 +677,11 @@ orderRouter.post(
 
       const store = await tx.store.findUnique({ where: { managerId: user.id } });
       if (!store || order.storeId !== store.id) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not your store's order");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của cửa hàng bạn");
       }
 
       if (order.status !== OrderStatus.PENDING) {
-        throw new HttpError(StatusCodes.BAD_REQUEST, "Order must be in PENDING status to confirm");
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng phải ở trạng thái CHỞ để xác nhận");
       }
 
       await tx.order.update({
@@ -597,11 +712,11 @@ orderRouter.post(
 
       const store = await tx.store.findUnique({ where: { managerId: user.id } });
       if (!store || order.storeId !== store.id) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not your store's order");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của cửa hàng bạn");
       }
 
       if (order.status !== OrderStatus.CONFIRMED) {
-        throw new HttpError(StatusCodes.BAD_REQUEST, "Order must be in CONFIRMED status to mark as ready/preparing");
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng phải ở trạng thái ĐÃ XÁC NHẬN để chuẩn bị");
       }
 
       await tx.order.update({
@@ -636,7 +751,7 @@ orderRouter.post(
 
       if (user.role === UserRole.CUSTOMER) {
         if (order.userId !== user.id) {
-          throw new HttpError(StatusCodes.FORBIDDEN, "Not your order");
+          throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của bạn");
         }
         if (order.status !== OrderStatus.PENDING) {
           throw new HttpError(
@@ -647,13 +762,13 @@ orderRouter.post(
       } else if (user.role === UserRole.STORE_MANAGER) {
         const store = await tx.store.findUnique({ where: { managerId: user.id } });
         if (!store || order.storeId !== store.id) {
-          throw new HttpError(StatusCodes.FORBIDDEN, "Not your store's order");
+          throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của cửa hàng bạn");
         }
         if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PREPARING) {
           throw new HttpError(StatusCodes.FORBIDDEN, "Chỉ có thể hủy khi đơn đang chờ hoặc đang chuẩn bị.");
         }
       } else if (user.role !== UserRole.ADMIN) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Unauthorized role to cancel");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền huỷ đơn hàng");
       }
 
       await cancelOrderWithSettlementRollback(tx, {
@@ -687,7 +802,7 @@ orderRouter.post(
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       
       if (order.driverId !== user.id) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not your assigned order");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng được giao cho bạn");
       }
       
       if (order.status !== OrderStatus.CONFIRMED && order.status !== OrderStatus.PREPARING) {
@@ -729,7 +844,7 @@ orderRouter.post(
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       
       if (order.driverId !== user.id) {
-        throw new HttpError(StatusCodes.FORBIDDEN, "Not your assigned order");
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng được giao cho bạn");
       }
       
       if (order.status !== OrderStatus.PICKED_UP) {
@@ -748,6 +863,83 @@ orderRouter.post(
     });
 
     res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+const reviewSchema = z.object({
+  rating: z.number().int().min(1).max(5),
+  comment: z.string().max(1000).optional(),
+});
+
+orderRouter.post(
+  "/:orderId/reviews",
+  requireRole(UserRole.CUSTOMER),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const payload = reviewSchema.parse(req.body);
+    const user = req.user!;
+
+    const result = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        include: { items: true, review: true },
+      });
+
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+      if (order.userId !== user.id) throw new HttpError(StatusCodes.FORBIDDEN, "Đây không phải đơn hàng của bạn");
+      if (order.status !== OrderStatus.DELIVERED) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Chỉ có thể đánh giá đơn hàng đã giao thành công");
+      }
+      if (order.review) {
+        throw new HttpError(StatusCodes.CONFLICT, "Bạn đã đánh giá đơn hàng này rồi");
+      }
+
+      const review = await tx.review.create({
+        data: {
+          orderId: order.id,
+          userId: user.id,
+          storeId: order.storeId,
+          rating: payload.rating,
+          comment: payload.comment,
+        },
+      });
+
+      const uniqueProductIds = Array.from(new Set(order.items.map(item => item.productId)));
+      for (const productId of uniqueProductIds) {
+        await tx.productReview.create({
+          data: {
+            orderId: order.id,
+            productId: productId,
+            userId: user.id,
+            rating: payload.rating,
+          },
+        });
+      }
+
+      const storeAggregate = await tx.review.aggregate({
+        _avg: { rating: true },
+        where: { storeId: order.storeId },
+      });
+      await tx.store.update({
+        where: { id: order.storeId },
+        data: { rating: storeAggregate._avg.rating ?? 0 },
+      });
+
+      for (const productId of uniqueProductIds) {
+        const productAggregate = await tx.productReview.aggregate({
+          _avg: { rating: true },
+          where: { productId: productId },
+        });
+        await tx.product.update({
+          where: { id: productId },
+          data: { rating: productAggregate._avg.rating ?? 0 },
+        });
+      }
+
+      return review;
+    });
+
+    res.json({ data: result, message: "Đánh giá thành công" });
   }),
 );
 
