@@ -1,6 +1,11 @@
+let hasWarnedUnsupportedNotification = false;
+
 export async function requestNotificationPermission() {
   if (!("Notification" in window)) {
-    console.warn("This browser does not support desktop notification");
+    if (!hasWarnedUnsupportedNotification) {
+      hasWarnedUnsupportedNotification = true;
+      console.warn("This browser does not support desktop notification");
+    }
     return false;
   }
   if (Notification.permission === "granted") return true;

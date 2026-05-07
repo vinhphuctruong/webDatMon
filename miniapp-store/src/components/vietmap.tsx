@@ -418,6 +418,8 @@ export const VietMapView: FC<VietMapProps> = ({
       className={className}
       style={{
         position: "relative",
+        zIndex: 0,
+        isolation: "isolate",
         borderRadius: 12,
         overflow: "hidden",
         ...wrapperStyle,

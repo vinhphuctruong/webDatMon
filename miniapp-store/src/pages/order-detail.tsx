@@ -5,6 +5,7 @@ import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady, cancelOrder }
 import { formatCurrency } from "utils/formatter";
 import { VietMapView, MapMarker } from "components/vietmap";
 import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
+import { formatStoreOrderCode } from "utils/order-code";
 
 const OrderDetailPage = () => {
   const { id } = useParams();
@@ -68,6 +69,7 @@ const OrderDetailPage = () => {
   }
 
   if (!order) return null;
+  const orderCode = formatStoreOrderCode(order);
 
   const toFiniteNumber = (value: unknown): number | null => {
     const parsed = typeof value === "number" ? value : Number(value);
@@ -126,7 +128,7 @@ const OrderDetailPage = () => {
       <Box p={4} className="tm-content-pad">
         <div className="tm-card" style={{ padding: 16 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid var(--tm-border)", paddingBottom: 12, marginBottom: 12 }}>
-            <Text.Title style={{ fontSize: 18 }}>Đơn #{order.id.slice(-6).toUpperCase()}</Text.Title>
+            <Text.Title style={{ fontSize: 18 }}>Đơn #{orderCode}</Text.Title>
             <div style={{ background: "rgba(0,169,109,0.1)", color: "var(--tm-primary)", padding: "4px 8px", borderRadius: 4, fontWeight: 600, fontSize: 12 }}>
               {order.status}
             </div>

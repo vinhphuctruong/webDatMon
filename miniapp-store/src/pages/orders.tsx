@@ -1,8 +1,10 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Page, Box, Text, Tabs, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
+import { vibrate as zmpVibrate } from "zmp-sdk";
 import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady, cancelOrder } from "services/api";
 import { formatCurrency } from "utils/formatter";
+import { formatStoreOrderCode } from "utils/order-code";
 
 const OrdersPage = () => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -10,12 +12,72 @@ const OrdersPage = () => {
   const [activeTab, setActiveTab] = useState("PENDING");
   const { openSnackbar } = useSnackbar();
   const navigate = useNavigate();
+  const knownPendingOrderIdsRef = useRef<Set<string>>(new Set());
+  const didBootstrapOrdersRef = useRef(false);
+
+  const playNewOrderAlert = useCallback(async () => {
+    try {
+      const AudioCtx =
+        (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        if (ctx.state === "suspended") {
+          await ctx.resume();
+        }
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.type = "triangle";
+        oscillator.frequency.setValueAtTime(880, ctx.currentTime);
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        gainNode.gain.setValueAtTime(0.0001, ctx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.24, ctx.currentTime + 0.02);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.3);
+        oscillator.start(ctx.currentTime);
+        oscillator.stop(ctx.currentTime + 0.3);
+      }
+    } catch (_error) {
+      // Ignore tone failures on restricted webviews
+    }
+
+    try {
+      await zmpVibrate({ type: "oneShot", milliseconds: 280 });
+    } catch (_error) {
+      try {
+        if (navigator.vibrate) {
+          navigator.vibrate([180, 90, 180]);
+        }
+      } catch (_fallbackError) {
+        // Ignore haptic failures
+      }
+    }
+  }, []);
 
   const loadOrders = async () => {
     setLoading(true);
     try {
       const response = await fetchStoreOrders({ limit: 50 });
-      setOrders(response.data);
+      const nextOrders = response.data || [];
+      setOrders(nextOrders);
+
+      const pendingOrders = nextOrders.filter((order: any) => order.status === "PENDING");
+      const nextPendingIds = new Set<string>(pendingOrders.map((order: any) => order.id));
+
+      if (didBootstrapOrdersRef.current) {
+        const previousPendingIds = knownPendingOrderIdsRef.current;
+        const newPendingOrders = pendingOrders.filter((order: any) => !previousPendingIds.has(order.id));
+        if (newPendingOrders.length > 0) {
+          const newestOrder = newPendingOrders[0];
+          openSnackbar({
+            text: `Có đơn mới #${formatStoreOrderCode(newestOrder)}`,
+            type: "success",
+          });
+          playNewOrderAlert();
+        }
+      }
+
+      knownPendingOrderIdsRef.current = nextPendingIds;
+      didBootstrapOrdersRef.current = true;
     } catch (error: any) {
       openSnackbar({ text: error.message || "Lỗi tải danh sách đơn", type: "error" });
     } finally {
@@ -76,7 +138,9 @@ const OrdersPage = () => {
           <Text style={{ textAlign: "center", color: "var(--tm-text-secondary)", marginTop: 20 }}>Không có đơn hàng nào.</Text>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
-            {filteredOrders.map(order => (
+            {filteredOrders.map((order) => {
+              const orderCode = formatStoreOrderCode(order);
+              return (
               <div 
                 key={order.id} 
                 className="tm-card tm-interactive animate-slide-up" 
@@ -84,7 +148,7 @@ const OrdersPage = () => {
                 onClick={() => navigate(`/order-detail/${order.id}`)}
               >
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <Text.Title style={{ fontSize: 16 }}>Đơn #{order.id.slice(-6).toUpperCase()}</Text.Title>
+                  <Text.Title style={{ fontSize: 16 }}>Đơn #{orderCode}</Text.Title>
                   <Text style={{ fontWeight: 800, color: "var(--tm-primary)", fontSize: 18 }}>{formatCurrency(order.total)}</Text>
                 </div>
                 
@@ -133,7 +197,8 @@ const OrdersPage = () => {
                   </button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Box>
