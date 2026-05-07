@@ -97,7 +97,7 @@ export const ProductListContent: FC = () => {
         {filtered.map((product) => (
           <ProductPicker key={product.id} product={product}>
             {({ open }) => (
-              <div className="tm-card animate-fade-in" onClick={open} style={{ cursor: 'pointer' }}>
+              <div className="tm-card tm-interactive animate-slide-up" onClick={open} style={{ cursor: 'pointer', borderRadius: '16px', overflow: 'hidden' }}>
                 <div style={{ position: 'relative' }}>
                   <img
                     loading="lazy"
@@ -107,37 +107,42 @@ export const ProductListContent: FC = () => {
                       aspectRatio: '1',
                       objectFit: 'cover',
                       display: 'block',
-                      borderRadius: '16px 16px 0 0',
                     }}
                     className="bg-skeleton"
                   />
                   {product.sale && (
-                    <span className="tm-badge tm-badge-sale" style={{ position: 'absolute', top: 6, left: 6 }}>
+                    <span className="tm-badge tm-badge-sale tm-glass" style={{ position: 'absolute', top: 6, left: 6, border: 'none', color: '#ff4757', fontWeight: 700 }}>
                       Giảm {product.sale.type === "percent" ? `${product.sale.percent * 100}%` : `${(product.sale.amount / 1000).toFixed(0)}K`}
                     </span>
                   )}
-                  {product.rating ? (
-                    <div style={{
+                  {(product.rating ?? 0) > 0 ? (
+                    <div className="tm-glass" style={{
                       position: 'absolute', bottom: 6, left: 6,
-                      background: 'rgba(0,0,0,0.55)',
                       borderRadius: 12, padding: '2px 6px',
                       display: 'flex', alignItems: 'center', gap: 2,
-                      backdropFilter: 'blur(4px)',
                     }}>
                       <span style={{ color: '#ffb800', fontSize: 10 }}>★</span>
-                      <span style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>
+                      <span style={{ color: 'var(--tm-text-primary)', fontSize: 10, fontWeight: 700 }}>
                         {product.rating}
                       </span>
                     </div>
-                  ) : null}
+                  ) : (
+                    <div className="tm-glass" style={{
+                      position: 'absolute', bottom: 6, left: 6,
+                      borderRadius: 12, padding: '2px 8px',
+                      display: 'flex', alignItems: 'center', gap: 2,
+                    }}>
+                      <span style={{ color: 'var(--tm-primary)', fontSize: 10, fontWeight: 700 }}>Mới</span>
+                    </div>
+                  )}
                   <FavoriteButton productId={typeof product.id === "number" ? product.id : 0} />
                   <button
-                    className="tm-add-btn"
-                    style={{ position: 'absolute', bottom: 6, right: 6, width: 26, height: 26, fontSize: 16 }}
+                    className="tm-add-btn tm-interactive"
+                    style={{ position: 'absolute', bottom: 6, right: 6, width: 28, height: 28, fontSize: 18, background: 'var(--tm-primary)', color: 'white', borderRadius: '50%', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: 'var(--tm-shadow-floating)' }}
                     onClick={(e) => { e.stopPropagation(); open(); }}
                   >+</button>
                 </div>
-                <Box style={{ padding: '8px 10px 10px' }}>
+                <Box style={{ padding: '10px 12px 12px' }}>
                   <Text
                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); navigate(`/product?id=${product.backendId || product.id}`); }}
                     style={{
@@ -147,13 +152,25 @@ export const ProductListContent: FC = () => {
                     }}>
                     {product.name}
                   </Text>
-                  <Text
-                    size="xxxSmall"
+                  <div
                     onClick={(e: React.MouseEvent) => { e.stopPropagation(); if (product.storeId) navigate(`/store?id=${product.storeId}`); }}
-                    style={{ color: 'var(--tm-primary)', fontSize: 11, marginBottom: 4, cursor: product.storeId ? 'pointer' : 'default', textDecoration: product.storeId ? 'underline' : 'none' }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, cursor: product.storeId ? 'pointer' : 'default' }}
                   >
-                    {product.storeName ?? "Quán đối tác"}
-                  </Text>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
+                      background: 'linear-gradient(135deg, var(--tm-primary), #00c97d)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      color: '#fff', fontSize: 9, fontWeight: 700,
+                    }}>
+                      {(product.storeName ?? 'Q').charAt(0).toUpperCase()}
+                    </div>
+                    <Text
+                      size="xxxSmall"
+                      style={{ color: 'var(--tm-primary)', fontSize: 11, textDecoration: product.storeId ? 'underline' : 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                    >
+                      {product.storeName ?? "Quán đối tác"}
+                    </Text>
+                  </div>
                   <Text style={{ color: 'var(--tm-primary)', fontWeight: 700, fontSize: 14 }}>
                     <FinalPrice>{product}</FinalPrice>
                   </Text>

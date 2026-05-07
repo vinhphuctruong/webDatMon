@@ -20,7 +20,7 @@ const tabs: Record<string, MenuItem> = {
     activeIcon: <CartIcon active />,
   },
   "/profile": {
-    label: "Cá nhân",
+    label: "Tôi",
     icon: <Icon icon="zi-user" />,
   },
 };
@@ -42,12 +42,6 @@ export const Navigation: FC = () => {
   const keyboardVisible = useVirtualKeyboardVisible();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-
-  useEffect(() => {
-    const session = localStorage.getItem("zaui_food_session");
-    setIsLoggedIn(!!session);
-  }, [location.pathname]);
 
   const noBottomNav = useMemo(() => {
     return NO_BOTTOM_NAVIGATION_PAGES.includes(location.pathname);
@@ -57,23 +51,30 @@ export const Navigation: FC = () => {
     return <></>;
   }
 
+  const handleNavigate = (path: string) => {
+    const session = localStorage.getItem("zaui_food_session");
+    if (!session && (path === "/notification" || path === "/cart")) {
+      navigate("/login");
+    } else {
+      navigate(path);
+    }
+  };
+
   return (
     <BottomNavigation
       id="footer"
       activeKey={location.pathname}
-      onChange={navigate}
+      onChange={handleNavigate}
       className="z-50"
     >
-      {(Object.keys(tabs) as TabKeys[])
-        .filter((path) => path !== "/profile" || isLoggedIn)
-        .map((path: TabKeys) => (
-          <BottomNavigation.Item
-            key={path}
-            label={tabs[path].label}
-            icon={tabs[path].icon}
-            activeIcon={tabs[path].activeIcon}
-          />
-        ))}
+      {(Object.keys(tabs) as TabKeys[]).map((path: TabKeys) => (
+        <BottomNavigation.Item
+          key={path}
+          label={tabs[path].label}
+          icon={tabs[path].icon}
+          activeIcon={tabs[path].activeIcon}
+        />
+      ))}
     </BottomNavigation>
   );
 };

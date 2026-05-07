@@ -6,6 +6,8 @@ export interface StoreInfo {
   rating: number;
   etaMinutesMin: number;
   etaMinutesMax: number;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface DashboardSummary {

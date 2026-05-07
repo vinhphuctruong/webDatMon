@@ -1,3 +1,4 @@
+import { getStorage, setStorage } from "zmp-sdk";
 export class ApiError extends Error {
   status: number;
   details?: unknown;
@@ -105,13 +106,23 @@ function getApiBaseCandidates() {
   return [API_BASE_URL, DEFAULT_API_BASE_URL];
 }
 
-function readSession(): Session | null {
+export async function readSession(): Promise<Session | null> {
   if (cachedSession) {
     return cachedSession;
   }
 
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    let raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) {
+      try {
+        const result = await getStorage({ keys: [SESSION_KEY] });
+        if (result && result[SESSION_KEY]) {
+          raw = String(result[SESSION_KEY]);
+          localStorage.setItem(SESSION_KEY, raw);
+        }
+      } catch (e) {}
+    }
+    
     if (!raw) {
       return null;
     }
@@ -132,9 +143,12 @@ function writeSession(session: Session | null) {
   try {
     if (!session) {
       localStorage.removeItem(SESSION_KEY);
+      setStorage({ data: { [SESSION_KEY]: "" } }).catch(() => {});
       return;
     }
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    const sessionStr = JSON.stringify(session);
+    localStorage.setItem(SESSION_KEY, sessionStr);
+    setStorage({ data: { [SESSION_KEY]: sessionStr } }).catch(() => {});
   } catch (_error) {
     // Ignore storage errors on restricted environments
   }
@@ -249,7 +263,7 @@ async function refreshAccessToken(current: Session): Promise<Session> {
 }
 
 async function ensureSession() {
-  const existing = readSession();
+  const existing = await readSession();
   if (existing) {
     return existing;
   }

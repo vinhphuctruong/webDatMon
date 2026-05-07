@@ -1,7 +1,161 @@
-import React, { FC, useEffect, useState, useCallback } from "react";
-import { Box, Page, Text, Header, useSnackbar, Modal } from "zmp-ui";
+import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
+import { Box, Modal, Page, Text, useSnackbar } from "zmp-ui";
 import { fetchMyOrders, completeOrder, reportFailedDelivery } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
+import { VietMapView, MapMarker } from "components/vietmap";
+import {
+  THU_DAU_MOT_CENTER,
+  calculateDistance,
+  calculateETA,
+  displayDistance,
+  normalizeStoredCoordinates,
+} from "utils/location";
+import { getLocation } from "zmp-sdk";
+
+const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
+  const normalizedStoreCoordinates = normalizeStoredCoordinates(
+    order.store?.latitude,
+    order.store?.longitude,
+  );
+  const normalizedCustomerCoordinates = normalizeStoredCoordinates(
+    order.deliveryAddress?.latitude,
+    order.deliveryAddress?.longitude,
+  );
+  const storeLat = normalizedStoreCoordinates?.lat ?? THU_DAU_MOT_CENTER.lat;
+  const storeLng = normalizedStoreCoordinates?.lng ?? THU_DAU_MOT_CENTER.lng;
+  const customerLat = normalizedCustomerCoordinates?.lat ?? THU_DAU_MOT_CENTER.lat - 0.01;
+  const customerLng = normalizedCustomerCoordinates?.lng ?? THU_DAU_MOT_CENTER.lng + 0.01;
+
+  const [driverLat, setDriverLat] = useState<number | null>(null);
+  const [driverLng, setDriverLng] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        const pos = await getLocation({});
+        if (pos && pos.latitude && pos.longitude) {
+          setDriverLat(parseFloat(pos.latitude as string));
+          setDriverLng(parseFloat(pos.longitude as string));
+        }
+      } catch (error) {
+        console.error("Failed to get driver location", error);
+      }
+    };
+
+    fetchLocation();
+    const interval = setInterval(fetchLocation, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const markers = useMemo<MapMarker[]>(() => {
+    const list: MapMarker[] = [
+      { lat: storeLat, lng: storeLng, label: order.store?.name || "Quán", type: "store" },
+      {
+        lat: customerLat,
+        lng: customerLng,
+        label: order.deliveryAddress?.receiverName || "Khách",
+        type: "customer",
+      },
+    ];
+
+    if (driverLat && driverLng) {
+      list.push({ lat: driverLat, lng: driverLng, label: "Bạn", type: "driver" });
+    }
+
+    return list;
+  }, [storeLat, storeLng, customerLat, customerLng, order.store?.name, order.deliveryAddress?.receiverName, driverLat, driverLng]);
+
+  const center = useMemo<[number, number]>(() => {
+    if (driverLat && driverLng) return [driverLng, driverLat];
+    return [(storeLng + customerLng) / 2, (storeLat + customerLat) / 2];
+  }, [storeLng, customerLng, storeLat, customerLat, driverLat, driverLng]);
+
+  const targetLat = order.status === "PICKED_UP" ? customerLat : storeLat;
+  const targetLng = order.status === "PICKED_UP" ? customerLng : storeLng;
+
+  const distance =
+    driverLat && driverLng
+      ? calculateDistance(driverLat, driverLng, targetLat, targetLng)
+      : calculateDistance(storeLat, storeLng, customerLat, customerLng);
+
+  const eta = calculateETA(distance);
+
+  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${driverLat || ""},${driverLng || ""}&destination=${targetLat},${targetLng}`;
+
+  return (
+    <div style={{ marginBottom: 10, position: "relative" }}>
+      <VietMapView
+        center={center}
+        zoom={14}
+        markers={markers}
+        height={190}
+        showRoute={false}
+        style={{ borderRadius: 12, border: "1px solid var(--tm-border)" }}
+      />
+
+      <div
+        style={{
+          position: "absolute",
+          top: 8,
+          left: 8,
+          zIndex: 1000,
+          background: "rgba(255,255,255,0.95)",
+          backdropFilter: "blur(8px)",
+          padding: "6px 10px",
+          borderRadius: 10,
+          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+        }}
+      >
+        <div style={{ fontSize: 10, color: "var(--tm-text-secondary)", fontWeight: 600 }}>
+          ETA tới {order.status === "PICKED_UP" ? "khách" : "quán"}
+        </div>
+        <div style={{ fontSize: 13, fontWeight: 800, color: "var(--tm-primary)" }}>{eta}</div>
+        <div style={{ fontSize: 10, color: "var(--tm-text-tertiary)" }}>{displayDistance(distance)}</div>
+      </div>
+
+      <button
+        onClick={() => {
+          import("zmp-sdk/apis").then(({ openWebview }) => {
+            openWebview({
+              url: googleMapsUrl,
+              config: { style: "normal" },
+            });
+          }).catch(() => {
+            // Fallback nếu SDK không hỗ trợ
+            window.open(googleMapsUrl, "_blank");
+          });
+        }}
+        style={{
+          width: "100%",
+          marginTop: 10,
+          background: "#4285F4",
+          color: "#fff",
+          border: "none",
+          borderRadius: 12,
+          padding: "10px",
+          fontWeight: 700,
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          gap: 8,
+          fontSize: 14
+        }}
+      >
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        </svg>
+        Dẫn đường bằng Google Maps
+      </button>
+
+    </div>
+  );
+};
+
+const statusLabels: Record<string, string> = {
+  PICKED_UP: "Đang giao tới khách",
+  CONFIRMED: "Quán đã xác nhận",
+  PREPARING: "Quán đang chuẩn bị",
+};
 
 const ActiveDeliveryPage: FC = () => {
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
@@ -12,15 +166,17 @@ const ActiveDeliveryPage: FC = () => {
   const [failing, setFailing] = useState(false);
   const snackbar = useSnackbar();
 
+  const [error, setError] = useState<any>(null);
+  if (error) throw error;
+
   const loadOrders = useCallback(async () => {
     try {
       const res = await fetchMyOrders();
-      const active = (res.data || []).filter((o: any) =>
-        ["PICKED_UP", "CONFIRMED", "PREPARING"].includes(o.status)
-      );
+      const active = (res.data || []).filter((o: any) => ["PICKED_UP", "CONFIRMED", "PREPARING"].includes(o.status));
       setActiveOrders(active);
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -30,16 +186,16 @@ const ActiveDeliveryPage: FC = () => {
     loadOrders();
     const interval = setInterval(loadOrders, 15000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadOrders]);
 
   const handleComplete = async (orderId: string) => {
     setCompleting(orderId);
     try {
       await completeOrder(orderId);
-      snackbar.openSnackbar({ type: "success", text: "Giao hàng thành công! ✅" });
+      snackbar.openSnackbar({ type: "success", text: "Giao hàng thành công" });
       loadOrders();
     } catch (error: any) {
-      snackbar.openSnackbar({ type: "error", text: error.message || "Lỗi" });
+      snackbar.openSnackbar({ type: "error", text: error.message || "Không thể hoàn tất đơn" });
     } finally {
       setCompleting(null);
     }
@@ -54,43 +210,55 @@ const ActiveDeliveryPage: FC = () => {
       setFailReason("");
       loadOrders();
     } catch (error: any) {
-      snackbar.openSnackbar({ type: "error", text: error.message || "Lỗi" });
+      snackbar.openSnackbar({ type: "error", text: error.message || "Không thể gửi báo cáo" });
     } finally {
       setFailing(false);
     }
   };
 
-  const statusLabels: Record<string, string> = {
-    PICKED_UP: "🚗 Đang giao",
-    CONFIRMED: "✅ Quán đã nhận",
-    PREPARING: "🍳 Đang chế biến",
-  };
-
   return (
-    <Page className="page-with-bg">
-      <Header title="Đơn đang giao" showBackIcon />
-      <Box style={{ padding: 16 }}>
+    <Page className="page-with-bg pb-20">
+      <Box
+        p={4}
+        className="tm-content-pad tm-page-safe-top"
+        style={{
+          background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
+          paddingBottom: 42,
+        }}
+      >
+        <Text.Title style={{ color: "#fff", fontSize: 20 }}>Đơn đang giao</Text.Title>
+        <Text size="xSmall" style={{ color: "rgba(255,255,255,0.82)", marginTop: 4 }}>
+          Theo dõi tiến trình và hoàn tất đơn ngay tại đây
+        </Text>
+      </Box>
+
+      <Box p={4} className="tm-content-pad" style={{ marginTop: -26 }}>
         {loading ? (
           <Box className="flex items-center justify-center" style={{ padding: 48 }}>
             <Text style={{ color: "var(--tm-text-secondary)" }}>Đang tải...</Text>
           </Box>
         ) : activeOrders.length === 0 ? (
-          <div className="tm-empty-state">
-            <span className="tm-empty-icon">🚗</span>
-            <Text style={{ fontWeight: 600, marginBottom: 4 }}>Không có đơn đang giao</Text>
+          <div className="tm-empty-state tm-card" style={{ padding: "42px 20px" }}>
+            <span className="tm-empty-icon">🛵</span>
+            <Text style={{ fontWeight: 700, marginBottom: 4 }}>Không có đơn đang giao</Text>
             <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>
-              Vào "Đơn chờ nhận" để nhận đơn mới nhé
+              Vào mục "Đơn chờ" để nhận thêm cuốc mới
             </Text>
           </div>
         ) : (
           activeOrders.map((order) => (
             <div key={order.id} className="tm-order-card animate-slide-up">
-              {/* Status */}
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                <span style={{
-                  background: "var(--tm-primary-light)", color: "var(--tm-primary)",
-                  padding: "4px 12px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-                }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, gap: 8 }}>
+                <span
+                  style={{
+                    background: "var(--tm-primary-light)",
+                    color: "var(--tm-primary)",
+                    padding: "4px 10px",
+                    borderRadius: 20,
+                    fontSize: 11,
+                    fontWeight: 700,
+                  }}
+                >
                   {statusLabels[order.status] || order.status}
                 </span>
                 <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>
@@ -98,17 +266,13 @@ const ActiveDeliveryPage: FC = () => {
                 </Text>
               </div>
 
-              {/* Store Info */}
               <div style={{ background: "var(--tm-bg)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
-                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>🏪 {order.store?.name}</Text>
-                <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-                  {order.store?.address}
-                </Text>
+                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>🏪 {order.store?.name}</Text>
+                <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>{order.store?.address}</Text>
               </div>
 
-              {/* Customer Info */}
-              <div style={{ background: "#fffbeb", borderRadius: 12, padding: 12, marginBottom: 10 }}>
-                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>📍 Giao tới</Text>
+              <div style={{ background: "#f8faf8", borderRadius: 12, padding: 12, marginBottom: 10 }}>
+                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>📍 Giao tới khách</Text>
                 <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
                   {order.deliveryAddress?.receiverName} · {order.deliveryAddress?.phone}
                 </Text>
@@ -117,46 +281,66 @@ const ActiveDeliveryPage: FC = () => {
                 </Text>
               </div>
 
-              {/* Items */}
+              <DeliveryRouteMap order={order} />
+
               <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 8 }}>
                 {order.items?.map((i: any) => `${i.productName} x${i.quantity}`).join(", ")}
               </Text>
 
-              {/* Payment & Actions */}
-              <div style={{
-                display: "flex", justifyContent: "space-between", alignItems: "center",
-                paddingTop: 12, borderTop: "1px solid var(--tm-border)",
-              }}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  paddingTop: 12,
+                  borderTop: "1px solid var(--tm-border)",
+                  gap: 10,
+                }}
+              >
                 <div>
                   <Text style={{ fontWeight: 700, color: "var(--tm-primary)", fontSize: 16 }}>
                     <DisplayPrice>{order.total || 0}</DisplayPrice>
                   </Text>
                   <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-                    {order.paymentMethod === "COD" ? "💵 Thu tiền mặt" : "💳 Đã thanh toán online"}
+                    {order.paymentMethod === "COD" ? "Khách trả tiền mặt" : "Khách đã thanh toán online"}
                   </Text>
                 </div>
-                <div style={{ display: "flex", gap: 8 }}>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 8 }}>
                   <button
+                    className="tm-interactive"
                     onClick={() => setFailModal({ orderId: order.id, visible: true })}
                     style={{
-                      background: "#fef2f2", color: "var(--tm-danger)",
-                      border: "none", borderRadius: 10, padding: "8px 14px",
-                      fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      background: "#fff1f2",
+                      color: "var(--tm-danger)",
+                      border: "2px solid #fecdd3",
+                      borderRadius: 14,
+                      padding: "12px",
+                      fontSize: 14,
+                      fontWeight: 800,
                     }}
                   >
                     Thất bại
                   </button>
                   <button
+                    className="tm-interactive animate-pulse-soft"
                     onClick={() => handleComplete(order.id)}
                     disabled={completing === order.id}
                     style={{
-                      background: "linear-gradient(135deg, #10b981, #059669)",
-                      color: "#fff", border: "none", borderRadius: 10,
-                      padding: "8px 20px", fontWeight: 700, fontSize: 13,
-                      cursor: "pointer", opacity: completing === order.id ? 0.7 : 1,
+                      background: "linear-gradient(135deg, #10b981, #047857)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: 14,
+                      padding: "12px",
+                      fontWeight: 800,
+                      fontSize: 16,
+                      boxShadow: "var(--tm-shadow-floating)",
+                      opacity: completing === order.id ? 0.7 : 1,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
                     }}
                   >
-                    {completing === order.id ? "..." : "✅ Đã giao"}
+                    {completing === order.id ? "Đang xử lý..." : "Đã giao"}
                   </button>
                 </div>
               </div>
@@ -165,34 +349,41 @@ const ActiveDeliveryPage: FC = () => {
         )}
       </Box>
 
-      {/* Failed Delivery Modal */}
       <Modal
         visible={failModal.visible}
         title="Báo giao thất bại"
         onClose={() => setFailModal({ orderId: "", visible: false })}
       >
         <Box p={4}>
-          <Text style={{ marginBottom: 12 }}>Lý do giao thất bại:</Text>
+          <Text style={{ marginBottom: 12 }}>Lý do giao thất bại</Text>
           <textarea
             value={failReason}
-            onChange={(e) => setFailReason(e.target.value)}
-            placeholder="VD: Khách không nghe máy, sai địa chỉ..."
+            onChange={(event) => setFailReason(event.target.value)}
+            placeholder="Ví dụ: Khách không nghe máy, sai địa chỉ..."
             rows={3}
             style={{
-              width: "100%", padding: 12, borderRadius: 8,
-              border: "1px solid var(--tm-border)", marginBottom: 16,
+              width: "100%",
+              padding: 12,
+              borderRadius: 8,
+              border: "1px solid var(--tm-border)",
+              marginBottom: 16,
             }}
           />
           <button
             onClick={handleFailed}
             disabled={failing}
             style={{
-              width: "100%", padding: 12, borderRadius: 12,
-              background: "var(--tm-danger)", color: "#fff",
-              fontWeight: 600, border: "none", opacity: failing ? 0.7 : 1,
+              width: "100%",
+              padding: 12,
+              borderRadius: 12,
+              background: "var(--tm-danger)",
+              color: "#fff",
+              fontWeight: 700,
+              border: "none",
+              opacity: failing ? 0.7 : 1,
             }}
           >
-            {failing ? "Đang xử lý..." : "Xác nhận giao thất bại"}
+            {failing ? "Đang xử lý..." : "Xác nhận"}
           </button>
         </Box>
       </Modal>

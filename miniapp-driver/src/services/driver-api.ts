@@ -12,9 +12,22 @@ export async function toggleOnline(isOnline: boolean) {
   }, { auth: true });
 }
 
+export async function syncDriverLocation(latitude: number, longitude: number) {
+  return apiFetch<{ data: any }>("/drivers/location", {
+    method: "PATCH",
+    body: JSON.stringify({ latitude, longitude }),
+  }, { auth: true });
+}
+
 // ── Orders ──────────────────────────────────────────
-export async function fetchAvailableOrders() {
-  return apiFetch<{ data: any[] }>("/drivers/orders/available", undefined, { auth: true });
+export async function fetchAvailableOrders(params?: { latitude?: number; longitude?: number }) {
+  const query = new URLSearchParams();
+  if (params?.latitude != null) query.set("latitude", String(params.latitude));
+  if (params?.longitude != null) query.set("longitude", String(params.longitude));
+  const qs = query.toString();
+  return apiFetch<{ data: any[] }>(`/drivers/orders/available${qs ? `?${qs}` : ""}`, undefined, {
+    auth: true,
+  });
 }
 
 export async function fetchMyOrders() {
@@ -23,6 +36,18 @@ export async function fetchMyOrders() {
 
 export async function claimOrder(orderId: string) {
   return apiFetch<{ data: any }>(`/drivers/orders/${orderId}/claim`, {
+    method: "POST",
+  }, { auth: true });
+}
+
+export async function acceptDispatchOrder(orderId: string) {
+  return apiFetch<{ data: any }>(`/drivers/orders/${orderId}/accept-dispatch`, {
+    method: "POST",
+  }, { auth: true });
+}
+
+export async function rejectDispatchOrder(orderId: string) {
+  return apiFetch<{ message: string }>(`/drivers/orders/${orderId}/reject-dispatch`, {
     method: "POST",
   }, { auth: true });
 }
@@ -42,7 +67,33 @@ export async function reportFailedDelivery(orderId: string, reason?: string) {
 
 // ── Wallet ──────────────────────────────────────────
 export async function fetchMyWallets() {
-  return apiFetch<{ data: any[] }>("/wallets/mine", undefined, { auth: true });
+  return apiFetch<{ data: any }>("/wallets/me", undefined, { auth: true });
+}
+
+export async function fetchWalletTransactions(walletId?: string, limit = 50) {
+  const qs = walletId ? `?walletId=${walletId}&limit=${limit}` : `?limit=${limit}`;
+  return apiFetch<{ data: any[] }>(`/wallets/transactions${qs}`, undefined, { auth: true });
+}
+
+export async function requestTopup(amount: number) {
+  return apiFetch<{ data: any }>("/wallets/topups/sepay", {
+    method: "POST",
+    body: JSON.stringify({ amount }),
+  }, { auth: true });
+}
+
+export async function confirmTopupMock(referenceCode: string) {
+  return apiFetch<{ data: any }>(`/wallets/topups/sepay/${referenceCode}/confirm`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  }, { auth: true });
+}
+
+export async function requestPayout(payload: { amount: number; bankCode: string; bankAccountNumber: string; bankAccountName: string; note?: string }) {
+  return apiFetch<{ data: any }>("/wallets/payouts", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  }, { auth: true });
 }
 
 // ── Orders list (paginated) ─────────────────────────

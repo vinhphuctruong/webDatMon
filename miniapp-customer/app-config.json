@@ -27,5 +27,10 @@
     "prefixCurrencySymbol": false,
     "currencySymbol": "đ",
     "headerLogo": ""
+  },
+  "permission": {
+    "scope.userLocation": {
+      "desc": "Vị trí của bạn được dùng để tìm cửa hàng gần nhất và nhận đơn hàng."
+    }
   }
 }

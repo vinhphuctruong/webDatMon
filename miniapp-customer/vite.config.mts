@@ -8,6 +8,28 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function manualVendorChunks(id: string) {
+  if (id.endsWith(".css") || !id.includes("node_modules")) {
+    return undefined;
+  }
+
+  if (
+    id.includes("react") ||
+    id.includes("react-dom") ||
+    id.includes("scheduler") ||
+    id.includes("zmp-sdk") ||
+    id.includes("zmp-ui")
+  ) {
+    return "vendor-core";
+  }
+  if (id.includes("leaflet") || id.includes("@vietmap")) return "vendor-map";
+  if (id.includes("swiper")) return "vendor-swiper";
+  if (id.includes("recoil")) return "vendor-state";
+  if (id.includes("lodash") || id.includes("@react-spring")) return "vendor-utils";
+
+  return "vendor";
+}
+
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -39,6 +61,22 @@ export default defineConfig(({ mode }) => {
         state: path.resolve(__dirname, "src/state.ts"),
         hooks: path.resolve(__dirname, "src/hooks.ts"),
         css: path.resolve(__dirname, "src/css"),
+      },
+    },
+    css: {
+      preprocessorOptions: {
+        scss: {
+          api: "modern",
+        },
+      },
+    },
+    build: {
+      target: "es2020",
+      chunkSizeWarningLimit: 700,
+      rollupOptions: {
+        output: {
+          manualChunks: manualVendorChunks,
+        },
       },
     },
   };

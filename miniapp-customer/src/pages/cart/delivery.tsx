@@ -7,7 +7,7 @@ import { CustomerLocationPicker, StorePicker } from "./store-picker";
 import { TimePicker } from "./time-picker";
 import { useRecoilState, useRecoilValueLoadable, useRecoilValue } from "recoil";
 import { orderNoteState, selectedStoreState, locationState, cartState } from "state";
-import { THU_DAU_MOT_CENTER } from "utils/location";
+import { THU_DAU_MOT_CENTER, calculateDistance, calculateETA, displayDistance } from "utils/location";
 
 const DeliveryRow: FC<{ icon: string; children: React.ReactNode }> = ({ icon, children }) => (
   <div style={{
@@ -26,11 +26,33 @@ const DeliveryMap: FC = () => {
   const selectedStore = useRecoilValueLoadable(selectedStoreState);
   const userLocation = useRecoilValueLoadable(locationState);
 
-  // Get coordinates
-  const customerLat = userLocation.state === "hasValue" && userLocation.contents
-    ? parseFloat(String(userLocation.contents.latitude)) : THU_DAU_MOT_CENTER.lat;
-  const customerLng = userLocation.state === "hasValue" && userLocation.contents
-    ? parseFloat(String(userLocation.contents.longitude)) : THU_DAU_MOT_CENTER.lng;
+  // Check if user has a real confirmed location
+  const hasRealLocation = userLocation.state === "hasValue" && userLocation.contents !== null;
+
+  // If no real location, show a prompt instead of a fake map
+  if (!hasRealLocation) {
+    return (
+      <div style={{
+        height: 180, borderRadius: 12,
+        background: 'linear-gradient(135deg, #f0fdf4, #ecfdf5)',
+        border: '1.5px dashed #86efac',
+        display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: 8, marginBottom: 8, padding: 16, textAlign: 'center',
+      }}>
+        <span style={{ fontSize: 40 }}>📍</span>
+        <Text style={{ fontWeight: 700, fontSize: 14, color: 'var(--tm-text-primary)' }}>
+          Chưa có vị trí giao hàng
+        </Text>
+        <Text style={{ fontSize: 12, color: 'var(--tm-text-secondary)', lineHeight: 1.4, maxWidth: 240 }}>
+          Vui lòng chọn địa chỉ giao hàng bên dưới để hiển thị bản đồ và tính phí ship chính xác
+        </Text>
+      </div>
+    );
+  }
+
+  const customerLat = parseFloat(String(userLocation.contents!.latitude));
+  const customerLng = parseFloat(String(userLocation.contents!.longitude));
 
   const storeLat = selectedStore.state === "hasValue" && selectedStore.contents
     ? selectedStore.contents.lat : THU_DAU_MOT_CENTER.lat;
@@ -61,8 +83,11 @@ const DeliveryMap: FC = () => {
     return [storeLng, storeLat];
   }, [storeLng, storeLat]);
 
+  const distance = calculateDistance(customerLat, customerLng, storeLat, storeLng);
+  const eta = calculateETA(distance);
+
   return (
-    <div>
+    <div style={{ position: "relative" }}>
       <VietMapView
         center={center}
         zoom={14}
@@ -72,6 +97,20 @@ const DeliveryMap: FC = () => {
         onMarkerClick={() => {}}
         style={{ margin: '0 0 8px', borderRadius: 12, border: '1px solid var(--tm-border)' }}
       />
+      {/* ETA Overlay */}
+      <div style={{
+        position: 'absolute', top: 12, left: 12, zIndex: 1000,
+        background: 'rgba(255, 255, 255, 0.95)',
+        backdropFilter: 'blur(8px)',
+        padding: '8px 12px', borderRadius: 12,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        display: 'flex', flexDirection: 'column', gap: 2,
+        border: '1px solid rgba(0,0,0,0.05)',
+      }}>
+        <div style={{ fontSize: 11, color: 'var(--tm-text-secondary)', fontWeight: 600 }}>Dự kiến giao hàng</div>
+        <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--tm-primary)' }}>{eta}</div>
+        <div style={{ fontSize: 10, color: 'var(--tm-text-tertiary)' }}>{displayDistance(distance)} từ quán đến bạn</div>
+      </div>
       {/* Legend */}
       <div style={{
         display: 'flex', gap: 12, padding: '6px 4px', flexWrap: 'wrap',
@@ -99,7 +138,7 @@ const LegendItem: FC<{ emoji: string; color: string; label: string }> = ({ emoji
   </div>
 );
 
-const SHOW_DELIVERY_MAP = false;
+const SHOW_DELIVERY_MAP = true;
 
 export const Delivery: FC = () => {
   const [note, setNote] = useRecoilState(orderNoteState);

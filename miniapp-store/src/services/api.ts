@@ -511,3 +511,20 @@ export async function submitStoreApplication(payload: any) {
 export async function fetchCategories() {
   return apiFetch<any>('/categories');
 }
+
+// ── Wallet ──────────────────────────────────────────
+export async function fetchMyWallets() {
+  return apiFetch<{ data: any }>('/wallets/me', undefined, { auth: true });
+}
+
+export async function fetchWalletTransactions(walletId?: string, limit = 50) {
+  const qs = walletId ? `?walletId=${walletId}&limit=${limit}` : `?limit=${limit}`;
+  return apiFetch<{ data: any[] }>(`/wallets/transactions${qs}`, undefined, { auth: true });
+}
+
+export async function requestPayout(payload: { amount: number; bankCode: string; bankAccountNumber: string; bankAccountName: string; note?: string }) {
+  return apiFetch<{ data: any }>('/wallets/payouts', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }, { auth: true });
+}

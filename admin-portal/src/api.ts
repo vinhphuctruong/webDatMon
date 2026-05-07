@@ -68,7 +68,11 @@ export async function api<T>(path: string, init: RequestInit = {}, auth = true, 
   if (!r.ok) {
     const msg = typeof payload === "object" && payload !== null
       ? (payload as any).message ?? (payload as any).error : undefined;
-    if (r.status === 401 && auth) { clearSession(); onUnauthorized?.(); }
+    if (r.status === 401 && auth) {
+      clearSession();
+      onUnauthorized?.();
+      throw new Error("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
+    }
     throw new Error(msg || `Request failed (${r.status})`);
   }
   return payload as T;

@@ -128,14 +128,16 @@ export function calculateDeliveryFeeFromDistance(roadDistanceKm: number): {
   };
 }
 
+import { calculateRouteWithVietmap } from "./vietmap.service";
+
 /**
  * Tính phí ship từ tọa độ cửa hàng và khách hàng.
  * Trả về phí mặc định nếu thiếu tọa độ.
  */
-export function estimateDeliveryFee(
+export async function estimateDeliveryFee(
   store: { latitude?: number | null; longitude?: number | null },
   customer: { latitude?: number | null; longitude?: number | null },
-): DeliveryFeeEstimate {
+): Promise<DeliveryFeeEstimate> {
   const p = DELIVERY_FEE_POLICY;
 
   // Fallback nếu thiếu tọa độ
@@ -165,7 +167,18 @@ export function estimateDeliveryFee(
     customer.longitude,
   );
 
-  const roadDistanceKm = straightLineKm * p.roadFactor;
+  let roadDistanceKm = straightLineKm * p.roadFactor; // default fallback
+
+  const vietmapRoute = await calculateRouteWithVietmap(
+    store.latitude,
+    store.longitude,
+    customer.latitude,
+    customer.longitude
+  );
+
+  if (vietmapRoute) {
+    roadDistanceKm = vietmapRoute.distanceKm;
+  }
 
   const { fee, breakdown } = calculateDeliveryFeeFromDistance(roadDistanceKm);
 

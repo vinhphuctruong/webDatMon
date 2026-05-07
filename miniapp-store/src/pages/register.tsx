@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Page, Box, Text, useSnackbar, Header } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { submitStoreApplication } from "services/api";
+import { geocodeAddress } from "utils/location";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -48,7 +49,17 @@ const RegisterPage = () => {
 
     setSubmitting(true);
     try {
-      await submitStoreApplication(formData);
+      const resolvedCoordinates = await geocodeAddress(formData.storeAddress.trim());
+
+      await submitStoreApplication({
+        storeName: formData.storeName.trim(),
+        storeAddress: formData.storeAddress.trim(),
+        storePhone: formData.storePhone.trim(),
+        frontStoreImageData: formData.frontStoreImageData,
+        businessLicenseImageData: formData.businessLicenseImageData,
+        storeLatitude: resolvedCoordinates?.lat ?? null,
+        storeLongitude: resolvedCoordinates?.lng ?? null,
+      });
       openSnackbar({ text: "Gửi hồ sơ thành công!", type: "success" });
       navigate("/application-status");
     } catch (error: any) {
@@ -97,6 +108,9 @@ const RegisterPage = () => {
                 style={{ width: "100%", padding: 12, borderRadius: 8, border: "1px solid var(--tm-border)" }}
                 placeholder="Số nhà, Tên đường, Phường/Xã..."
               />
+              <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 6 }}>
+                Hệ thống sẽ tự xác định vị trí map từ địa chỉ này.
+              </Text>
             </div>
 
             <div>

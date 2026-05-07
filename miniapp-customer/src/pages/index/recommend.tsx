@@ -55,10 +55,16 @@ export const RecommendContent: FC = () => {
                       display: 'flex', alignItems: 'center', gap: 3,
                       backdropFilter: 'blur(4px)',
                     }}>
-                      <span style={{ color: '#ffb800', fontSize: 11 }}>★</span>
-                      <span style={{ color: '#fff', fontSize: 11, fontWeight: 600 }}>
-                        {product.rating ?? 4.7}
-                      </span>
+                    {(product.rating ?? 0) > 0 ? (
+                      <>
+                        <span style={{ color: '#ffb800', fontSize: 11 }}>★</span>
+                        <span style={{ color: '#fff', fontSize: 11, fontWeight: 600 }}>
+                          {product.rating}
+                        </span>
+                      </>
+                    ) : (
+                      <span style={{ color: '#fff', fontSize: 11, fontWeight: 600 }}>Mới</span>
+                    )}
                     </div>
                   </div>
                   {/* Info section */}
@@ -76,9 +82,19 @@ export const RecommendContent: FC = () => {
                     >
                       {product.name}
                     </Text>
-                    <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)', marginBottom: 6 }}>
-                      {product.storeName ?? "Quán đối tác"}
-                    </Text>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                      <div style={{
+                        width: 18, height: 18, borderRadius: '50%', flexShrink: 0,
+                        background: 'linear-gradient(135deg, var(--tm-primary), #00c97d)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        color: '#fff', fontSize: 8, fontWeight: 700,
+                      }}>
+                        {(product.storeName ?? 'Q').charAt(0).toUpperCase()}
+                      </div>
+                      <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {product.storeName ?? "Quán đối tác"}
+                      </Text>
+                    </div>
                     <Box flex justifyContent="space-between" alignItems="center">
                       <div>
                         {product.sale && (

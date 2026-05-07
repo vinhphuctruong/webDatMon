@@ -1,7 +1,13 @@
 import React, { FC, useEffect, useState } from "react";
-import { Box, Page, Text, Header, Input, Button, useSnackbar } from "zmp-ui";
+import { Box, Button, Input, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { fetchMyProfile, updateMyProfile, changeMyPassword, clearApiSession, hasSession } from "services/api";
+import {
+  fetchMyProfile,
+  updateMyProfile,
+  changeMyPassword,
+  clearApiSession,
+  hasSession,
+} from "services/api";
 import { fetchDriverProfile } from "services/driver-api";
 
 const ProfilePage: FC = () => {
@@ -22,6 +28,7 @@ const ProfilePage: FC = () => {
       navigate("/login", { replace: true });
       return;
     }
+
     Promise.all([fetchMyProfile(), fetchDriverProfile()])
       .then(([userRes, driverRes]) => {
         setUser(userRes);
@@ -30,7 +37,7 @@ const ProfilePage: FC = () => {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [navigate]);
 
   const handleSaveProfile = async () => {
     setSavingProfile(true);
@@ -38,9 +45,9 @@ const ProfilePage: FC = () => {
       await updateMyProfile(editForm);
       setUser({ ...user, ...editForm });
       setEditing(false);
-      snackbar.openSnackbar({ type: "success", text: "Cập nhật thành công" });
+      snackbar.openSnackbar({ type: "success", text: "Cập nhật thông tin thành công" });
     } catch (error: any) {
-      snackbar.openSnackbar({ type: "error", text: error.message });
+      snackbar.openSnackbar({ type: "error", text: error.message || "Không thể cập nhật thông tin" });
     } finally {
       setSavingProfile(false);
     }
@@ -51,6 +58,7 @@ const ProfilePage: FC = () => {
       snackbar.openSnackbar({ type: "error", text: "Mật khẩu mới tối thiểu 8 ký tự" });
       return;
     }
+
     setSavingPassword(true);
     try {
       await changeMyPassword(passwordForm.current, passwordForm.newPw);
@@ -58,7 +66,7 @@ const ProfilePage: FC = () => {
       setPasswordForm({ current: "", newPw: "" });
       snackbar.openSnackbar({ type: "success", text: "Đổi mật khẩu thành công" });
     } catch (error: any) {
-      snackbar.openSnackbar({ type: "error", text: error.message });
+      snackbar.openSnackbar({ type: "error", text: error.message || "Không thể đổi mật khẩu" });
     } finally {
       setSavingPassword(false);
     }
@@ -72,7 +80,6 @@ const ProfilePage: FC = () => {
   if (loading) {
     return (
       <Page className="page-with-bg">
-        <Header title="Tài khoản" showBackIcon />
         <Box className="flex items-center justify-center" style={{ padding: 48 }}>
           <Text style={{ color: "var(--tm-text-secondary)" }}>Đang tải...</Text>
         </Box>
@@ -81,92 +88,143 @@ const ProfilePage: FC = () => {
   }
 
   return (
-    <Page className="page-with-bg">
-      <Header title="Tài khoản" />
-      <Box style={{ padding: 16 }}>
-        {/* Profile Header */}
-        <div className="tm-card animate-slide-up" style={{ padding: 20, textAlign: "center", marginBottom: 16 }}>
-          <div style={{
-            width: 64, height: 64, borderRadius: "50%",
-            background: "linear-gradient(135deg, var(--tm-primary), var(--tm-primary-dark))",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            margin: "0 auto 12px", fontSize: 28, color: "#fff",
-          }}>
-            🚗
+    <Page className="page-with-bg pb-20">
+      <Box
+        p={4}
+        className="tm-content-pad tm-page-safe-top"
+        style={{
+          background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
+          paddingBottom: 42,
+        }}
+      >
+        <Text.Title style={{ color: "#fff", fontSize: 20 }}>Tài khoản tài xế</Text.Title>
+        <Text size="xSmall" style={{ color: "rgba(255,255,255,0.82)", marginTop: 4 }}>
+          Quản lý hồ sơ, phương tiện và bảo mật đăng nhập
+        </Text>
+      </Box>
+
+      <Box p={4} className="tm-content-pad" style={{ marginTop: -26 }}>
+        <div className="tm-card" style={{ padding: 16, marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div
+              style={{
+                width: 62,
+                height: 62,
+                borderRadius: "50%",
+                background: "linear-gradient(135deg, var(--tm-primary), var(--tm-primary-dark))",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: 28,
+                color: "#fff",
+              }}
+            >
+              🛵
+            </div>
+            <div>
+              <Text style={{ fontWeight: 700, fontSize: 17 }}>{user?.name}</Text>
+              <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>{user?.email}</Text>
+              {driver && (
+                <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)", marginTop: 3 }}>
+                  {driver.vehicleType} · {driver.licensePlate}
+                </Text>
+              )}
+            </div>
           </div>
-          <Text style={{ fontWeight: 700, fontSize: 18 }}>{user?.name}</Text>
-          <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>{user?.email}</Text>
-          {driver && (
-            <Text size="xxSmall" style={{ color: "var(--tm-text-tertiary)", marginTop: 4 }}>
-              {driver.vehicleType} · {driver.licensePlate}
-            </Text>
-          )}
         </div>
 
-        {/* Edit Info */}
-        <div className="tm-card" style={{ padding: 20, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div className="tm-card" style={{ padding: 16, marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <Text style={{ fontWeight: 700, fontSize: 15 }}>Thông tin cá nhân</Text>
-            <Text
-              size="xSmall"
-              style={{ color: "var(--tm-primary)", cursor: "pointer", fontWeight: 600 }}
+            <button
               onClick={() => setEditing(!editing)}
+              style={{ border: "none", background: "transparent", color: "var(--tm-primary)", fontWeight: 700 }}
             >
               {editing ? "Huỷ" : "Sửa"}
-            </Text>
+            </button>
           </div>
+
           {editing ? (
             <div style={{ display: "grid", gap: 12 }}>
-              <Input value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} placeholder="Họ tên" />
-              <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="Số điện thoại" />
-              <Button fullWidth loading={savingProfile} onClick={handleSaveProfile}>Lưu</Button>
+              <Input
+                value={editForm.name}
+                onChange={(event) => setEditForm({ ...editForm, name: event.target.value })}
+                placeholder="Họ tên"
+              />
+              <Input
+                value={editForm.phone}
+                onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })}
+                placeholder="Số điện thoại"
+              />
+              <Button fullWidth loading={savingProfile} onClick={handleSaveProfile}>
+                Lưu thay đổi
+              </Button>
             </div>
           ) : (
             <div style={{ display: "grid", gap: 8 }}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                 <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>Họ tên</Text>
-                <Text size="xSmall" style={{ fontWeight: 600 }}>{user?.name}</Text>
+                <Text size="xSmall" style={{ fontWeight: 700 }}>{user?.name}</Text>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>SĐT</Text>
-                <Text size="xSmall" style={{ fontWeight: 600 }}>{user?.phone || "Chưa cập nhật"}</Text>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+                <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>Số điện thoại</Text>
+                <Text size="xSmall" style={{ fontWeight: 700 }}>{user?.phone || "Chưa cập nhật"}</Text>
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
                 <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>Email</Text>
-                <Text size="xSmall" style={{ fontWeight: 600 }}>{user?.email}</Text>
+                <Text size="xSmall" style={{ fontWeight: 700 }}>{user?.email}</Text>
               </div>
             </div>
           )}
         </div>
 
-        {/* Change Password */}
-        <div className="tm-card" style={{ padding: 20, marginBottom: 16 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div className="tm-card" style={{ padding: 16, marginBottom: 12 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
             <Text style={{ fontWeight: 700, fontSize: 15 }}>Bảo mật</Text>
-            <Text
-              size="xSmall"
-              style={{ color: "var(--tm-primary)", cursor: "pointer", fontWeight: 600 }}
+            <button
               onClick={() => setShowPasswordForm(!showPasswordForm)}
+              style={{ border: "none", background: "transparent", color: "var(--tm-primary)", fontWeight: 700 }}
             >
               {showPasswordForm ? "Huỷ" : "Đổi mật khẩu"}
-            </Text>
+            </button>
           </div>
-          {showPasswordForm && (
+
+          {showPasswordForm ? (
             <div style={{ display: "grid", gap: 12 }}>
-              <Input type="password" placeholder="Mật khẩu hiện tại" value={passwordForm.current} onChange={(e) => setPasswordForm({ ...passwordForm, current: e.target.value })} />
-              <Input type="password" placeholder="Mật khẩu mới" value={passwordForm.newPw} onChange={(e) => setPasswordForm({ ...passwordForm, newPw: e.target.value })} />
-              <Button fullWidth loading={savingPassword} onClick={handleChangePassword}>Xác nhận</Button>
+              <Input
+                type="password"
+                placeholder="Mật khẩu hiện tại"
+                value={passwordForm.current}
+                onChange={(event) => setPasswordForm({ ...passwordForm, current: event.target.value })}
+              />
+              <Input
+                type="password"
+                placeholder="Mật khẩu mới"
+                value={passwordForm.newPw}
+                onChange={(event) => setPasswordForm({ ...passwordForm, newPw: event.target.value })}
+              />
+              <Button fullWidth loading={savingPassword} onClick={handleChangePassword}>
+                Xác nhận đổi mật khẩu
+              </Button>
             </div>
+          ) : (
+            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>
+              Nên đổi mật khẩu định kỳ để bảo vệ tài khoản giao hàng.
+            </Text>
           )}
         </div>
 
-        {/* Logout */}
         <button
           onClick={handleLogout}
           style={{
-            width: "100%", padding: 14, borderRadius: 12,
-            background: "#fef2f2", color: "var(--tm-danger)",
-            fontWeight: 600, border: "none", fontSize: 15, cursor: "pointer",
+            width: "100%",
+            border: "none",
+            borderRadius: 12,
+            background: "#fff1f2",
+            color: "var(--tm-danger)",
+            padding: "12px 14px",
+            fontWeight: 700,
+            fontSize: 14,
           }}
         >
           Đăng xuất

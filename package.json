@@ -1,0 +1,8 @@
+{
+  "name": "tm-food-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "npx concurrently \"npm run dev --prefix backend\" \"npm start --prefix miniapp-customer\" \"npm start --prefix miniapp-driver\" \"npm start --prefix miniapp-store\" \"npm run dev --prefix admin-portal\""
+  }
+}

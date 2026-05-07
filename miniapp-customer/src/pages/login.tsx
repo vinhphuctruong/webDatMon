@@ -9,6 +9,7 @@ import {
   requestForgotPasswordOtp,
   verifyForgotPasswordOtp,
   resetPasswordWithOtp,
+  readSession,
 } from "services/api";
 
 type AuthMode = "login" | "register_customer" | "forgot_password";
@@ -71,9 +72,12 @@ const LoginPage: FC = () => {
   useEffect(() => {
     const required = parseRequiredFromSearch(location.search);
     setRequireRegistration(required);
-    const session = localStorage.getItem("zaui_food_session");
-    setIsLoggedIn(!!session);
     setMode(required ? "register_customer" : parseModeFromSearch(location.search));
+    
+    // Check session asynchronously
+    readSession().then((session) => {
+      setIsLoggedIn(!!session);
+    });
   }, [location.search]);
 
   // Zalo info fetching moved to manual button click

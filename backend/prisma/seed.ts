@@ -257,12 +257,21 @@ async function main() {
   );
 
   const storeAddressFallback = [
-    "56 Nguyen Thai Binh, Quan 1, Ho Chi Minh",
-    "124 Le Lai, Quan 1, Ho Chi Minh",
-    "88 Nguyen Dinh Chieu, Quan 1, Ho Chi Minh",
-    "189 Cach Mang Thang 8, Quan 3, Ho Chi Minh",
-    "33 Tran Quang Dieu, Quan 3, Ho Chi Minh",
-    "15 Vo Van Tan, Quan 3, Ho Chi Minh",
+    "56 Yersin, P. Hiệp Thành, Thủ Dầu Một, Bình Dương",
+    "124 Cách Mạng Tháng 8, P. Phú Cường, Thủ Dầu Một, Bình Dương",
+    "88 Phú Lợi, P. Phú Hòa, Thủ Dầu Một, Bình Dương",
+    "189 Đại Lộ Bình Dương, P. Phú Thọ, Thủ Dầu Một, Bình Dương",
+    "33 Thích Quảng Đức, P. Phú Cường, Thủ Dầu Một, Bình Dương",
+    "15 Huỳnh Văn Lũy, P. Phú Lợi, Thủ Dầu Một, Bình Dương",
+  ];
+
+  const storeCoordinatesFallback = [
+    { lat: 10.9856, lng: 106.6685 },
+    { lat: 10.9780, lng: 106.6720 },
+    { lat: 10.9815, lng: 106.6850 },
+    { lat: 10.9720, lng: 106.6755 },
+    { lat: 10.9795, lng: 106.6710 },
+    { lat: 10.9880, lng: 106.6820 },
   ];
 
   const storeIdByName = new Map<string, string>();
@@ -283,6 +292,8 @@ async function main() {
         name: storeName,
         slug: `${slugify(storeName)}-${index + 1}`,
         address: storeAddressFallback[index % storeAddressFallback.length],
+        latitude: storeCoordinatesFallback[index % storeCoordinatesFallback.length].lat,
+        longitude: storeCoordinatesFallback[index % storeCoordinatesFallback.length].lng,
         rating: 4.5 + ((index % 4) * 0.1),
         etaMinutesMin: 15 + (index % 3) * 5,
         etaMinutesMax: 25 + (index % 3) * 8,

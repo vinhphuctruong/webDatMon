@@ -4,6 +4,8 @@ import { Box, Text } from "zmp-ui";
 import { Navigation } from "./navigation";
 import { ScrollRestoration } from "./scroll-restoration";
 import { ErrorBoundary } from "./error-boundary";
+import { GpsRequiredOverlay } from "./gps-required-overlay";
+import { IncomingOrderAlert } from "./incoming-order-alert";
 import HomePage from "../pages/index";
 import AvailableOrdersPage from "../pages/available-orders";
 import ActiveDeliveryPage from "../pages/active-delivery";
@@ -42,15 +44,25 @@ export const Layout: FC = () => {
             }
           >
             <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/available" element={<AvailableOrdersPage />} />
-              <Route path="/delivering" element={<ActiveDeliveryPage />} />
-              <Route path="/orders" element={<OrdersPage />} />
-              <Route path="/wallet" element={<WalletPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
+              {/* Auth routes — no GPS required */}
               <Route path="/login" element={<LoginPage />} />
               <Route path="/register" element={<RegisterPage />} />
               <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+              {/* Protected routes — GPS required */}
+              <Route path="/*" element={
+                <GpsRequiredOverlay>
+                  <IncomingOrderAlert />
+                  <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/available" element={<AvailableOrdersPage />} />
+                    <Route path="/delivering" element={<ActiveDeliveryPage />} />
+                    <Route path="/orders" element={<OrdersPage />} />
+                    <Route path="/wallet" element={<WalletPage />} />
+                    <Route path="/profile" element={<ProfilePage />} />
+                  </Routes>
+                </GpsRequiredOverlay>
+              } />
             </Routes>
           </Suspense>
         </ErrorBoundary>

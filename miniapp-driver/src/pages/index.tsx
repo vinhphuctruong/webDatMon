@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState, useCallback } from "react";
+import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { hasSession } from "services/api";
@@ -14,6 +14,9 @@ const HomePage: FC = () => {
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
 
+  const [error, setError] = useState<any>(null);
+  if (error) throw error;
+
   const loadData = useCallback(async () => {
     try {
       const profileRes = await fetchDriverProfile();
@@ -22,15 +25,17 @@ const HomePage: FC = () => {
 
       const ordersRes = await fetchMyOrders();
       const today = new Date().toDateString();
-      const todayOrders = (ordersRes.data || []).filter((o: any) =>
-        o.status === "DELIVERED" && o.completedAt && new Date(o.completedAt).toDateString() === today
+      const todayOrders = (ordersRes.data || []).filter(
+        (o: any) => o.status === "DELIVERED" && o.completedAt && new Date(o.completedAt).toDateString() === today,
       );
+
       setTodayStats({
         earnings: todayOrders.reduce((sum: number, o: any) => sum + (o.driverPayout || 0), 0),
         deliveries: todayOrders.length,
       });
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      console.error(err);
+      setError(err);
     } finally {
       setLoading(false);
     }
@@ -42,7 +47,7 @@ const HomePage: FC = () => {
       return;
     }
     loadData();
-  }, []);
+  }, [loadData, navigate]);
 
   const handleToggle = async () => {
     setToggling(true);
@@ -51,7 +56,7 @@ const HomePage: FC = () => {
       setIsOnline(res.data.isOnline);
       snackbar.openSnackbar({
         type: "success",
-        text: res.data.isOnline ? "Bạn đã bật nhận đơn! 🟢" : "Bạn đã tắt nhận đơn",
+        text: res.data.isOnline ? "Bạn đã bật nhận đơn" : "Bạn đã tắt nhận đơn",
       });
     } catch (error: any) {
       snackbar.openSnackbar({ type: "error", text: error.message || "Lỗi cập nhật trạng thái" });
@@ -59,6 +64,16 @@ const HomePage: FC = () => {
       setToggling(false);
     }
   };
+
+  const quickActions = useMemo(
+    () => [
+      { icon: "📋", label: "Đơn chờ nhận", path: "/available" },
+      { icon: "🛵", label: "Đang giao", path: "/delivering" },
+      { icon: "📦", label: "Lịch sử đơn", path: "/orders" },
+      { icon: "💰", label: "Ví thu nhập", path: "/wallet" },
+    ],
+    [],
+  );
 
   if (loading) {
     return (
@@ -71,93 +86,91 @@ const HomePage: FC = () => {
   }
 
   return (
-    <Page className="page-with-bg">
-      {/* Header */}
-      <div className="tm-header-gradient">
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+    <Page className="page-with-bg pb-20">
+      <Box
+        p={4}
+        className="tm-content-pad tm-page-safe-top"
+        style={{
+          background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
+          paddingBottom: 54,
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
           <div>
-            <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 13 }}>Xin chào 👋</Text>
-            <Text.Title style={{ color: "#fff", fontSize: 22, fontWeight: 800, marginTop: 2 }}>
-              {profile?.user?.name || "Tài xế"}
-            </Text.Title>
+            <Text style={{ color: "rgba(255,255,255,0.8)", fontSize: 13 }}>Xin chào, tài xế</Text>
+            <Text.Title style={{ color: "#fff", fontSize: 20 }}>{profile?.user?.name || "TM Driver"}</Text.Title>
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              background: "rgba(255,255,255,0.2)",
+              padding: "6px 12px",
+              borderRadius: 20,
+            }}
+          >
             <span className={`tm-status-dot ${isOnline ? "tm-status-dot-online" : "tm-status-dot-offline"}`} />
-            <Text style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>
-              {isOnline ? "Online" : "Offline"}
-            </Text>
+            <Text style={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>{isOnline ? "ĐANG ONLINE" : "OFFLINE"}</Text>
           </div>
         </div>
-      </div>
+      </Box>
 
-      <Box style={{ padding: 16 }}>
-        {/* Online Toggle Card */}
-        <div className="tm-card animate-slide-up" style={{ padding: 20, marginBottom: 16, textAlign: "center" }}>
-          <Text style={{ fontWeight: 600, fontSize: 15, marginBottom: 12 }}>
-            {isOnline ? "Bạn đang nhận đơn" : "Bật để bắt đầu nhận đơn"}
-          </Text>
-          <button
-            className={`tm-toggle ${isOnline ? "tm-toggle-on" : "tm-toggle-off"}`}
-            onClick={handleToggle}
-            disabled={toggling}
-            style={{ margin: "0 auto", display: "block", opacity: toggling ? 0.6 : 1 }}
-          >
-            <div className="tm-toggle-knob" />
-          </button>
-          <Text size="xxSmall" style={{ color: "var(--tm-text-tertiary)", marginTop: 8 }}>
-            {profile?.vehicleType} · {profile?.licensePlate}
-          </Text>
-        </div>
-
-        {/* Today Stats */}
-        <Text style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>📊 Hôm nay</Text>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 20 }}>
-          <div className="tm-stat-card animate-fade-in">
-            <div className="tm-stat-value" style={{ color: "var(--tm-primary)" }}>
-              <DisplayPrice>{todayStats.earnings}</DisplayPrice>
+      <Box p={4} className="tm-content-pad" style={{ marginTop: -36 }}>
+        <div className="tm-card" style={{ padding: 16, marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+            <div>
+              <Text style={{ fontWeight: 700, fontSize: 16 }}>{isOnline ? "Sẵn sàng nhận đơn" : "Bật nhận đơn"}</Text>
+              <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 2 }}>
+                {profile?.vehicleType || "Phương tiện"} · {profile?.licensePlate || "Biển số"}
+              </Text>
             </div>
-            <div className="tm-stat-label">Thu nhập</div>
-          </div>
-          <div className="tm-stat-card animate-fade-in">
-            <div className="tm-stat-value">{todayStats.deliveries}</div>
-            <div className="tm-stat-label">Đơn đã giao</div>
+            <button
+              className={`tm-toggle ${isOnline ? "tm-toggle-on" : "tm-toggle-off"}`}
+              onClick={handleToggle}
+              disabled={toggling}
+              style={{ opacity: toggling ? 0.6 : 1 }}
+            >
+              <div className="tm-toggle-knob" />
+            </button>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <Text style={{ fontWeight: 700, fontSize: 16, marginBottom: 12 }}>⚡ Thao tác nhanh</Text>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-          <div
-            className="tm-card"
-            onClick={() => navigate("/available")}
-            style={{ padding: 16, textAlign: "center", cursor: "pointer" }}
-          >
-            <span style={{ fontSize: 28 }}>📋</span>
-            <Text style={{ fontWeight: 600, fontSize: 13, marginTop: 6 }}>Đơn chờ nhận</Text>
+        <div className="tm-card" style={{ padding: 16, marginBottom: 14 }}>
+          <Text.Title style={{ fontSize: 16, marginBottom: 12 }}>Hiệu suất hôm nay</Text.Title>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
+            <div style={{ background: "var(--tm-bg)", borderRadius: 12, padding: 12 }}>
+              <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>Thu nhập</Text>
+              <Text.Title style={{ fontSize: 18, color: "var(--tm-primary)" }}>
+                <DisplayPrice>{todayStats.earnings}</DisplayPrice>
+              </Text.Title>
+            </div>
+            <div style={{ background: "var(--tm-bg)", borderRadius: 12, padding: 12 }}>
+              <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>Đơn hoàn thành</Text>
+              <Text.Title style={{ fontSize: 18 }}>{todayStats.deliveries}</Text.Title>
+            </div>
           </div>
-          <div
-            className="tm-card"
-            onClick={() => navigate("/delivering")}
-            style={{ padding: 16, textAlign: "center", cursor: "pointer" }}
-          >
-            <span style={{ fontSize: 28 }}>🚗</span>
-            <Text style={{ fontWeight: 600, fontSize: 13, marginTop: 6 }}>Đang giao</Text>
-          </div>
-          <div
-            className="tm-card"
-            onClick={() => navigate("/orders")}
-            style={{ padding: 16, textAlign: "center", cursor: "pointer" }}
-          >
-            <span style={{ fontSize: 28 }}>📦</span>
-            <Text style={{ fontWeight: 600, fontSize: 13, marginTop: 6 }}>Lịch sử đơn</Text>
-          </div>
-          <div
-            className="tm-card"
-            onClick={() => navigate("/wallet")}
-            style={{ padding: 16, textAlign: "center", cursor: "pointer" }}
-          >
-            <span style={{ fontSize: 28 }}>💰</span>
-            <Text style={{ fontWeight: 600, fontSize: 13, marginTop: 6 }}>Ví & Thu nhập</Text>
+        </div>
+
+        <div className="tm-card" style={{ padding: 16 }}>
+          <Text.Title style={{ fontSize: 16, marginBottom: 12 }}>Tác vụ nhanh</Text.Title>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+            {quickActions.map((action) => (
+              <button
+                key={action.path}
+                onClick={() => navigate(action.path)}
+                style={{
+                  border: "1px solid var(--tm-border)",
+                  background: "#fff",
+                  borderRadius: 12,
+                  padding: "12px 8px",
+                  textAlign: "center",
+                }}
+              >
+                <div style={{ fontSize: 24, marginBottom: 4 }}>{action.icon}</div>
+                <Text size="xSmall" style={{ fontWeight: 600 }}>{action.label}</Text>
+              </button>
+            ))}
           </div>
         </div>
       </Box>

@@ -284,6 +284,14 @@ model CartItem {
   @@index([userId])
 }
 
+enum DispatchStatus {
+  PENDING
+  OFFERED
+  ACCEPTED
+  BROADCAST
+  EXPIRED
+}
+
 model Order {
   id                  String              @id @default(uuid())
   userId              String
@@ -320,6 +328,7 @@ model Order {
   items               OrderItem[]
   payment             OrderPayment?
   walletTransactions  WalletTransaction[]
+  dispatch            OrderDispatch?
 
   review              Review?
   productReviews      ProductReview[]
@@ -330,6 +339,46 @@ model Order {
   @@index([storeId, status])
   @@index([paymentMethod, paymentStatus])
   @@index([completedAt])
+}
+
+model OrderDispatch {
+  id              String         @id @default(uuid())
+  orderId         String         @unique
+  status          DispatchStatus @default(PENDING)
+  currentDriverId String?
+  offerExpiresAt  DateTime?
+  attemptCount    Int            @default(0)
+  maxAttempts     Int            @default(5)
+  broadcastAt     DateTime?
+  acceptedAt      DateTime?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  order           Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  attempts        DispatchAttempt[]
+
+  @@index([status])
+  @@index([currentDriverId])
+  @@index([offerExpiresAt])
+}
+
+model DispatchAttempt {
+  id           String   @id @default(uuid())
+  dispatchId   String
+  driverId     String
+  score        Float
+  distanceKm   Float?
+  timeMinutes  Float?
+  offered      Boolean  @default(false)
+  accepted     Boolean?
+  respondedAt  DateTime?
+  expiredAt    DateTime?
+  createdAt    DateTime @default(now())
+
+  dispatch     OrderDispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+
+  @@index([dispatchId])
+  @@index([driverId])
 }
 
 model OrderItem {

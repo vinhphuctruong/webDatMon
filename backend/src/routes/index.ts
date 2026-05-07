@@ -13,6 +13,7 @@ import paymentRouter from "./payment.route";
 import storeApplicationRoutes from "./store-applications";
 import { voucherRouter } from "./voucher.route";
 import bannerRouter from "./banner.route";
+import { reviewRouter } from "./review.route";
 
 const apiRouter = Router();
 
@@ -30,5 +31,6 @@ apiRouter.use("/payments", paymentRouter);
 apiRouter.use("/store-applications", storeApplicationRoutes);
 apiRouter.use("/vouchers", voucherRouter);
 apiRouter.use("/banners", bannerRouter);
+apiRouter.use("/reviews", reviewRouter);
 
 export default apiRouter;

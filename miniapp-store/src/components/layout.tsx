@@ -2,6 +2,7 @@ import React, { FC, Suspense } from "react";
 import { Route, Routes } from "react-router";
 import { Box, Text } from "zmp-ui";
 import { Navigation } from "./navigation";
+import { IncomingStoreOrderAlert } from "./incoming-store-order-alert";
 import HomePage from "../pages/index";
 import OrdersPage from "../pages/orders";
 import OrderDetailPage from "../pages/order-detail";
@@ -49,6 +50,7 @@ export const Layout: FC = () => {
               </Box>
             }
           >
+            <IncomingStoreOrderAlert />
             <Routes>
               <Route path="/" element={<HomePage />}></Route>
               <Route path="/orders" element={<OrdersPage />}></Route>

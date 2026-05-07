@@ -1,16 +1,12 @@
 import React, { FC } from "react";
-import { Box, Text } from "zmp-ui";
-import { useRecoilValueLoadable } from "recoil";
-import { selectedStoreState, userState } from "state";
+import { Box, Text, useNavigate } from "zmp-ui";
+import { useRecoilValueLoadable, useRecoilValue } from "recoil";
+import { userState, customerAddressDisplayState } from "state";
 
 export const Welcome: FC = () => {
-  const selectedStore = useRecoilValueLoadable(selectedStoreState);
+  const deliveryAddress = useRecoilValue(customerAddressDisplayState);
   const user = useRecoilValueLoadable(userState);
-
-  const storeName =
-    selectedStore.state === "hasValue" && selectedStore.contents
-      ? selectedStore.contents.name
-      : "Đang xác định...";
+  const navigate = useNavigate();
 
   const [isLoggedIn, setIsLoggedIn] = React.useState(false);
 
@@ -26,7 +22,13 @@ export const Welcome: FC = () => {
   return (
     <div className="tm-header-gradient">
       <Box flex alignItems="center" justifyContent="space-between">
-        <Box flex alignItems="center" className="space-x-3 flex-1 min-w-0">
+        <Box 
+          flex 
+          alignItems="center" 
+          className="space-x-3 flex-1 min-w-0"
+          onClick={() => navigate("/addresses")}
+          style={{ cursor: "pointer" }}
+        >
           {/* Location icon */}
           <div style={{
             width: 36, height: 36, borderRadius: '50%',
@@ -42,9 +44,14 @@ export const Welcome: FC = () => {
             <Text size="xxSmall" style={{ color: 'rgba(255,255,255,0.8)', fontSize: 11 }}>
               Giao đến
             </Text>
-            <Text.Title size="small" style={{ color: '#fff', fontSize: 14, fontWeight: 600 }} className="truncate">
-              {storeName}
-            </Text.Title>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <Text.Title size="small" style={{ color: '#fff', fontSize: 14, fontWeight: 600 }} className="truncate">
+                {deliveryAddress}
+              </Text.Title>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
+                <path d="M8 10L12 14L16 10" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+            </div>
           </Box>
         </Box>
         {/* Avatar */}

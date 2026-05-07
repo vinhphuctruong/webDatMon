@@ -151,26 +151,6 @@ function saveCustomerAddressText(value: string) {
   localStorage.setItem("tm_customer_address_text", value.trim());
 }
 
-function loadManualStoreOverride(): Store | null {
-  try {
-    const raw = localStorage.getItem("tm_manual_store_location");
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (
-      parsed &&
-      typeof parsed.name === "string" &&
-      typeof parsed.address === "string" &&
-      typeof parsed.lat === "number" &&
-      typeof parsed.long === "number"
-    ) {
-      return parsed as Store;
-    }
-  } catch {
-    // no-op
-  }
-  return null;
-}
-
 function saveManualStoreOverride(store: Store | null) {
   if (!store) {
     localStorage.removeItem("tm_manual_store_location");
@@ -246,38 +226,14 @@ export const activeOrdersState = selector({
 export const categoriesState = selector<Category[]>({
   key: "categories",
   get: async () => {
-    try {
-      return await fetchCategories();
-    } catch (error) {
-      console.warn("Load categories from backend failed", error);
-      return mockCategories as Category[];
-    }
+    return await fetchCategories();
   },
 });
 
 export const productsState = selector<Product[]>({
   key: "products",
   get: async () => {
-    try {
-      return await fetchProducts();
-    } catch (error) {
-      console.warn("Load products from backend failed", error);
-      await wait(1000);
-      const products = mockProducts as Array<{
-        variantId?: string[];
-        [key: string]: unknown;
-      }>;
-      const variants = mockVariants as Array<{ id: string; [key: string]: unknown }>;
-      return products.map(
-        (product) =>
-          ({
-            ...product,
-            variants: variants.filter((variant) =>
-              (product.variantId ?? []).includes(variant.id)
-            ),
-          } as Product)
-      );
-    }
+    return await fetchProducts();
   },
 });
 
@@ -338,7 +294,42 @@ export const deliveryFeeState = selector<number>({
     if (cart.length === 0) {
       return 0;
     }
-    return Math.max(...cart.map((item) => item.product.deliveryFee ?? 0));
+
+    const store = get(selectedStoreState);
+    const location = get(locationState);
+    
+    // No location yet — return 0 to signal "chưa xác định"
+    if (!location) return 0;
+    // No store selected
+    if (!store) return 15000;
+
+    const distanceKm = calculateDistance(
+      Number(location.latitude), 
+      Number(location.longitude), 
+      store.lat, 
+      store.long
+    );
+    
+    // ShopeeFood style: 15.000đ cho 3km đầu, 5.000đ cho mỗi km tiếp theo
+    const baseFee = 15000;
+    const baseDistance = 3; // km
+    const feePerExtraKm = 5000;
+    
+    if (distanceKm <= baseDistance) {
+      return baseFee;
+    }
+    
+    const extraDistance = Math.ceil(distanceKm - baseDistance);
+    return baseFee + (extraDistance * feePerExtraKm);
+  },
+});
+
+// Helper: whether user has confirmed a delivery location
+export const hasConfirmedLocationState = selector<boolean>({
+  key: "hasConfirmedLocation",
+  get: ({ get }) => {
+    const location = get(locationState);
+    return location !== null;
   },
 });
 
@@ -431,26 +422,21 @@ export const storesState = atom<Store[]>({
 export const remoteStoresState = selector<Store[]>({
   key: "remoteStores",
   get: async () => {
-    try {
-      const remoteStores = await fetchStores();
-      const inAreaStores = remoteStores.filter(isStoreInServiceArea);
-      if (inAreaStores.length > 0) {
-        return inAreaStores;
-      }
-      console.warn(
-        "Remote stores are outside Thủ Dầu Một service area, fallback to local Bình Dương stores",
-      );
-      return DEFAULT_THU_DAU_MOT_STORES;
-    } catch (error) {
-      console.warn("Load stores from backend failed, using mock stores", error);
-      return DEFAULT_THU_DAU_MOT_STORES;
+    const remoteStores = await fetchStores();
+    const inAreaStores = remoteStores.filter(isStoreInServiceArea);
+    if (inAreaStores.length > 0) {
+      return inAreaStores;
     }
+    console.warn(
+      "Remote stores are outside Thủ Dầu Một service area, fallback to local Bình Dương stores",
+    );
+    return DEFAULT_THU_DAU_MOT_STORES;
   },
 });
 
 export const manualStoreOverrideState = atom<Store | null>({
   key: "manualStoreOverride",
-  default: loadManualStoreOverride(),
+  default: null,
   effects: [
     ({ onSet }) => {
       onSet((store) => saveManualStoreOverride(store));
@@ -462,32 +448,24 @@ export const nearbyStoresState = selector<(Store & { distance?: number })[]>({
   key: "nearbyStores",
   get: ({ get }) => {
     const location = get(locationState);
-    const manualStore = get(manualStoreOverrideState);
     const stores = get(storesState);
 
     const inAreaStores = stores.filter(isStoreInServiceArea);
     const sourceStores = inAreaStores.length > 0 ? inAreaStores : DEFAULT_THU_DAU_MOT_STORES;
 
+    // Use real location if available, otherwise use center for display only
+    const refLat = location ? Number(location.latitude) : THU_DAU_MOT_CENTER.lat;
+    const refLng = location ? Number(location.longitude) : THU_DAU_MOT_CENTER.lng;
+
     const storesWithDistance = sourceStores.map((store) => ({
       ...store,
-      distance: calculateDistance(
-        Number(location.latitude),
-        Number(location.longitude),
-        store.lat,
-        store.long,
-      ),
+      distance: location
+        ? calculateDistance(refLat, refLng, store.lat, store.long)
+        : undefined, // Don't show distance if no real location
     }));
 
-    storesWithDistance.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
-
-    if (manualStore) {
-      const manualDistance = calculateDistance(
-        Number(location.latitude),
-        Number(location.longitude),
-        manualStore.lat,
-        manualStore.long,
-      );
-      return [{ ...manualStore, distance: manualDistance }, ...storesWithDistance];
+    if (location) {
+      storesWithDistance.sort((a, b) => (a.distance ?? 0) - (b.distance ?? 0));
     }
 
     return storesWithDistance;
@@ -556,7 +534,7 @@ export const manualCustomerLocationState = atom<CustomerLocation | null>({
   ],
 });
 
-export const locationState = selector<CustomerLocation>({
+export const locationState = selector<CustomerLocation | null>({
   key: "location",
   get: ({ get }) => {
     const manualLocation = get(manualCustomerLocationState);
@@ -566,13 +544,13 @@ export const locationState = selector<CustomerLocation>({
       if (isWithinThuDauMotServiceArea(manualLat, manualLng)) {
         return manualLocation;
       }
-      console.warn("Vị trí nhập tay ngoài phạm vi giao hàng, dùng tâm Thủ Dầu Một");
-      return DEFAULT_CUSTOMER_LOCATION;
+      console.warn("Vị trí nhập tay ngoài phạm vi giao hàng");
+      return null;
     }
 
     const requested = get(requestLocationTriesState);
     if (!requested) {
-      return DEFAULT_CUSTOMER_LOCATION;
+      return null; // No GPS requested yet — don't fake a location
     }
 
     return getLocation({ fail: console.warn })
@@ -583,26 +561,20 @@ export const locationState = selector<CustomerLocation>({
           if (isWithinThuDauMotServiceArea(latNum, lngNum)) {
             return { latitude: String(latNum), longitude: String(lngNum) };
           }
-          console.warn(
-            "GPS ngoài phạm vi Thủ Dầu Một/lân cận Bình Dương, dùng vị trí mặc định khu vực phục vụ",
-          );
-          return DEFAULT_CUSTOMER_LOCATION;
+          console.warn("GPS ngoài phạm vi Thủ Dầu Một/lân cận Bình Dương");
+          return null;
         }
         if (token) {
           console.warn(
             "Sử dụng token này để truy xuất vị trí chính xác của người dùng",
             token,
           );
-          console.warn(
-            "Chi tiết tham khảo: ",
-            "https://mini.zalo.me/blog/thong-bao-thay-doi-luong-truy-xuat-thong-tin-nguoi-dung-tren-zalo-mini-app",
-          );
         }
-        return DEFAULT_CUSTOMER_LOCATION;
+        return null;
       })
       .catch((error) => {
         console.warn("Lấy GPS thất bại", error);
-        return DEFAULT_CUSTOMER_LOCATION;
+        return null;
       });
   },
 });
@@ -657,6 +629,9 @@ export const customerAddressDisplayState = selector<string>({
       return addressText;
     }
     const location = get(locationState);
+    if (!location) {
+      return "📍 Vui lòng chọn địa chỉ giao hàng";
+    }
     const lat = Number(location.latitude).toFixed(5);
     const lng = Number(location.longitude).toFixed(5);
     return `Vị trí GPS (${lat}, ${lng}), Bình Dương`;
@@ -676,6 +651,7 @@ export interface SavedAddress {
   long: number;
   contactName: string;
   contactPhone: string;
+  note?: string;
 }
 
 function loadSavedAddresses(): SavedAddress[] {
@@ -697,4 +673,9 @@ export const savedAddressesState = atom<SavedAddress[]>({
       onSet((newValue) => saveSavedAddresses(newValue));
     }
   ]
+});
+
+export const selectedVoucherState = atom<{ code: string; discount: number; minOrderValue: number } | null>({
+  key: "selectedVoucher",
+  default: null,
 });

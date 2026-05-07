@@ -11,6 +11,7 @@ import { Box, Button, Text, useSnackbar } from "zmp-ui";
 import { MultipleOptionPicker } from "./multiple-option-picker";
 import { QuantityPicker } from "./quantity-picker";
 import { SingleOptionPicker } from "./single-option-picker";
+import { useNavigate } from "react-router";
 
 export interface ProductPickerProps {
   product?: Product;
@@ -48,6 +49,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const setCart = useSetRecoilState(cartState);
   const snackbar = useSnackbar();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (selected) {
@@ -58,6 +60,13 @@ export const ProductPicker: FC<ProductPickerProps> = ({
 
   const addToCart = async () => {
     if (!product) {
+      return;
+    }
+
+    const session = localStorage.getItem("zaui_food_session");
+    if (!session) {
+      setVisible(false);
+      navigate("/login");
       return;
     }
 

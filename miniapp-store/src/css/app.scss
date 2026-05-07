@@ -19,6 +19,10 @@
   --tm-shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
   --tm-shadow-md: 0 4px 12px rgba(0,0,0,0.08);
   --tm-shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  --tm-shadow-floating: 0 12px 30px -8px rgba(0, 169, 109, 0.25);
+  --tm-shadow-pressed: 0 2px 4px rgba(0,0,0,0.05);
+  --tm-glass-bg: rgba(255, 255, 255, 0.85);
+  --tm-glass-border: rgba(255, 255, 255, 0.6);
   --tm-radius-sm: 8px;
   --tm-radius-md: 12px;
   --tm-radius-lg: 16px;
@@ -728,4 +732,45 @@ body {
   .zaui-bottom-navigation .zaui-bottom-navigation-item .zaui-bottom-navigation-item-label {
     font-size: 11px !important;
   }
+}
+
+/* ── Premium UI Utilities ──────────────── */
+.tm-glass {
+  background: var(--tm-glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--tm-glass-border);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.04);
+}
+
+.tm-interactive {
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s ease;
+  will-change: transform;
+}
+.tm-interactive:active {
+  transform: scale(0.96);
+  box-shadow: var(--tm-shadow-pressed);
+}
+
+/* Animations */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-slide-up {
+  animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulseSoft {
+  0% { box-shadow: 0 0 0 0 rgba(0, 169, 109, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(0, 169, 109, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 169, 109, 0); }
+}
+.animate-pulse-soft {
+  animation: pulseSoft 2s infinite;
+}
+
+/* Safe Area adjustments */
+.tm-safe-bottom {
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
 }

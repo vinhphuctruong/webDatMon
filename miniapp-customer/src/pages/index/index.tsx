@@ -1,7 +1,6 @@
 import React, { Suspense, useEffect } from "react";
 import { Box, Page, useNavigate } from "zmp-ui";
 import { Inquiry } from "./inquiry";
-import { EntryActions } from "./entry-actions";
 import { Welcome } from "./welcome";
 import { Banner } from "./banner";
 import { Categories } from "./categories";
@@ -9,6 +8,7 @@ import { Recommend } from "./recommend";
 import { ProductList } from "./product-list";
 import { clearApiSession, fetchMyProfile } from "services/api";
 import { ActiveOrderBanner } from "components/active-order-banner";
+import { LocationGate } from "components/location-gate";
 
 const HomePage: React.FunctionComponent = () => {
   const navigate = useNavigate();
@@ -38,8 +38,8 @@ const HomePage: React.FunctionComponent = () => {
         <Suspense>
           <ActiveOrderBanner />
         </Suspense>
+        <LocationGate mode="inline"><span /></LocationGate>
         <Inquiry />
-        <EntryActions />
         <Banner />
         <div className="tm-divider" />
         <Suspense>

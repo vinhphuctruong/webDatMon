@@ -246,38 +246,14 @@ export const activeOrdersState = selector({
 export const categoriesState = selector<Category[]>({
   key: "categories",
   get: async () => {
-    try {
-      return await fetchCategories();
-    } catch (error) {
-      console.warn("Load categories from backend failed", error);
-      return mockCategories as Category[];
-    }
+    return await fetchCategories();
   },
 });
 
 export const productsState = selector<Product[]>({
   key: "products",
   get: async () => {
-    try {
-      return await fetchProducts();
-    } catch (error) {
-      console.warn("Load products from backend failed", error);
-      await wait(1000);
-      const products = mockProducts as Array<{
-        variantId?: string[];
-        [key: string]: unknown;
-      }>;
-      const variants = mockVariants as Array<{ id: string; [key: string]: unknown }>;
-      return products.map(
-        (product) =>
-          ({
-            ...product,
-            variants: variants.filter((variant) =>
-              (product.variantId ?? []).includes(variant.id)
-            ),
-          } as Product)
-      );
-    }
+    return await fetchProducts();
   },
 });
 
@@ -431,20 +407,15 @@ export const storesState = atom<Store[]>({
 export const remoteStoresState = selector<Store[]>({
   key: "remoteStores",
   get: async () => {
-    try {
-      const remoteStores = await fetchStores();
-      const inAreaStores = remoteStores.filter(isStoreInServiceArea);
-      if (inAreaStores.length > 0) {
-        return inAreaStores;
-      }
-      console.warn(
-        "Remote stores are outside Thủ Dầu Một service area, fallback to local Bình Dương stores",
-      );
-      return DEFAULT_THU_DAU_MOT_STORES;
-    } catch (error) {
-      console.warn("Load stores from backend failed, using mock stores", error);
-      return DEFAULT_THU_DAU_MOT_STORES;
+    const remoteStores = await fetchStores();
+    const inAreaStores = remoteStores.filter(isStoreInServiceArea);
+    if (inAreaStores.length > 0) {
+      return inAreaStores;
     }
+    console.warn(
+      "Remote stores are outside Thủ Dầu Một service area, fallback to local Bình Dương stores",
+    );
+    return DEFAULT_THU_DAU_MOT_STORES;
   },
 });
 

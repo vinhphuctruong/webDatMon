@@ -23,14 +23,18 @@
   },
   "dependencies": {
     "@react-spring/web": "^9.6.1",
+    "@types/leaflet": "^1.9.21",
     "@types/lodash": "^4.14.191",
+    "@vietmap/vietmap-gl-js": "^7.0.0-pre.1",
     "@vitejs/plugin-react": "^1.3.2",
+    "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
     "prop-types": "^15.8.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router-dom": "^6.8.2",
     "recoil": "^0.7.7",
+    "socket.io-client": "^4.8.3",
     "swiper": "^9.1.0",
     "zmp-sdk": "^2.39.9",
     "zmp-ui": "^1.11.5"

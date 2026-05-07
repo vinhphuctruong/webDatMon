@@ -23,6 +23,7 @@ import {
 import { calculateUnitPrice } from "../utils/pricing";
 import { estimateDeliveryFee } from "../services/delivery-fee";
 import { validateVoucher } from "./voucher.route";
+import { startDispatch } from "../services/dispatch-engine";
 
 const orderRouter = Router();
 
@@ -211,7 +212,7 @@ orderRouter.get(
       }
     }
 
-    const estimate = estimateDeliveryFee(
+    const estimate = await estimateDeliveryFee(
       { latitude: store.latitude, longitude: store.longitude },
       { latitude: customerLat, longitude: customerLon },
     );
@@ -264,6 +265,10 @@ orderRouter.post(
     }
 
     const selectedStore = cartItems[0].product.store;
+
+    if (!selectedStore.isOpen) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Cửa hàng hiện đang đóng cửa, không thể nhận đơn");
+    }
 
     const lineItems = cartItems.map((item) => {
       const { unitPrice, selectedOptions } = calculateUnitPrice(item.product, item.selectedOptions);
@@ -339,7 +344,7 @@ orderRouter.post(
     }
 
     // ── Tính phí ship theo khoảng cách (giống Shopee Food / Grab Food) ──
-    const feeEstimate = estimateDeliveryFee(
+    const feeEstimate = await estimateDeliveryFee(
       { latitude: selectedStore.latitude, longitude: selectedStore.longitude },
       { latitude: deliveryAddress.latitude, longitude: deliveryAddress.longitude },
     );
@@ -383,7 +388,7 @@ orderRouter.post(
           userId,
           storeId: selectedStore.id,
           addressId,
-          status: OrderStatus.PENDING,
+          status: payload.paymentMethod === PaymentMethod.COD ? OrderStatus.CONFIRMED : OrderStatus.PENDING,
           paymentMethod: payload.paymentMethod,
           paymentStatus: PaymentStatus.PENDING,
           subtotal,
@@ -457,8 +462,16 @@ orderRouter.post(
       });
     });
 
+    const responseData = toOrderResponse(created);
+    if (created.status === "CONFIRMED") {
+      // Smart Dispatch: find best driver instead of broadcasting
+      startDispatch(created.id).catch((err) => {
+        console.error("[Dispatch] Failed to start dispatch for order", created.id, err);
+      });
+    }
+    
     res.status(StatusCodes.CREATED).json({
-      data: toOrderResponse(created),
+      data: responseData,
     });
   }),
 );
@@ -695,7 +708,14 @@ orderRouter.post(
       });
     });
 
-    res.json({ data: toOrderResponse(updated) });
+    const responseData = toOrderResponse(updated);
+
+    // Smart Dispatch: find best driver for this newly confirmed order
+    startDispatch(updated.id).catch((err) => {
+      console.error("[Dispatch] Failed to start dispatch for store-confirm", updated.id, err);
+    });
+
+    res.json({ data: responseData });
   }),
 );
 

@@ -133,3 +133,48 @@ export async function reverseGeocode(lat: number, lng: number): Promise<string |
   }
   return null;
 }
+
+function toFiniteNumber(value: unknown) {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function toValidCoordinatePair(latRaw: unknown, lngRaw: unknown) {
+  const lat = toFiniteNumber(latRaw);
+  const lng = toFiniteNumber(lngRaw);
+
+  if (lat === null || lng === null) {
+    return null;
+  }
+  if (Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return null;
+  }
+
+  return { lat, lng };
+}
+
+export function normalizeStoredCoordinates(latitude: unknown, longitude: unknown) {
+  const direct = toValidCoordinatePair(latitude, longitude);
+  if (direct) {
+    return { ...direct, wasSwapped: false };
+  }
+
+  const lat = toFiniteNumber(latitude);
+  const lng = toFiniteNumber(longitude);
+  if (lat === null || lng === null) {
+    return null;
+  }
+
+  const swapped = toValidCoordinatePair(lng, lat);
+  if (swapped) {
+    return { ...swapped, wasSwapped: true };
+  }
+
+  return null;
+}

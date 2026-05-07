@@ -7,13 +7,13 @@ import {
   useSetRecoilState,
   useRecoilValueLoadable,
 } from "recoil";
-import { createOrder } from "services/backend";
-import { notifyNearestActiveDriver } from "services/dispatch";
+import { addItemToCart, createOrder } from "services/backend";
 import {
   cartState,
   customerAddressDisplayState,
   deliveryFeeState,
   effectiveCustomerPhoneState,
+  hasConfirmedLocationState,
   locationState,
   manualCustomerContactState,
   orderNoteState,
@@ -28,7 +28,7 @@ import {
   addOrderToHistory,
   orderHistoryState,
 } from "services/features";
-import { validateVoucherApi } from "services/api";
+import { readSession, validateVoucherApi } from "services/api";
 import { THU_DAU_MOT_CENTER } from "utils/location";
 
 export const CartPreview: FC = () => {
@@ -74,6 +74,8 @@ export const CartPreview: FC = () => {
   const setRefreshActiveOrders = useSetRecoilState(refreshActiveOrdersAtom);
   const selectedStore = useRecoilValueLoadable(selectedStoreState);
   const userLocation = useRecoilValueLoadable(locationState);
+  const hasLocationLoadable = useRecoilValueLoadable(hasConfirmedLocationState);
+  const hasLocation = hasLocationLoadable.state === "hasValue" ? hasLocationLoadable.contents : false;
   const [submitting, setSubmitting] = useState(false);
   const [voucherInput, setVoucherInput] = useState("");
   const [showVoucher, setShowVoucher] = useState(false);
@@ -108,7 +110,13 @@ export const CartPreview: FC = () => {
   };
 
   const placeOrder = async () => {
-    const session = localStorage.getItem("zaui_food_session");
+    if (!hasLocation) {
+      snackbar.openSnackbar({ type: "error", text: "Vui lòng chọn địa chỉ giao hàng trước khi đặt đơn" });
+      navigate("/addresses");
+      return;
+    }
+
+    const session = await readSession();
     if (!session) {
       snackbar.openSnackbar({ type: "error", text: "Vui lòng đăng nhập để đặt hàng" });
       navigate("/login?required=1");
@@ -140,28 +148,63 @@ export const CartPreview: FC = () => {
             : "TM Food - Thủ Dầu Một",
       };
 
-      let orderId: string;
-      try {
-        const order = await createOrder({
-          ...(note.trim() ? { note: note.trim() } : {}),
-          ...(appliedVoucherCode ? { voucherCode: appliedVoucherCode } : {}),
-          deliveryAddress: {
-            receiverName: customerName,
-            phone: customerPhone,
-            street: customerAddress,
-            ward: "Phường mặc định",
-            district: "Thủ Dầu Một",
-            city: "Bình Dương",
-            latitude: trackingSnapshot.customerLat,
-            longitude: trackingSnapshot.customerLng,
-          },
-        });
-        orderId = order.id.slice(0, 8);
-      } catch (backendError) {
-        // Backend unavailable — create local order
-        console.warn("Backend unavailable, creating local order", backendError);
-        orderId = "TM" + Math.random().toString(36).slice(2, 8).toUpperCase();
-      }
+      const orderPayload = {
+        ...(note.trim() ? { note: note.trim() } : {}),
+        ...(appliedVoucherCode ? { voucherCode: appliedVoucherCode } : {}),
+        deliveryAddress: {
+          receiverName: customerName,
+          phone: customerPhone,
+          street: customerAddress,
+          ward: "Phường mặc định",
+          district: "Thủ Dầu Một",
+          city: "Bình Dương",
+          latitude: trackingSnapshot.customerLat,
+          longitude: trackingSnapshot.customerLng,
+        },
+      };
+
+      const createOrderWithCartRecovery = async () => {
+        try {
+          return await createOrder(orderPayload);
+        } catch (error) {
+          const message = error instanceof Error ? error.message : "";
+          const canRecover =
+            message.includes("Giỏ hàng đang trống") && cart.length > 0;
+
+          if (!canRecover) {
+            throw error;
+          }
+
+          for (const item of cart) {
+            const normalizedOptions = Object.entries(item.options ?? {}).reduce(
+              (acc, [key, value]) => {
+                if (typeof value === "string" || Array.isArray(value)) {
+                  acc[key] = value;
+                }
+                return acc;
+              },
+              {} as Record<string, string | string[]>,
+            );
+
+            await addItemToCart({
+              productBackendId: item.product.backendId,
+              productExternalId:
+                typeof item.product.id === "number"
+                  ? item.product.id
+                  : item.product.externalId,
+              quantity: item.quantity,
+              selectedOptions: normalizedOptions,
+            });
+          }
+
+          return createOrder(orderPayload);
+        }
+      };
+
+      const order = await createOrderWithCartRecovery();
+
+      const orderBackendId = order.id;
+      const orderId = order.id.slice(0, 8);
 
       // Save to order history
       addOrderToHistory(setOrders, {
@@ -180,54 +223,16 @@ export const CartPreview: FC = () => {
       // Trigger a refresh of the active orders banner
       setRefreshActiveOrders((v) => v + 1);
 
-      let dispatchInfo;
-      try {
-        dispatchInfo = await notifyNearestActiveDriver({
-          order: {
-            id: orderId,
-            code: `#${orderId}`,
-            total: payableTotal,
-            itemCount: quantity,
-            items: cart.map((item) => `${item.product.name} x${item.quantity}`),
-            ...(note.trim() ? { note: note.trim() } : {}),
-          },
-          store: {
-            name: trackingSnapshot.storeName,
-            address:
-              selectedStore.state === "hasValue" && selectedStore.contents
-                ? selectedStore.contents.address
-                : "Thủ Dầu Một, Bình Dương",
-            phone:
-              selectedStore.state === "hasValue" && selectedStore.contents?.phone
-                ? selectedStore.contents.phone
-                : "0274 3622 899",
-            lat: trackingSnapshot.storeLat,
-            lng: trackingSnapshot.storeLng,
-          },
-          customer: {
-            name: customerName,
-            address: customerAddress,
-            phone: customerPhone,
-            lat: trackingSnapshot.customerLat,
-            lng: trackingSnapshot.customerLng,
-          },
-        });
-      } catch (dispatchError) {
-        console.warn("Notify nearest driver failed", dispatchError);
-      }
-
       resetCart();
-      setAppliedCode(null);
+      setAppliedVoucherCode(null);
       navigate("/result", {
         replace: true,
         state: {
           localOrderStatus: "success",
-          localOrderMessage: dispatchInfo
-            ? `Đơn #${orderId} đã tạo thành công. ${dispatchInfo.customerNotice}`
-            : `Đơn #${orderId} đã tạo thành công.`,
+          localOrderMessage: `Đơn #${orderId} đã tạo thành công. Hệ thống đang tìm tài xế gần nhất cho bạn.`,
           localOrderId: orderId,
+          localOrderBackendId: orderBackendId,
           trackingSnapshot,
-          dispatchInfo,
         },
       });
     } catch (error) {
@@ -247,12 +252,20 @@ export const CartPreview: FC = () => {
         storeName: cart[0]?.product.storeName ?? "Quán đối tác",
       });
 
-      snackbar.openSnackbar({ type: "error", text: "Không thể tạo đơn. Vui lòng thử lại." });
+      const errorMessage =
+        error instanceof Error && error.message
+          ? error.message
+          : "Không thể tạo đơn.";
+
+      snackbar.openSnackbar({
+        type: "error",
+        text: `${errorMessage} Đơn chưa được gửi tới quán.`,
+      });
       navigate("/result", {
         replace: true,
         state: {
           localOrderStatus: "failed",
-          localOrderMessage: "Tạo đơn thất bại. Bạn có thể thử lại sau.",
+          localOrderMessage: `${errorMessage} Đơn chưa được gửi tới quán.`,
         },
       });
     } finally {
@@ -261,16 +274,10 @@ export const CartPreview: FC = () => {
   };
 
   return (
-    <div style={{
+    <div className="tm-glass tm-safe-bottom animate-slide-up" style={{
       position: 'sticky',
-      bottom: 0,
-      left: 0,
-      right: 0,
-      background: '#fff',
-      borderTop: '1px solid var(--tm-border)',
-      padding: '12px 16px',
-      paddingBottom: 'max(12px, env(safe-area-inset-bottom))',
-      zIndex: 100,
+      bottom: 0, left: 0, right: 0,
+      padding: '16px', zIndex: 100, borderTopLeftRadius: 20, borderTopRightRadius: 20,
       flexShrink: 0,
     }}>
       {/* Voucher section — backend validated */}
@@ -355,8 +362,8 @@ export const CartPreview: FC = () => {
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
           <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)' }}>Phí giao hàng</Text>
-          <Text size="xxxSmall" style={{ color: 'var(--tm-text-primary)', fontWeight: 500 }}>
-            <DisplayPrice>{deliveryFee}</DisplayPrice>
+          <Text size="xxxSmall" style={{ color: deliveryFee === 0 && !hasLocation ? '#f59e0b' : 'var(--tm-text-primary)', fontWeight: 500 }}>
+            {deliveryFee === 0 && !hasLocation ? 'Chưa xác định' : <DisplayPrice>{deliveryFee}</DisplayPrice>}
           </Text>
         </div>
         {voucherDiscount > 0 && (
@@ -378,20 +385,45 @@ export const CartPreview: FC = () => {
         </div>
       </div>
 
+      {/* Location warning */}
+      {!hasLocation && quantity > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 12px', marginBottom: 8, borderRadius: 10,
+          background: '#fff7ed', border: '1px solid #fed7aa',
+        }}>
+          <span style={{ fontSize: 16 }}>📍</span>
+          <Text size="xxxSmall" style={{ color: '#92400e', flex: 1, lineHeight: 1.3 }}>
+            Vui lòng chọn địa chỉ giao hàng để tính phí ship chính xác
+          </Text>
+          <button
+            onClick={() => navigate('/addresses')}
+            style={{
+              padding: '4px 10px', borderRadius: 6, border: 'none',
+              background: '#f59e0b', color: '#fff', fontSize: 11,
+              fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap',
+              fontFamily: 'Inter, sans-serif',
+            }}
+          >Chọn</button>
+        </div>
+      )}
+
       {/* CTA Button — always visible */}
       <button
-        disabled={!quantity || submitting}
-        onClick={placeOrder}
+        className="tm-interactive"
+        disabled={!quantity || submitting || !hasLocation}
+        onClick={hasLocation ? placeOrder : () => navigate('/addresses')}
         style={{
-          width: '100%', padding: '12px 0', borderRadius: 12, border: 'none',
-          background: !quantity ? '#e5e7eb' : 'linear-gradient(135deg, var(--tm-primary) 0%, #00c97d 100%)',
-          color: !quantity ? 'var(--tm-text-tertiary)' : '#fff',
-          fontSize: 15, fontWeight: 700, cursor: quantity ? 'pointer' : 'not-allowed',
+          width: '100%', padding: '14px 0', borderRadius: 14, border: 'none',
+          background: (!quantity || !hasLocation) ? '#e5e7eb' : 'linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)',
+          color: (!quantity || !hasLocation) ? 'var(--tm-text-tertiary)' : '#fff',
+          fontSize: 16, fontWeight: 700,
+          cursor: (quantity && hasLocation) ? 'pointer' : 'not-allowed',
           fontFamily: 'Inter, sans-serif',
-          boxShadow: quantity ? '0 4px 16px rgba(0, 169, 109, 0.3)' : 'none',
+          boxShadow: (quantity && hasLocation) ? 'var(--tm-shadow-floating)' : 'none',
         }}
       >
-        {submitting ? "Đang tạo đơn..." : "Đặt giao ngay"}
+        {submitting ? "Đang tạo đơn..." : !hasLocation ? "📍 Chọn địa chỉ giao hàng" : "Đặt giao ngay"}
       </button>
     </div>
   );

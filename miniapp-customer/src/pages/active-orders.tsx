@@ -3,6 +3,40 @@ import { Box, Header, Page, Text, useSnackbar, useNavigate } from "zmp-ui";
 import { DisplayPrice } from "components/display/price";
 import { fetchOrders } from "services/backend";
 import { cancelOrder } from "services/api";
+import { initSocket } from "services/socket";
+import { VietMapView, MapMarker } from "components/vietmap";
+import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
+
+
+import { calculateDistance } from "utils/location";
+
+const OrderLocationMap: FC<{ order: any }> = ({ order }) => {
+  const storeLoc = normalizeStoredCoordinates(order.store?.latitude, order.store?.longitude) || THU_DAU_MOT_CENTER;
+  const customerLoc = normalizeStoredCoordinates(order.deliveryAddress?.latitude, order.deliveryAddress?.longitude) || { lat: storeLoc.lat - 0.01, lng: storeLoc.lng + 0.01 };
+
+  const markers = [
+    { lat: storeLoc.lat, lng: storeLoc.lng, label: order.store?.name || "Quán", type: "store" as any },
+    { lat: customerLoc.lat, lng: customerLoc.lng, label: order.deliveryAddress?.receiverName || "Khách", type: "customer" as any },
+  ];
+
+  const distance = calculateDistance(storeLoc.lat, storeLoc.lng, customerLoc.lat, customerLoc.lng);
+
+  return (
+    <div style={{ marginTop: 12, marginBottom: 12, position: "relative" }}>
+      <VietMapView
+        center={[storeLoc.lng, storeLoc.lat]}
+        zoom={13}
+        markers={markers}
+        height={160}
+        showRoute={false}
+        style={{ borderRadius: 12, border: "1px solid var(--tm-border)" }}
+      />
+      <div style={{ position: "absolute", top: 12, left: 12, background: "rgba(255,255,255,0.9)", padding: "4px 8px", borderRadius: 12, fontSize: 12, fontWeight: 600, color: "#e53935", boxShadow: "0 2px 4px rgba(0,0,0,0.1)" }}>
+        Khoảng cách chim bay: {distance.toFixed(1)} km
+      </div>
+    </div>
+  );
+};
 
 const OrderCard: FC<{ order: any; onCancelSuccess: () => void }> = ({ order, onCancelSuccess }) => {
   const snackbar = useSnackbar();
@@ -70,6 +104,9 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void }> = ({ order, onC
       <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {order.items?.map((item: any) => `${item.productName || item.name} x${item.quantity}`).join(", ")}
       </Text>
+      
+      {order.status === "PICKED_UP" && <OrderLocationMap order={order} />}
+
       <div
         style={{
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -131,6 +168,15 @@ const ActiveOrdersPage: FC = () => {
 
   useEffect(() => {
     loadOrders();
+    const socket = initSocket();
+    if (socket) {
+      socket.on("order_status_updated", () => {
+        loadOrders();
+      });
+      return () => {
+        socket.off("order_status_updated");
+      };
+    }
   }, []);
 
   return (

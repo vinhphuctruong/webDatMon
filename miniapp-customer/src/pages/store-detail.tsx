@@ -32,6 +32,11 @@ const StoreDetailPage: FC = () => {
   }, [storeId]);
 
   const addToCart = useCallback((product: Product) => {
+    const session = localStorage.getItem("zaui_food_session");
+    if (!session) {
+      navigate("/login");
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
@@ -42,7 +47,7 @@ const StoreDetailPage: FC = () => {
       return [...prev, { product, quantity: 1, options: {} }];
     });
     snackbar.openSnackbar({ type: "success", text: `Đã thêm ${product.name}` });
-  }, [setCart, snackbar]);
+  }, [setCart, snackbar, navigate]);
 
   if (loading) {
     return (
@@ -68,14 +73,14 @@ const StoreDetailPage: FC = () => {
         background: "linear-gradient(135deg, #00a96d 0%, #00c97d 100%)",
         padding: "16px 16px 20px", color: "#fff",
       }}>
-        <button onClick={() => window.history.back()} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12 }}>
+        <button onClick={() => window.history.back()} style={{ background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", borderRadius: 8, padding: "6px 12px", fontSize: 13, fontWeight: 600, cursor: "pointer", marginBottom: 12, marginTop: "calc(env(safe-area-inset-top, 0px) + 32px)", position: "relative", zIndex: 100 }}>
           ← Quay lại
         </button>
         <Text style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 4 }}>{store.name}</Text>
         <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>📍 {store.address}</Text>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, background: "rgba(255,255,255,0.2)", padding: "4px 10px", borderRadius: 20 }}>
-            ⭐ {store.rating.toFixed(1)}
+            {store.rating > 0 ? `⭐ ${store.rating.toFixed(1)}` : "🆕 Mới"}
           </span>
           <span style={{ fontSize: 12, background: "rgba(255,255,255,0.2)", padding: "4px 10px", borderRadius: 20 }}>
             🕐 {store.etaMinutesMin}-{store.etaMinutesMax} phút
@@ -143,7 +148,7 @@ const StoreDetailPage: FC = () => {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
                     <span style={{ fontSize: 11, color: "var(--tm-text-secondary)" }}>
-                      ⭐ {(product.rating ?? 0).toFixed(1)} · Đã bán {product.sold ?? 0}
+                      {(product.rating ?? 0) > 0 ? `⭐ ${(product.rating ?? 0).toFixed(1)}` : "🆕 Mới"} · Đã bán {product.sold ?? 0}
                     </span>
                     <button
                       onClick={() => addToCart(product)}

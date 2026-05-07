@@ -1,227 +1,536 @@
 import React, { FC, useState } from "react";
-import { Box, Header, Page, Text, Input, Button, Icon, Modal, useSnackbar } from "zmp-ui";
+import { Box, Header, Page, Text, Button, Icon, useSnackbar } from "zmp-ui";
 import { useRecoilState } from "recoil";
 import { savedAddressesState, SavedAddress } from "state";
-import { THU_DAU_MOT_CENTER, reverseGeocode } from "utils/location";
-import { getLocation } from "zmp-sdk";
+import { AddressSearchSheet, AddressSearchResult } from "components/address-search-sheet";
+
+type AddressType = "home" | "office";
+
+/* ── Address Form (shared between Create & Edit) ──────────── */
+
+interface AddressFormProps {
+  title: string;
+  selectedAddress: AddressSearchResult | null;
+  label: AddressType;
+  name: string;
+  phone: string;
+  note: string;
+  isDefault: boolean;
+  onChangeLabel: (v: AddressType) => void;
+  onChangeName: (v: string) => void;
+  onChangePhone: (v: string) => void;
+  onChangeNote: (v: string) => void;
+  onChangeDefault: (v: boolean) => void;
+  onChangeAddress: () => void;
+  onBack: () => void;
+  onSave: () => void;
+  saveText: string;
+}
+
+const fieldStyle: React.CSSProperties = {
+  width: "100%",
+  border: "none",
+  borderBottom: "1px solid #e8e8e8",
+  padding: "16px 0",
+  fontSize: 15,
+  outline: "none",
+  background: "transparent",
+  fontFamily: "Inter, sans-serif",
+  color: "#1a1a2e",
+};
+
+const AddressForm: FC<AddressFormProps> = ({
+  title,
+  selectedAddress,
+  label,
+  name,
+  phone,
+  note,
+  isDefault,
+  onChangeLabel,
+  onChangeName,
+  onChangePhone,
+  onChangeNote,
+  onChangeDefault,
+  onChangeAddress,
+  onBack,
+  onSave,
+  saveText,
+}) => (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      background: "#fff",
+      display: "flex",
+      flexDirection: "column",
+    }}
+  >
+    {/* Header - below Zalo system bar */}
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        padding: "14px 16px",
+        paddingTop: "calc(env(safe-area-inset-top, 0px) + 50px)",
+        borderBottom: "1px solid #f0f0f0",
+        background: "#fff",
+        position: "relative",
+        zIndex: 10000,
+      }}
+    >
+      <div onClick={onBack} style={{ padding: 8, cursor: "pointer", marginLeft: -4 }}>
+        <Icon icon="zi-arrow-left" style={{ fontSize: 24 }} />
+      </div>
+      <Text
+        style={{
+          flex: 1,
+          textAlign: "center",
+          fontSize: 18,
+          fontWeight: 600,
+          marginRight: 32,
+        }}
+      >
+        {title}
+      </Text>
+    </div>
+
+    {/* Form body */}
+    <div style={{ flex: 1, overflowY: "auto" }}>
+      <div
+        style={{
+          background: "#fff",
+          padding: "4px 20px 20px",
+        }}
+      >
+        {/* Họ và tên */}
+        <input
+          type="text"
+          placeholder="Họ và tên"
+          value={name}
+          onChange={(e) => onChangeName(e.target.value)}
+          style={fieldStyle}
+        />
+
+        {/* Số điện thoại */}
+        <input
+          type="tel"
+          placeholder="Số điện thoại"
+          value={phone}
+          onChange={(e) => onChangePhone(e.target.value)}
+          style={fieldStyle}
+        />
+
+        {/* Địa chỉ (click to open search) */}
+        <div
+          onClick={onChangeAddress}
+          style={{
+            ...fieldStyle,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            cursor: "pointer",
+            color: selectedAddress ? "#1a1a2e" : "#999",
+          }}
+        >
+          <span
+            style={{
+              flex: 1,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              paddingRight: 8,
+            }}
+          >
+            {selectedAddress?.fullName || "Tỉnh/Thành phố, Quận/Huyện, Tên đường, Số nhà"}
+          </span>
+          <Icon icon="zi-chevron-right" style={{ fontSize: 20, color: "#ccc", flexShrink: 0 }} />
+        </div>
+
+        {/* Ghi chú chi tiết */}
+        <input
+          type="text"
+          placeholder="Ghi chú (Hẻm, tầng, cổng phụ, mốc dễ tìm...)"
+          value={note}
+          onChange={(e) => onChangeNote(e.target.value)}
+          style={fieldStyle}
+        />
+      </div>
+
+      {/* Đặt làm mặc định */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "14px 20px",
+          borderTop: "8px solid #f4f5f6",
+        }}
+      >
+        <Text style={{ fontSize: 15, fontWeight: 500 }}>Đặt làm địa chỉ mặc định</Text>
+        <div
+          onClick={() => onChangeDefault(!isDefault)}
+          style={{
+            width: 48,
+            height: 28,
+            borderRadius: 14,
+            background: isDefault ? "var(--tm-primary)" : "#ddd",
+            position: "relative",
+            cursor: "pointer",
+            transition: "background 0.2s",
+          }}
+        >
+          <div
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: "50%",
+              background: "#fff",
+              position: "absolute",
+              top: 2,
+              left: isDefault ? 22 : 2,
+              transition: "left 0.2s",
+              boxShadow: "0 1px 3px rgba(0,0,0,0.2)",
+            }}
+          />
+        </div>
+      </div>
+
+      {/* Loại địa chỉ */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          padding: "14px 20px",
+          gap: 12,
+          borderTop: "1px solid #f0f0f0",
+        }}
+      >
+        <Text style={{ fontSize: 15, fontWeight: 500, marginRight: 8 }}>Loại địa chỉ:</Text>
+        {(
+          [
+            { key: "office" as AddressType, text: "Văn Phòng" },
+            { key: "home" as AddressType, text: "Nhà Riêng" },
+          ] as const
+        ).map((item) => (
+          <div
+            key={item.key}
+            onClick={() => onChangeLabel(item.key)}
+            style={{
+              padding: "6px 16px",
+              borderRadius: 6,
+              border: `1.5px solid ${label === item.key ? "var(--tm-primary)" : "#ddd"}`,
+              background: label === item.key ? "var(--tm-primary-light)" : "#fff",
+              color: label === item.key ? "var(--tm-primary)" : "#666",
+              fontWeight: 600,
+              fontSize: 13,
+              cursor: "pointer",
+              transition: "all 0.15s",
+            }}
+          >
+            {item.text}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    {/* Save button */}
+    <div style={{ padding: "12px 20px 20px", borderTop: "1px solid #f0f0f0" }}>
+      <button
+        onClick={onSave}
+        style={{
+          width: "100%",
+          padding: "14px",
+          borderRadius: 8,
+          border: "none",
+          background: "var(--tm-primary)",
+          color: "#fff",
+          fontSize: 15,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: 1,
+          cursor: "pointer",
+        }}
+      >
+        {saveText}
+      </button>
+    </div>
+  </div>
+);
+
+/* ── Main Page ────────────────────────────────────────────── */
 
 const AddressesPage: FC = () => {
   const [addresses, setAddresses] = useRecoilState(savedAddressesState);
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
-  const [newAddress, setNewAddress] = useState("");
-  const [newName, setNewName] = useState("");
-  const [newPhone, setNewPhone] = useState("");
-  const [newLat, setNewLat] = useState<number | null>(null);
-  const [newLng, setNewLng] = useState<number | null>(null);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
+  const [selectedAddress, setSelectedAddress] = useState<AddressSearchResult | null>(null);
+  const [formLabel, setFormLabel] = useState<AddressType>("home");
+  const [formName, setFormName] = useState("");
+  const [formPhone, setFormPhone] = useState("");
+  const [formNote, setFormNote] = useState("");
+  const [formDefault, setFormDefault] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
   const snackbar = useSnackbar();
 
-  const handleAddAddress = () => {
-    if (!newLabel || !newAddress || !newName || !newPhone) {
-      snackbar.openSnackbar({ type: "error", text: "Vui lòng nhập đầy đủ thông tin" });
+  const resetForm = () => {
+    setSelectedAddress(null);
+    setFormLabel("home");
+    setFormName("");
+    setFormPhone("");
+    setFormNote("");
+    setFormDefault(false);
+    setEditingId(null);
+  };
+
+  /* ── Create flow ──────────── */
+
+  const handleStartCreate = () => {
+    resetForm();
+    setIsFormOpen(true);
+  };
+
+  const handleSearchConfirm = (result: AddressSearchResult) => {
+    setSelectedAddress(result);
+    setIsSearchOpen(false);
+    setIsFormOpen(true);
+  };
+
+  /* ── Edit flow ────────────── */
+
+  const handleStartEdit = (addr: SavedAddress) => {
+    setEditingId(addr.id);
+    setFormName(addr.contactName);
+    setFormPhone(addr.contactPhone);
+    setFormNote(addr.note || "");
+    setFormDefault(addresses.findIndex((a) => a.id === addr.id) === 0); // first = default
+    setFormLabel(addr.label.toLowerCase().includes("văn phòng") || addr.label.toLowerCase() === "office" ? "office" : "home");
+
+    // Parse stored address back into search result
+    const notePart = addr.note ? ` (${addr.note})` : "";
+    const cleanAddress = addr.address.replace(notePart, "").trim();
+    setSelectedAddress({
+      lat: addr.lat,
+      lng: addr.long,
+      streetName: cleanAddress.split(",")[0] || addr.label,
+      fullName: cleanAddress,
+    });
+
+    setIsFormOpen(true);
+  };
+
+  /* ── Save (create or update) ── */
+
+  const handleSave = () => {
+    if (!formName.trim()) {
+      snackbar.openSnackbar({ type: "error", text: "Vui lòng nhập họ và tên" });
       return;
     }
-    const newEntry: SavedAddress = {
-      id: Math.random().toString(36).substring(7),
-      label: newLabel,
-      address: newAddress,
-      lat: newLat || THU_DAU_MOT_CENTER.lat,
-      long: newLng || THU_DAU_MOT_CENTER.lng,
-      contactName: newName,
-      contactPhone: newPhone,
-    };
-    setAddresses([...addresses, newEntry]);
-    setIsAddModalOpen(false);
-    setNewLabel("");
-    setNewAddress("");
-    setNewName("");
-    setNewPhone("");
-    setNewLat(null);
-    setNewLng(null);
-    snackbar.openSnackbar({ type: "success", text: "Thêm địa chỉ thành công" });
-  };
-
-  const handleGetLocation = async () => {
-    snackbar.openSnackbar({ type: "info", text: "Đang lấy vị trí...", duration: 2000 });
-
-    const fetchAddressFromCoords = async (lat: number, lng: number) => {
-      const shortAddress = await reverseGeocode(lat, lng);
-      if (shortAddress) {
-        setNewAddress(shortAddress);
-      }
-    };
-
-    const getHtml5Location = () => {
-      if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            setNewLat(lat);
-            setNewLng(lng);
-            fetchAddressFromCoords(lat, lng);
-            snackbar.openSnackbar({ type: "success", text: "Đã điền địa chỉ (HTML5)" });
-          },
-          (err) => {
-            console.error("HTML5 Geo Error", err);
-            snackbar.openSnackbar({ type: "error", text: "Không thể lấy vị trí. Vui lòng bật GPS." });
-          },
-          { timeout: 5000, maximumAge: 0, enableHighAccuracy: true }
-        );
-      } else {
-        snackbar.openSnackbar({ type: "error", text: "Thiết bị không hỗ trợ định vị." });
-      }
-    };
-
-    try {
-      // Try Zalo SDK first
-      let isResolved = false;
-      const { latitude, longitude } = await Promise.race([
-        getLocation({
-          fail: (error) => {
-            console.error("Zalo Geo Error:", error);
-            if (!isResolved) getHtml5Location();
-          }
-        }),
-        new Promise<any>((_, reject) => setTimeout(() => reject(new Error("TIMEOUT")), 3000))
-      ]);
-      
-      isResolved = true;
-      if (latitude && longitude) {
-        const lat = Number(latitude);
-        const lng = Number(longitude);
-        setNewLat(lat);
-        setNewLng(lng);
-        fetchAddressFromCoords(lat, lng);
-        snackbar.openSnackbar({ type: "success", text: "Đã tự động điền địa chỉ" });
-      } else {
-        getHtml5Location();
-      }
-    } catch (err) {
-      console.warn("Zalo getLocation failed or timed out, falling back to HTML5", err);
-      getHtml5Location();
+    if (!formPhone.trim()) {
+      snackbar.openSnackbar({ type: "error", text: "Vui lòng nhập số điện thoại" });
+      return;
     }
+    if (!selectedAddress) {
+      snackbar.openSnackbar({ type: "error", text: "Vui lòng chọn địa chỉ" });
+      return;
+    }
+
+    const labelText = formLabel === "office" ? "Văn Phòng" : "Nhà Riêng";
+
+    const entry: SavedAddress = {
+      id: editingId || Math.random().toString(36).substring(7),
+      label: labelText,
+      address: selectedAddress.fullName,
+      lat: selectedAddress.lat,
+      long: selectedAddress.lng,
+      contactName: formName.trim(),
+      contactPhone: formPhone.trim(),
+      note: formNote.trim() || undefined,
+    };
+
+    if (editingId) {
+      let updated = addresses.map((a) => (a.id === editingId ? entry : a));
+      if (formDefault) {
+        updated = [entry, ...updated.filter((a) => a.id !== editingId)];
+      }
+      setAddresses(updated);
+      snackbar.openSnackbar({ type: "success", text: "Cập nhật địa chỉ thành công" });
+    } else {
+      if (formDefault) {
+        setAddresses([entry, ...addresses]);
+      } else {
+        setAddresses([...addresses, entry]);
+      }
+      snackbar.openSnackbar({ type: "success", text: "Thêm địa chỉ thành công" });
+    }
+
+    setIsFormOpen(false);
+    resetForm();
   };
+
+  /* ── Delete ────────────────── */
 
   const handleDelete = (id: string) => {
-    setAddresses(addresses.filter(a => a.id !== id));
+    setAddresses(addresses.filter((a) => a.id !== id));
     snackbar.openSnackbar({ type: "success", text: "Đã xóa địa chỉ" });
   };
+
+  /* ── Render ─────────────────── */
 
   return (
     <Page style={{ background: "var(--tm-bg)" }}>
       <Header title="Địa chỉ đã lưu" showBackIcon />
-      <Box style={{ padding: "16px" }}>
+      <Box style={{ padding: "16px", paddingBottom: 80 }}>
         {addresses.length === 0 ? (
-          <Box className="flex flex-col items-center justify-center py-10">
-            <Text style={{ color: "var(--tm-text-secondary)" }}>Bạn chưa có địa chỉ nào được lưu</Text>
+          <Box className="flex flex-col items-center justify-center" style={{ padding: "48px 0" }}>
+            <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
+            <Text style={{ color: "var(--tm-text-secondary)", fontWeight: 500 }}>
+              Bạn chưa có địa chỉ nào được lưu
+            </Text>
           </Box>
         ) : (
-          <div className="space-y-3">
-            {addresses.map((addr) => (
-              <div key={addr.id} className="tm-card" style={{ padding: "14px 16px", marginBottom: 12, position: "relative" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ 
-                      width: 32, height: 32, borderRadius: "50%", background: "var(--tm-primary-light)", 
-                      color: "var(--tm-primary)", display: "flex", alignItems: "center", justifyContent: "center" 
-                    }}>
-                      <Icon icon={addr.label.toLowerCase() === "nhà" ? "zi-home" : "zi-location"} />
-                    </div>
-                    <Text style={{ fontWeight: 600, fontSize: 16, color: "var(--tm-text-primary)" }}>
-                      {addr.label}
-                    </Text>
+          addresses.map((addr, i) => (
+            <div
+              key={addr.id}
+              className="tm-card"
+              style={{ padding: "14px 16px", marginBottom: 12 }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "flex-start",
+                  marginBottom: 6,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: "50%",
+                      background: "var(--tm-primary-light)",
+                      color: "var(--tm-primary)",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon
+                      icon={
+                        addr.label.toLowerCase().includes("nhà") ? "zi-home" : "zi-location"
+                      }
+                    />
                   </div>
-                  <div 
-                    style={{ color: "var(--tm-danger)", padding: 4, cursor: "pointer" }}
+                  <div>
+                    <Text style={{ fontWeight: 600, fontSize: 15 }}>{addr.label}</Text>
+                    {i === 0 && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          color: "var(--tm-primary)",
+                          fontWeight: 600,
+                          marginLeft: 6,
+                          background: "var(--tm-primary-light)",
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        Mặc định
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 2 }}>
+                  <div
+                    onClick={() => handleStartEdit(addr)}
+                    style={{ color: "var(--tm-primary)", padding: 4, cursor: "pointer" }}
+                  >
+                    <Icon icon="zi-edit" />
+                  </div>
+                  <div
                     onClick={() => handleDelete(addr.id)}
+                    style={{ color: "var(--tm-danger)", padding: 4, cursor: "pointer" }}
                   >
                     <Icon icon="zi-delete" />
                   </div>
                 </div>
-                <Text size="small" style={{ color: "var(--tm-text-secondary)", marginBottom: 4 }}>
-                  {addr.address}
-                </Text>
-                <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-                  {addr.contactName} - {addr.contactPhone}
-                </Text>
               </div>
-            ))}
-          </div>
+
+              <Text size="small" style={{ color: "var(--tm-text-secondary)", marginBottom: 2, lineHeight: 1.4 }}>
+                {addr.address}
+              </Text>
+              {addr.note && (
+                <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)", fontStyle: "italic", marginBottom: 2 }}>
+                  📝 {addr.note}
+                </Text>
+              )}
+              <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)" }}>
+                {addr.contactName} · {addr.contactPhone}
+              </Text>
+            </div>
+          ))
         )}
       </Box>
 
-      <Box style={{ padding: "16px", position: "fixed", bottom: 0, left: 0, right: 0, background: "#fff", borderTop: "1px solid var(--tm-border)" }}>
+      {/* Fixed bottom button */}
+      <Box
+        style={{
+          padding: "12px 16px",
+          position: "fixed",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          background: "#fff",
+          borderTop: "1px solid var(--tm-border)",
+        }}
+      >
         <Button
           fullWidth
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={handleStartCreate}
           style={{ background: "var(--tm-primary)", color: "#fff", fontWeight: 600 }}
         >
           Thêm địa chỉ mới
         </Button>
       </Box>
 
-      <Modal
-        visible={isAddModalOpen}
-        title="Thêm địa chỉ mới"
-        onClose={() => setIsAddModalOpen(false)}
-        actions={[
-          {
-            text: "Hủy",
-            onClick: () => setIsAddModalOpen(false),
-          },
-          {
-            text: "Lưu",
-            highLight: true,
-            onClick: handleAddAddress,
-          },
-        ]}
-      >
-        <Box style={{ padding: "8px 0" }} className="space-y-4">
-          <Input 
-            label="Tên gợi nhớ (VD: Nhà, Công ty)" 
-            value={newLabel} 
-            onChange={(e) => setNewLabel(e.target.value)} 
-          />
-          <Input 
-            label="Địa chỉ chi tiết" 
-            value={newAddress} 
-            onChange={(e) => setNewAddress(e.target.value)} 
-          />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 0" }}>
-            <Button
-              size="small"
-              variant="secondary"
-              onClick={handleGetLocation}
-              style={{ background: newLat ? "var(--tm-primary-light)" : "#f4f5f6", color: newLat ? "var(--tm-primary)" : "var(--tm-text-secondary)", width: "auto", flex: "none" }}
-            >
-              <Icon icon="zi-location" style={{ fontSize: 16, marginRight: 4 }} />
-              {newLat ? "Đã đính kèm GPS" : "Lấy toạ độ GPS"}
-            </Button>
-            {newLat && (
-              <Text size="xxxSmall" style={{ color: "var(--tm-primary)", fontWeight: 500 }}>
-                ✓ Đã lưu {newLat.toFixed(4)}, {newLng?.toFixed(4)}
-              </Text>
-            )}
-          </div>
-          {newLat && (
-            <Text size="xxxSmall" style={{ color: "var(--tm-danger)", marginTop: -4, fontStyle: "italic" }}>
-              * Vui lòng nhấp vào ô "Địa chỉ chi tiết" để bổ sung số nhà, ngõ/hẻm (nếu có) giúp tài xế dễ tìm hơn nhé!
-            </Text>
-          )}
-          <Input 
-            label="Tên người nhận" 
-            value={newName} 
-            onChange={(e) => setNewName(e.target.value)} 
-          />
-          <Input 
-            label="Số điện thoại" 
-            type="text"
-            value={newPhone} 
-            onChange={(e) => setNewPhone(e.target.value)} 
-          />
-        </Box>
-      </Modal>
+      {/* Search sheet */}
+      <AddressSearchSheet
+        visible={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        onConfirm={handleSearchConfirm}
+      />
+
+      {/* Address form (Create / Edit) */}
+      {isFormOpen && (
+        <AddressForm
+          title={editingId ? "Chỉnh sửa địa chỉ" : "Địa chỉ mới"}
+          selectedAddress={selectedAddress}
+          label={formLabel}
+          name={formName}
+          phone={formPhone}
+          note={formNote}
+          isDefault={formDefault}
+          onChangeLabel={setFormLabel}
+          onChangeName={setFormName}
+          onChangePhone={setFormPhone}
+          onChangeNote={setFormNote}
+          onChangeDefault={setFormDefault}
+          onChangeAddress={() => {
+            setIsFormOpen(false);
+            setIsSearchOpen(true);
+          }}
+          onBack={() => {
+            setIsFormOpen(false);
+            resetForm();
+          }}
+          onSave={handleSave}
+          saveText="Hoàn thành"
+        />
+      )}
     </Page>
   );
 };

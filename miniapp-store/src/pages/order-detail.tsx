@@ -3,6 +3,8 @@ import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useParams, useNavigate } from "react-router";
 import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady } from "services/api";
 import { formatCurrency } from "utils/formatter";
+import { VietMapView, MapMarker } from "components/vietmap";
+import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
 
 const OrderDetailPage = () => {
   const { id } = useParams();
@@ -62,6 +64,49 @@ const OrderDetailPage = () => {
 
   if (!order) return null;
 
+  const toFiniteNumber = (value: unknown): number | null => {
+    const parsed = typeof value === "number" ? value : Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const normalizedStoreCoordinates = normalizeStoredCoordinates(
+    order.store?.latitude,
+    order.store?.longitude,
+  );
+  const normalizedDeliveryCoordinates = normalizeStoredCoordinates(
+    order.deliveryAddress?.latitude,
+    order.deliveryAddress?.longitude,
+  );
+  const deliveryLat = normalizedDeliveryCoordinates?.lat ?? toFiniteNumber(order.deliveryAddress?.latitude);
+  const deliveryLng = normalizedDeliveryCoordinates?.lng ?? toFiniteNumber(order.deliveryAddress?.longitude);
+
+  const mapMarkers: MapMarker[] = [];
+  if (normalizedStoreCoordinates) {
+    mapMarkers.push({
+      id: "store",
+      lat: normalizedStoreCoordinates.lat,
+      lng: normalizedStoreCoordinates.lng,
+      type: "store",
+      label: order.store?.name || "Cua hang",
+    });
+  }
+  if (deliveryLat !== null && deliveryLng !== null) {
+    mapMarkers.push({
+      id: "customer",
+      lat: deliveryLat,
+      lng: deliveryLng,
+      type: "customer",
+      label: order.deliveryAddress?.receiverName || "Khach hang",
+    });
+  }
+
+  const showRoute = mapMarkers.some((marker) => marker.type === "store")
+    && mapMarkers.some((marker) => marker.type === "customer");
+  const mapCenter: [number, number] =
+    mapMarkers.length > 0
+      ? [mapMarkers[0].lng, mapMarkers[0].lat]
+      : [THU_DAU_MOT_CENTER.lng, THU_DAU_MOT_CENTER.lat];
+
   return (
     <Page className="page-with-bg pb-20">
       <Box className="tm-page-topbar tm-page-safe-top" style={{ justifyContent: "flex-start", gap: 12 }}>
@@ -110,6 +155,24 @@ const OrderDetailPage = () => {
               </div>
             )}
           </div>
+        </div>
+
+        <div className="tm-card" style={{ padding: 16, marginTop: 16 }}>
+          <Text.Title style={{ fontSize: 16, marginBottom: 12 }}>Bản đồ giao hàng</Text.Title>
+          {mapMarkers.length === 0 ? (
+            <Text size="small" style={{ color: "var(--tm-text-secondary)" }}>
+              Chưa có tọa độ hợp lệ cho cửa hàng hoặc địa chỉ giao hàng.
+            </Text>
+          ) : (
+            <VietMapView
+              center={mapCenter}
+              zoom={14}
+              height={180}
+              showRoute={showRoute}
+              markers={mapMarkers}
+              style={{ borderRadius: 12, border: "1px solid var(--tm-border)" }}
+            />
+          )}
         </div>
 
         <div style={{ display: "grid", gap: 12, marginTop: 16 }}>

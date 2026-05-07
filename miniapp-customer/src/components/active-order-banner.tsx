@@ -31,6 +31,18 @@ export const ActiveOrderBanner: FC = () => {
 
   const activeOrdersCount = ordersLoadable.contents.length;
   const activeOrder = ordersLoadable.contents[0]; // Most recent active order
+  const fallbackStoreLat = THU_DAU_MOT_CENTER.lat;
+  const fallbackStoreLng = THU_DAU_MOT_CENTER.lng;
+  const fallbackCustomerLat = THU_DAU_MOT_CENTER.lat - 0.01;
+  const fallbackCustomerLng = THU_DAU_MOT_CENTER.lng + 0.01;
+
+  const storeLat = Number(activeOrder.store?.latitude);
+  const storeLng = Number(activeOrder.store?.longitude);
+  const customerLat = Number(activeOrder.deliveryAddress?.latitude);
+  const customerLng = Number(activeOrder.deliveryAddress?.longitude);
+
+  const hasStoreCoords = Number.isFinite(storeLat) && Number.isFinite(storeLng);
+  const hasCustomerCoords = Number.isFinite(customerLat) && Number.isFinite(customerLng);
 
   return (
     <Box style={{ padding: "0 16px 16px 16px" }}>
@@ -53,13 +65,14 @@ export const ActiveOrderBanner: FC = () => {
               state: {
                 localOrderStatus: "success",
                 localOrderId: activeOrder.id.slice(0, 8),
+                localOrderBackendId: activeOrder.id,
                 localOrderMessage: `Đơn #${activeOrder.id.slice(0, 8)} đang được xử lý.`,
                 trackingSnapshot: {
                   storeName: activeOrder.store?.name || "TM Food",
-                  storeLat: THU_DAU_MOT_CENTER.lat,
-                  storeLng: THU_DAU_MOT_CENTER.lng,
-                  customerLat: THU_DAU_MOT_CENTER.lat - 0.01,
-                  customerLng: THU_DAU_MOT_CENTER.lng + 0.01,
+                  storeLat: hasStoreCoords ? storeLat : fallbackStoreLat,
+                  storeLng: hasStoreCoords ? storeLng : fallbackStoreLng,
+                  customerLat: hasCustomerCoords ? customerLat : fallbackCustomerLat,
+                  customerLng: hasCustomerCoords ? customerLng : fallbackCustomerLng,
                 }
               },
             });

@@ -4,6 +4,30 @@ import { requireAuth } from "../middlewares/auth";
 
 const router = express.Router();
 
+function parseOptionalCoordinate(
+  value: unknown,
+  kind: "latitude" | "longitude",
+): { ok: true; value: number | null } | { ok: false; error: string } {
+  if (value === undefined || value === null || value === "") {
+    return { ok: true, value: null };
+  }
+
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed)) {
+    return { ok: false, error: `${kind} không hợp lệ` };
+  }
+
+  if (kind === "latitude" && (parsed < -90 || parsed > 90)) {
+    return { ok: false, error: "latitude phải nằm trong khoảng -90 đến 90" };
+  }
+
+  if (kind === "longitude" && (parsed < -180 || parsed > 180)) {
+    return { ok: false, error: "longitude phải nằm trong khoảng -180 đến 180" };
+  }
+
+  return { ok: true, value: parsed };
+}
+
 // Get current user's store application
 router.get("/me", requireAuth, async (req, res) => {
   try {
@@ -60,18 +84,32 @@ router.post("/", requireAuth, async (req, res) => {
       businessLicenseImageData,
     } = req.body;
 
-    if (!storeName || !storeAddress || !storePhone) {
+    const normalizedName = typeof storeName === "string" ? storeName.trim() : "";
+    const normalizedAddress = typeof storeAddress === "string" ? storeAddress.trim() : "";
+    const normalizedPhone = typeof storePhone === "string" ? storePhone.trim() : "";
+
+    if (!normalizedName || !normalizedAddress || !normalizedPhone) {
       return res.status(400).json({ error: "Vui lòng nhập đầy đủ Tên, Địa chỉ và SĐT" });
+    }
+
+    const latitudeResult = parseOptionalCoordinate(storeLatitude, "latitude");
+    if (!latitudeResult.ok) {
+      return res.status(400).json({ error: latitudeResult.error });
+    }
+
+    const longitudeResult = parseOptionalCoordinate(storeLongitude, "longitude");
+    if (!longitudeResult.ok) {
+      return res.status(400).json({ error: longitudeResult.error });
     }
 
     const newApp = await prisma.storeApplication.create({
       data: {
         applicantId: userId,
-        storeName,
-        storeAddress,
-        storeLatitude: storeLatitude ? parseFloat(storeLatitude) : null,
-        storeLongitude: storeLongitude ? parseFloat(storeLongitude) : null,
-        storePhone,
+        storeName: normalizedName,
+        storeAddress: normalizedAddress,
+        storeLatitude: latitudeResult.value,
+        storeLongitude: longitudeResult.value,
+        storePhone: normalizedPhone,
         frontStoreImageData,
         businessLicenseImageData,
         status: "PENDING",

@@ -5,8 +5,8 @@ import { useRecoilValueLoadable, useResetRecoilState } from "recoil";
 import { AsyncCallbackFailObject, CheckTransactionReturns, Payment } from "zmp-sdk";
 import { Box, Header, Page, Text, useNavigate } from "zmp-ui";
 import { cartState, locationState, selectedStoreState } from "state";
-import { DriverDispatchResult } from "services/dispatch";
-import { THU_DAU_MOT_CENTER } from "utils/location";
+import { ApiOrder, fetchOrderById } from "services/backend";
+import { THU_DAU_MOT_CENTER, calculateDistance, calculateETA, displayDistance } from "utils/location";
 
 interface TrackingSnapshot {
   customerLat: number;
@@ -20,11 +20,11 @@ interface LocalResultState {
   localOrderStatus: "success" | "failed";
   localOrderMessage?: string;
   localOrderId?: string;
+  localOrderBackendId?: string;
   trackingSnapshot?: TrackingSnapshot;
-  dispatchInfo?: DriverDispatchResult;
 }
 
-const SHOW_TRACKING_MAP = false;
+const SHOW_TRACKING_MAP = true;
 
 const getStepStatus = (status: "done" | "active" | "pending") => {
   if (status === "done") {
@@ -48,6 +48,14 @@ const getStepStatus = (status: "done" | "active" | "pending") => {
     color: "var(--tm-text-tertiary)",
     opacity: 0.6,
   };
+};
+
+const toFiniteNumber = (value: unknown): number | null => {
+  const numeric = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numeric)) {
+    return null;
+  }
+  return numeric;
 };
 
 const LegendItem: FC<{ emoji: string; color: string; label: string }> = ({ emoji, color, label }) => (
@@ -178,56 +186,65 @@ const ResultSummary: FC<{ title: string; message: string; icon: string; color: s
   </Box>
 );
 
-const DriverDispatchCard: FC<{ dispatchInfo: DriverDispatchResult }> = ({ dispatchInfo }) => (
-  <div className="tm-card" style={{ marginTop: 12, padding: 14 }}>
-    <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "var(--tm-text-primary)" }}>
-      Tài xế nhận đơn
-    </Text>
-    <Text size="small" style={{ fontWeight: 600, color: "var(--tm-text-primary)" }}>
-      {dispatchInfo.driver.name}
-    </Text>
-    <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 2 }}>
-      SĐT: {dispatchInfo.driver.phone}
-    </Text>
-    <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 2 }}>
-      Phương tiện: {dispatchInfo.driver.vehicleType} · {dispatchInfo.driver.licensePlate}
-    </Text>
-    <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 2 }}>
-      Cách quán: {dispatchInfo.distanceToStoreKm} km
-    </Text>
-    <div
-      style={{
-        marginTop: 10,
-        padding: "8px 10px",
-        borderRadius: 10,
-        border: "1px dashed var(--tm-border)",
-        background: "var(--tm-bg)",
-      }}
-    >
-      <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-        Thông báo cho quán: {dispatchInfo.storeNotice}
+const DriverAssignmentCard: FC<{ order?: ApiOrder | null }> = ({ order }) => {
+  if (!order?.driver) {
+    return (
+      <div className="tm-card" style={{ marginTop: 12, padding: 14 }}>
+        <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "var(--tm-text-primary)" }}>
+          Tài xế nhận đơn
+        </Text>
+        <Text size="small" style={{ color: "var(--tm-text-secondary)" }}>
+          Hệ thống đang gửi đơn đến tài xế thật gần quán nhất.
+        </Text>
+        <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 4 }}>
+          Khi tài xế nhận đơn, thông tin sẽ tự động cập nhật tại đây.
+        </Text>
+      </div>
+    );
+  }
+
+  return (
+    <div className="tm-card" style={{ marginTop: 12, padding: 14 }}>
+      <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "var(--tm-text-primary)" }}>
+        Tài xế nhận đơn
       </Text>
-      <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 4 }}>
-        Thông báo cho khách: {dispatchInfo.customerNotice}
+      <Text size="small" style={{ fontWeight: 600, color: "var(--tm-text-primary)" }}>
+        {order.driver.name}
       </Text>
-      <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 4 }}>
-        Nội dung đã gửi tài xế: {dispatchInfo.dispatchMessage}
+      <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 2 }}>
+        SĐT: {order.driver.phone || "Đang cập nhật"}
+      </Text>
+      <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 2 }}>
+        Phương tiện: {order.driver.vehicleType || "Đang cập nhật"} · {order.driver.licensePlate || "Đang cập nhật"}
       </Text>
     </div>
-  </div>
-);
+  );
+};
 
-const OrderTrackingMap: FC<{ snapshot: TrackingSnapshot }> = ({ snapshot }) => {
+const OrderTrackingMap: FC<{
+  snapshot: TrackingSnapshot;
+  hasAssignedDriver: boolean;
+  driverName?: string;
+  orderStatus?: string;
+}> = ({ snapshot, hasAssignedDriver, driverName, orderStatus }) => {
   const center = useMemo<[number, number]>(() => {
     return [(snapshot.storeLng + snapshot.customerLng) / 2, (snapshot.storeLat + snapshot.customerLat) / 2];
   }, [snapshot]);
 
-  const markers = useMemo<MapMarker[]>(() => {
-    const driverProgress = 0.35;
-    const driverLat = snapshot.storeLat + (snapshot.customerLat - snapshot.storeLat) * driverProgress;
-    const driverLng = snapshot.storeLng + (snapshot.customerLng - snapshot.storeLng) * driverProgress;
+  const driverProgress =
+    orderStatus === "DELIVERED"
+      ? 1
+      : orderStatus === "PICKED_UP"
+        ? 0.75
+        : hasAssignedDriver
+          ? 0.2
+          : 0;
 
-    return [
+  const driverLat = snapshot.storeLat + (snapshot.customerLat - snapshot.storeLat) * driverProgress;
+  const driverLng = snapshot.storeLng + (snapshot.customerLng - snapshot.storeLng) * driverProgress;
+
+  const markers = useMemo<MapMarker[]>(() => {
+    const list: MapMarker[] = [
       {
         lat: snapshot.customerLat,
         lng: snapshot.customerLng,
@@ -240,32 +257,73 @@ const OrderTrackingMap: FC<{ snapshot: TrackingSnapshot }> = ({ snapshot }) => {
         label: snapshot.storeName,
         type: "store",
       },
-      {
+    ];
+
+    if (hasAssignedDriver) {
+      list.push({
         lat: driverLat,
         lng: driverLng,
-        label: "Tài xế Minh",
+        label: driverName || "Tài xế",
         type: "driver",
-      },
-    ];
-  }, [snapshot]);
+      });
+    }
+
+    return list;
+  }, [snapshot, hasAssignedDriver, driverLat, driverLng, driverName]);
+
+  const distanceLeft = calculateDistance(driverLat, driverLng, snapshot.customerLat, snapshot.customerLng);
+  const etaLeft = calculateETA(distanceLeft);
 
   return (
-    <div className="tm-card" style={{ padding: 12, marginTop: 14 }}>
+    <div className="tm-card" style={{ padding: 12, marginTop: 14, position: "relative" }}>
       <Text style={{ fontWeight: 700, fontSize: 14, color: "var(--tm-text-primary)", marginBottom: 8 }}>
         Bản đồ giao hàng
       </Text>
-      <VietMapView
-        center={center}
-        zoom={14}
-        markers={markers}
-        height={230}
-        showRoute={true}
-        style={{ borderRadius: 12, border: "1px solid var(--tm-border)" }}
-      />
+      <div style={{ position: "relative" }}>
+        <VietMapView
+          center={center}
+          zoom={14}
+          markers={markers}
+          height={230}
+          showRoute={true}
+          style={{ borderRadius: 12, border: "1px solid var(--tm-border)" }}
+        />
+        <div
+          style={{
+            position: "absolute",
+            top: 12,
+            left: 12,
+            zIndex: 1000,
+            background: "rgba(255, 255, 255, 0.95)",
+            backdropFilter: "blur(8px)",
+            padding: "8px 12px",
+            borderRadius: 12,
+            boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 2,
+            border: "1px solid rgba(0,0,0,0.05)",
+          }}
+        >
+          {hasAssignedDriver ? (
+            <>
+              <div style={{ fontSize: 11, color: "var(--tm-text-secondary)", fontWeight: 600 }}>Tài xế đang đến</div>
+              <div style={{ fontSize: 15, fontWeight: 800, color: "var(--tm-primary)" }}>Còn {etaLeft}</div>
+              <div style={{ fontSize: 10, color: "var(--tm-text-tertiary)" }}>Cách bạn {displayDistance(distanceLeft)}</div>
+            </>
+          ) : (
+            <>
+              <div style={{ fontSize: 11, color: "var(--tm-text-secondary)", fontWeight: 600 }}>Đang tìm tài xế</div>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "var(--tm-primary)" }}>Ưu tiên tài xế gần nhất</div>
+              <div style={{ fontSize: 10, color: "var(--tm-text-tertiary)" }}>Sẽ cập nhật ngay khi tài xế nhận đơn</div>
+            </>
+          )}
+        </div>
+      </div>
       <div style={{ display: "flex", gap: 12, padding: "8px 4px 2px", flexWrap: "wrap" }}>
         <LegendItem emoji="📍" color="#4285f4" label="Bạn" />
         <LegendItem emoji="🏪" color="#00a96d" label="Quán" />
-        <LegendItem emoji="🏍️" color="#ff6b35" label="Tài xế" />
+        {hasAssignedDriver && <LegendItem emoji="🏍️" color="#ff6b35" label="Tài xế" />}
       </div>
     </div>
   );
@@ -279,6 +337,7 @@ const CheckoutResultPage: FC = () => {
   const [paymentResult, setPaymentResult] = useState<
     CheckTransactionReturns | AsyncCallbackFailObject
   >();
+  const [liveOrder, setLiveOrder] = useState<ApiOrder | null>(null);
 
   const localState =
     state &&
@@ -313,8 +372,6 @@ const CheckoutResultPage: FC = () => {
 
     return { customerLat, customerLng, storeLat, storeLng, storeName };
   }, [selectedStore.state, selectedStore.contents, userLocation.state, userLocation.contents]);
-
-  const trackingSnapshot = localState?.trackingSnapshot || fallbackTrackingSnapshot;
 
   useEffect(() => {
     if (localState) {
@@ -357,14 +414,7 @@ const CheckoutResultPage: FC = () => {
     return () => {
       clearTimeout(timeout);
     };
-  }, [localState]);
-
-  const clearCart = useResetRecoilState(cartState);
-  useEffect(() => {
-    if (paymentResult?.resultCode >= 0) {
-      clearCart();
-    }
-  }, [paymentResult]);
+  }, [localState, state]);
 
   const isSuccess = paymentResult?.resultCode === 1;
   const isPending = paymentResult?.resultCode === 0 || !paymentResult;
@@ -373,6 +423,71 @@ const CheckoutResultPage: FC = () => {
     paymentResult.resultCode !== undefined &&
     paymentResult.resultCode !== 0 &&
     paymentResult.resultCode !== 1;
+
+  useEffect(() => {
+    if (!isSuccess || !localState?.localOrderBackendId) {
+      return;
+    }
+
+    let active = true;
+    const loadOrder = async () => {
+      try {
+        const order = await fetchOrderById(localState.localOrderBackendId!);
+        if (active) {
+          setLiveOrder(order);
+        }
+      } catch (orderError) {
+        console.warn("Load live order failed", orderError);
+      }
+    };
+
+    loadOrder();
+    const interval = setInterval(loadOrder, 10000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [isSuccess, localState?.localOrderBackendId]);
+
+  const clearCart = useResetRecoilState(cartState);
+  useEffect(() => {
+    if (paymentResult?.resultCode >= 0) {
+      clearCart();
+    }
+  }, [paymentResult, clearCart]);
+
+  const trackingSnapshot = useMemo<TrackingSnapshot>(() => {
+    const base = localState?.trackingSnapshot || fallbackTrackingSnapshot;
+    const liveStoreLat = toFiniteNumber(liveOrder?.store?.latitude);
+    const liveStoreLng = toFiniteNumber(liveOrder?.store?.longitude);
+    const liveCustomerLat = toFiniteNumber(liveOrder?.deliveryAddress?.latitude);
+    const liveCustomerLng = toFiniteNumber(liveOrder?.deliveryAddress?.longitude);
+
+    return {
+      customerLat: liveCustomerLat ?? base.customerLat,
+      customerLng: liveCustomerLng ?? base.customerLng,
+      storeLat: liveStoreLat ?? base.storeLat,
+      storeLng: liveStoreLng ?? base.storeLng,
+      storeName: liveOrder?.store?.name || base.storeName,
+    };
+  }, [localState?.trackingSnapshot, fallbackTrackingSnapshot, liveOrder]);
+
+  const hasAssignedDriver = Boolean(liveOrder?.driverId && liveOrder?.driver);
+  const status = liveOrder?.status;
+  const stepPreparing: "done" | "active" | "pending" =
+    status && ["PREPARING", "PICKED_UP", "DELIVERED"].includes(status) ? "done" : "active";
+  const stepDriver: "done" | "active" | "pending" = hasAssignedDriver
+    ? status && ["PICKED_UP", "DELIVERED"].includes(status)
+      ? "done"
+      : "active"
+    : "pending";
+  const stepDelivering: "done" | "active" | "pending" =
+    status === "DELIVERED" ? "done" : status === "PICKED_UP" ? "active" : "pending";
+
+  const orderCode = localState?.localOrderId || (liveOrder?.id ? liveOrder.id.slice(0, 8) : undefined);
+  const liveMessage = hasAssignedDriver
+    ? `Tài xế ${liveOrder?.driver?.name} đang xử lý đơn của bạn.`
+    : "Đơn đã tạo thành công. Hệ thống đang tìm tài xế gần nhất.";
 
   return (
     <Page className="flex flex-col" style={{ background: "#fff" }}>
@@ -385,9 +500,9 @@ const CheckoutResultPage: FC = () => {
               Đặt đơn thành công
             </Text>
             <Text style={{ marginTop: 4, color: "var(--tm-text-secondary)", lineHeight: "22px" }}>
-              {localState?.localOrderMessage || "Quán đã nhận đơn. Bạn có thể theo dõi tài xế ngay bên dưới."}
+              {localState?.localOrderMessage || liveMessage}
             </Text>
-            {localState?.localOrderId && (
+            {orderCode && (
               <Text
                 size="xSmall"
                 style={{
@@ -400,13 +515,18 @@ const CheckoutResultPage: FC = () => {
                   fontWeight: 600,
                 }}
               >
-                Mã đơn: #{localState.localOrderId}
+                Mã đơn: #{orderCode}
               </Text>
             )}
           </div>
 
           {SHOW_TRACKING_MAP ? (
-            <OrderTrackingMap snapshot={trackingSnapshot} />
+            <OrderTrackingMap
+              snapshot={trackingSnapshot}
+              hasAssignedDriver={hasAssignedDriver}
+              driverName={liveOrder?.driver?.name || undefined}
+              orderStatus={status}
+            />
           ) : (
             <div
               className="tm-card"
@@ -419,21 +539,21 @@ const CheckoutResultPage: FC = () => {
               }}
             >
               <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-                🗺️ Tạm ẩn bản đồ theo dõi đơn hàng.
+                Tạm ẩn bản đồ theo dõi đơn hàng.
               </Text>
             </div>
           )}
 
-          {localState?.dispatchInfo && <DriverDispatchCard dispatchInfo={localState.dispatchInfo} />}
+          <DriverAssignmentCard order={liveOrder} />
 
           <div className="tm-card" style={{ marginTop: 12, padding: 14 }}>
             <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, color: "var(--tm-text-primary)" }}>
               Tiến trình đơn hàng
             </Text>
             <TrackingStep index={0} text="Đơn đã xác nhận" status="done" />
-            <TrackingStep index={1} text="Quán đang chuẩn bị món" status="active" />
-            <TrackingStep index={2} text="Tài xế đang đến quán" status="pending" />
-            <TrackingStep index={3} text="Đang giao đến bạn" status="pending" />
+            <TrackingStep index={1} text="Quán đang chuẩn bị món" status={stepPreparing} />
+            <TrackingStep index={2} text="Tài xế nhận đơn" status={stepDriver} />
+            <TrackingStep index={3} text="Đang giao đến bạn" status={stepDelivering} />
           </div>
         </Box>
       ) : isFailed ? (

@@ -228,7 +228,7 @@ const MenuSections: FC = () => {
   const personalItems: MenuItemData[] = [
     { icon: "👤", label: "Thông tin tài khoản", action: "account" },
     { icon: "📦", label: "Đơn hàng gần đây" },
-    { icon: "📍", label: "Địa chỉ đã lưu" },
+    { icon: "📍", label: "Địa chỉ cửa hàng" },
     { icon: "💳", label: "Phương thức thanh toán" },
   ];
 
@@ -255,8 +255,8 @@ const MenuSections: FC = () => {
     if (item.label === "Đơn hàng gần đây") {
       return () => navigate("/orders");
     }
-    if (item.label === "Địa chỉ đã lưu") {
-      return () => navigate("/addresses");
+    if (item.label === "Địa chỉ cửa hàng") {
+      return () => navigate("/settings");
     }
     return onClick;
   };

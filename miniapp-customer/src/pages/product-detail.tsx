@@ -9,8 +9,10 @@ import {
   ProductReviewStats,
 } from "services/backend";
 import { Product } from "types/product";
-import { cartState } from "state";
+import { cartState, locationState, remoteStoresState } from "state";
 import { calcFinalPrice } from "utils/product";
+import { useRecoilValueLoadable } from "recoil";
+import { calculateDistance } from "utils/location";
 
 const stars = (n: number) => "★".repeat(n) + "☆".repeat(5 - n);
 
@@ -37,6 +39,11 @@ const ProductDetailPage: FC = () => {
   const [cart, setCart] = useRecoilState(cartState);
   const [activeTab, setActiveTab] = useState<"info" | "reviews">("info");
 
+  const locationLoadable = useRecoilValueLoadable(locationState);
+  const location = locationLoadable.state === "hasValue" ? locationLoadable.contents : null;
+  const storesLoadable = useRecoilValueLoadable(remoteStoresState);
+  const stores = storesLoadable.state === "hasValue" ? storesLoadable.contents : [];
+
   const cartQty = cart.reduce((s, i) => s + i.quantity, 0);
 
   useEffect(() => {
@@ -51,13 +58,21 @@ const ProductDetailPage: FC = () => {
         setProduct(product);
         setReviews(reviews);
         setStats(reviewStats);
+        setLoading(false);
       })
-      .catch(() => setError("Không tải được thông tin sản phẩm"))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        setError("Không tải được thông tin sản phẩm");
+        setLoading(false);
+      });
   }, [productId]);
 
   const addToCart = useCallback(() => {
     if (!product) return;
+    const session = localStorage.getItem("zaui_food_session");
+    if (!session) {
+      navigate("/login");
+      return;
+    }
     setCart((prev) => {
       const existing = prev.find((i) => i.product.id === product.id);
       if (existing) {
@@ -73,7 +88,7 @@ const ProductDetailPage: FC = () => {
       type: "success",
       text: `Đã thêm ${product.name}`,
     });
-  }, [product, setCart, snackbar]);
+  }, [product, setCart, snackbar, navigate]);
 
   if (loading) {
     return (
@@ -104,12 +119,12 @@ const ProductDetailPage: FC = () => {
         ) : (
           <div style={{ width: "100%", height: 220, background: "linear-gradient(135deg, #f0fdf4, #ecfeff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56 }}>🍽️</div>
         )}
-        <button onClick={() => window.history.back()} style={{
-          position: "absolute", top: 12, left: 12,
-          background: "rgba(0,0,0,0.45)", border: "none", color: "#fff",
-          borderRadius: "50%", width: 34, height: 34, fontSize: 16, cursor: "pointer",
-          backdropFilter: "blur(4px)",
+        <button className="tm-interactive tm-glass" onClick={() => window.history.back()} style={{
+          position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 44px)", left: 12,
+          border: "none", color: "var(--tm-text-primary)",
+          borderRadius: "50%", width: 36, height: 36, fontSize: 18, cursor: "pointer",
           display: "flex", alignItems: "center", justifyContent: "center",
+          zIndex: 100,
         }}>←</button>
         {hasSale && (
           <span style={{ position: "absolute", top: 12, right: 12, background: "#ef4444", color: "#fff", fontSize: 12, fontWeight: 700, padding: "4px 10px", borderRadius: 6 }}>
@@ -135,7 +150,11 @@ const ProductDetailPage: FC = () => {
         </div>
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "var(--tm-text-secondary)", display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ color: "#ffb800" }}>★</span> {(product.rating ?? 0).toFixed(1)} ({stats.totalReviews} đánh giá)
+            {stats.totalReviews > 0 ? (
+              <><span style={{ color: "#ffb800" }}>★</span> {(product.rating ?? 0).toFixed(1)} ({stats.totalReviews} đánh giá)</>
+            ) : (
+              <span style={{ color: "var(--tm-primary)", fontWeight: 600 }}>🆕 Mới</span>
+            )}
           </span>
           <span style={{ fontSize: 12, color: "var(--tm-text-secondary)" }}>🛒 Đã bán {product.sold ?? 0}</span>
           <span style={{ fontSize: 12, color: "var(--tm-text-secondary)" }}>🕐 {product.eta ?? "20-30 phút"}</span>
@@ -177,12 +196,28 @@ const ProductDetailPage: FC = () => {
           <Text style={{ fontSize: 13, color: "var(--tm-text-secondary)", lineHeight: 1.6 }}>
             {product.description || "Chưa có mô tả cho sản phẩm này."}
           </Text>
-          {product.deliveryFee !== undefined && (
-            <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
-              <span style={{ fontSize: 14 }}>🚚</span>
-              <Text style={{ fontSize: 13, color: "var(--tm-text-secondary)" }}>Phí giao: <Text style={{ fontWeight: 600, color: "var(--tm-primary)" }}><DisplayPrice>{product.deliveryFee}</DisplayPrice></Text></Text>
-            </div>
-          )}
+          {(() => {
+            let fee = product.deliveryFee ?? 15000;
+            // Attempt to calculate dynamic fee if we can find the store
+            const store = stores.find(s => String(s.id) === String(product.storeId));
+            if (store && location) {
+              const distanceKm = calculateDistance(
+                Number(location.latitude), Number(location.longitude), store.lat, store.long
+              );
+              if (distanceKm > 3) {
+                fee = 15000 + (Math.ceil(distanceKm - 3) * 5000);
+              } else {
+                fee = 15000;
+              }
+            }
+            
+            return (
+              <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 14 }}>🚚</span>
+                <Text style={{ fontSize: 13, color: "var(--tm-text-secondary)" }}>Phí giao: <Text style={{ fontWeight: 600, color: "var(--tm-primary)" }}>Từ <DisplayPrice>{fee}</DisplayPrice></Text></Text>
+              </div>
+            );
+          })()}
         </div>
       ) : (
         <div style={{ padding: "0", margin: "8px 0" }}>
@@ -250,30 +285,29 @@ const ProductDetailPage: FC = () => {
       )}
 
       {/* Fixed Bottom Add to Cart */}
-      <div style={{
+      <div className="tm-glass tm-safe-bottom animate-slide-up" style={{
         position: "fixed", bottom: 0, left: 0, right: 0,
-        background: "#fff", borderTop: "1px solid var(--tm-border)",
-        padding: "10px 16px", paddingBottom: "max(10px, env(safe-area-inset-bottom))",
+        padding: "12px 16px",
         display: "flex", alignItems: "center", gap: 12,
-        zIndex: 100,
+        zIndex: 100, borderTopLeftRadius: 16, borderTopRightRadius: 16,
       }}>
         <div style={{ flex: 1 }}>
-          <Text style={{ fontSize: 10, color: "var(--tm-text-muted)" }}>Giá</Text>
-          <Text style={{ fontSize: 18, fontWeight: 800, color: "var(--tm-primary)" }}><DisplayPrice>{finalPrice}</DisplayPrice></Text>
+          <Text style={{ fontSize: 11, color: "var(--tm-text-secondary)" }}>Tạm tính</Text>
+          <Text style={{ fontSize: 18, fontWeight: 800, color: "var(--tm-primary)", lineHeight: 1 }}><DisplayPrice>{finalPrice}</DisplayPrice></Text>
         </div>
-        <button onClick={addToCart} style={{
-          padding: "11px 28px", borderRadius: 10, border: "none",
-          background: "linear-gradient(135deg, var(--tm-primary), #00c97d)",
+        <button className="tm-interactive" onClick={addToCart} style={{
+          padding: "12px 24px", borderRadius: 12, border: "none",
+          background: "linear-gradient(135deg, var(--tm-primary), var(--tm-primary-dark))",
           color: "#fff", fontSize: 14, fontWeight: 700, cursor: "pointer",
-          boxShadow: "0 4px 12px rgba(0,169,109,0.3)",
+          boxShadow: "var(--tm-shadow-floating)",
           display: "flex", alignItems: "center", gap: 6,
         }}>
-          🛒 Thêm vào giỏ
+          + Thêm
         </button>
         {cartQty > 0 && (
-          <button onClick={() => navigate("/cart")} style={{
-            padding: "11px 16px", borderRadius: 10, border: "1px solid var(--tm-primary)",
-            background: "transparent", color: "var(--tm-primary)", fontSize: 13, fontWeight: 600, cursor: "pointer",
+          <button className="tm-interactive" onClick={() => navigate("/cart")} style={{
+            padding: "12px 16px", borderRadius: 12, border: "none",
+            background: "var(--tm-primary-light)", color: "var(--tm-primary)", fontSize: 14, fontWeight: 700, cursor: "pointer",
           }}>
             Giỏ ({cartQty})
           </button>

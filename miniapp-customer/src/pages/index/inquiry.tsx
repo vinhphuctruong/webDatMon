@@ -54,6 +54,13 @@ export const Inquiry: FC = () => {
             {filter.label}
           </button>
         ))}
+        <button
+          className="tm-chip"
+          style={{ background: "var(--tm-primary-light)", color: "var(--tm-primary)", fontWeight: 700 }}
+          onClick={() => navigate("/nearby-stores-map")}
+        >
+          🗺️ Bản đồ quán
+        </button>
       </div>
     </Box>
   );

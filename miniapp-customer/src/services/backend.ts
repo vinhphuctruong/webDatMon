@@ -1,7 +1,7 @@
 import { Cart } from "types/cart";
 import { Category } from "types/category";
 import { Product, Variant } from "types/product";
-import { THU_DAU_MOT_CENTER } from "utils/location";
+import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
 import { apiFetch } from "./api";
 
 interface ApiCategory {
@@ -84,14 +84,39 @@ interface ApiCartSummary {
   total: number;
 }
 
-interface ApiOrder {
+export interface ApiOrderDriver {
+  id: string;
+  name: string;
+  phone?: string | null;
+  vehicleType?: string | null;
+  licensePlate?: string | null;
+}
+
+export interface ApiOrder {
   id: string;
   status: string;
+  driverId?: string | null;
+  driver?: ApiOrderDriver | null;
   total: number;
+  deliveryFee?: number;
+  paymentMethod?: "SEPAY_QR" | "COD" | string;
   estimatedDeliveryAt?: string;
+  deliveryAddress?: {
+    receiverName?: string;
+    phone?: string;
+    street?: string;
+    ward?: string;
+    district?: string;
+    city?: string;
+    latitude?: number;
+    longitude?: number;
+  } | null;
   store: {
     id: string;
     name: string;
+    address?: string;
+    latitude?: number | null;
+    longitude?: number | null;
   };
   items: {
     id: string;
@@ -220,17 +245,20 @@ export async function fetchProductDetail(productId: string): Promise<ProductDeta
 export async function fetchStores() {
   const response = await apiFetch<{ data: ApiStore[] }>("/stores?limit=50");
 
-  return response.data.map((store, index) => ({
-    id: index + 1,
-    backendId: store.id,
-    name: store.name,
-    address: store.address,
-    phone: store.phone || `0274 3622 ${String(800 + index + 1)}`,
-    lat: store.latitude ?? THU_DAU_MOT_CENTER.lat + index * 0.005,
-    long: store.longitude ?? THU_DAU_MOT_CENTER.lng + index * 0.005,
-    rating: store.rating,
-    eta: `${store.etaMinutesMin}-${store.etaMinutesMax} phút`,
-  }));
+  return response.data.map((store, index) => {
+    const normalizedCoordinates = normalizeStoredCoordinates(store.latitude, store.longitude);
+    return {
+      id: index + 1,
+      backendId: store.id,
+      name: store.name,
+      address: store.address,
+      phone: store.phone || `0274 3622 ${String(800 + index + 1)}`,
+      lat: normalizedCoordinates?.lat ?? THU_DAU_MOT_CENTER.lat + index * 0.005,
+      long: normalizedCoordinates?.lng ?? THU_DAU_MOT_CENTER.lng + index * 0.005,
+      rating: store.rating,
+      eta: `${store.etaMinutesMin}-${store.etaMinutesMax} phút`,
+    };
+  });
 }
 
 export interface StoreDetail {
@@ -345,8 +373,16 @@ export async function createOrder(payload?: CreateOrderPayload) {
 }
 
 export async function fetchOrders(status?: string) {
-  const url = status ? `/orders?status=${status}&limit=50` : `/orders?limit=50`;
+  const t = Date.now();
+  const url = status ? `/orders?status=${status}&limit=50&_t=${t}` : `/orders?limit=50&_t=${t}`;
   const response = await apiFetch<{ data: ApiOrder[] }>(url, undefined, { auth: true });
+  return response.data;
+}
+
+export async function fetchOrderById(orderId: string) {
+  const response = await apiFetch<{ data: ApiOrder }>(`/orders/${orderId}`, undefined, {
+    auth: true,
+  });
   return response.data;
 }
 
@@ -378,4 +414,17 @@ export async function getMyStoreApplication() {
     }
     throw error;
   }
+}
+
+export async function fetchVouchers() {
+  const res = await apiFetch<{ data: any[] }>('/vouchers', undefined, { auth: true });
+  return res.data || [];
+}
+
+export async function validateVoucher(code: string, subtotal: number) {
+  const res = await apiFetch<{ data: any }>('/vouchers/validate', {
+    method: 'POST',
+    body: JSON.stringify({ code, subtotal }),
+  }, { auth: true });
+  return res.data;
 }

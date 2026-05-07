@@ -203,44 +203,57 @@ const RegisterPage: FC = () => {
   ].filter(Boolean).length;
 
   return (
-    <Page className="page-with-bg" style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <Box style={{ flex: 1, padding: 24, paddingBottom: 100 }}>
-        {/* Header */}
-        <div style={{ marginBottom: 20 }}>
-          <div
-            className="tm-link-back"
-            onClick={() => {
-              if (step === "otp") setStep("images");
-              else if (step === "images") setStep("info");
-              else if (step === "done") navigate("/login");
-              else navigate("/login");
-            }}
-          >
-            ← {step === "done" ? "Về đăng nhập" : "Quay lại"}
+    <Page className="page-with-bg pb-20">
+      <Box
+        p={4}
+        className="tm-content-pad tm-page-safe-top"
+        style={{
+          background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
+          paddingBottom: 42,
+        }}
+      >
+        <button
+          onClick={() => {
+            if (step === "otp") setStep("images");
+            else if (step === "images") setStep("info");
+            else if (step === "done") navigate("/login");
+            else navigate("/login");
+          }}
+          style={{ border: "none", background: "transparent", color: "#fff", fontWeight: 700, marginBottom: 8 }}
+        >
+          ← {step === "done" ? "Về đăng nhập" : "Quay lại"}
+        </button>
+        <Text.Title style={{ color: "#fff", fontSize: 22 }}>
+          {step === "info" && "Đăng ký Tài xế"}
+          {step === "images" && "Tải ảnh xác minh"}
+          {step === "otp" && "Xác nhận Email"}
+          {step === "done" && "Đã nộp đơn!"}
+        </Text.Title>
+        {step !== "done" ? (
+          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+            <div style={{ flex: 1, height: 4, borderRadius: 3, background: "rgba(255,255,255,0.95)" }} />
+            <div
+              style={{
+                flex: 1,
+                height: 4,
+                borderRadius: 3,
+                background:
+                  step === "images" || step === "otp" ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)",
+              }}
+            />
+            <div
+              style={{
+                flex: 1,
+                height: 4,
+                borderRadius: 3,
+                background: step === "otp" ? "rgba(255,255,255,0.95)" : "rgba(255,255,255,0.35)",
+              }}
+            />
           </div>
-          <Text.Title style={{ fontSize: 22, fontWeight: 800 }}>
-            {step === "info" && "Đăng ký Tài xế"}
-            {step === "images" && "Tải ảnh xác minh"}
-            {step === "otp" && "Xác nhận Email"}
-            {step === "done" && "Đã nộp đơn!"}
-          </Text.Title>
-          {step !== "done" && (
-            <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-              <div style={{
-                flex: 1, height: 4, borderRadius: 2,
-                background: "var(--tm-primary)",
-              }} />
-              <div style={{
-                flex: 1, height: 4, borderRadius: 2,
-                background: step === "images" || step === "otp" ? "var(--tm-primary)" : "var(--tm-border)",
-              }} />
-              <div style={{
-                flex: 1, height: 4, borderRadius: 2,
-                background: step === "otp" ? "var(--tm-primary)" : "var(--tm-border)",
-              }} />
-            </div>
-          )}
-        </div>
+        ) : null}
+      </Box>
+
+      <Box p={4} className="tm-content-pad" style={{ marginTop: -24 }}>
 
         {/* Step 1: Info */}
         {step === "info" && (

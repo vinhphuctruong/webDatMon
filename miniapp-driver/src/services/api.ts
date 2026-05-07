@@ -51,13 +51,42 @@ const API_BASE_URL = resolveApiBaseUrl();
 
 let cachedSession: Session | null = null;
 
-function readSession(): Session | null {
+import { getStorage } from "zmp-sdk";
+
+function readSessionSync(): Session | null {
   if (cachedSession) return cachedSession;
   try {
     const raw = localStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Session;
     if (!parsed.accessToken || !parsed.refreshToken) return null;
+    cachedSession = parsed;
+    return parsed;
+  } catch (_error) {
+    return null;
+  }
+}
+
+export async function readSession(): Promise<Session | null> {
+  if (cachedSession) return cachedSession;
+
+  try {
+    let raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) {
+      try {
+        const result = await getStorage({ keys: [SESSION_KEY] });
+        if (result && result[SESSION_KEY]) {
+          raw = String(result[SESSION_KEY]);
+          localStorage.setItem(SESSION_KEY, raw);
+        }
+      } catch (e) {}
+    }
+
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Session;
+    if (!parsed.accessToken || !parsed.refreshToken) return null;
+    
     cachedSession = parsed;
     return parsed;
   } catch (_error) {
@@ -121,7 +150,7 @@ async function refreshAccessToken(current: Session): Promise<Session> {
 }
 
 async function ensureSession() {
-  const existing = readSession();
+  const existing = await readSession();
   if (existing) return existing;
   throw new ApiError("Vui lòng đăng nhập để tiếp tục", 401);
 }
@@ -233,5 +262,5 @@ export async function resetPasswordWithOtp(payload: { email: string; otpCode: st
 }
 
 export function hasSession(): boolean {
-  return !!readSession();
+  return !!readSessionSync();
 }

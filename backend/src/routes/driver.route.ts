@@ -14,10 +14,18 @@ import { requireAuth, requireRole } from "../middlewares/auth";
 import { HttpError } from "../lib/http-error";
 import { StatusCodes } from "http-status-codes";
 import { ensureDriverWallets, holdWalletAmount, settleDeliveredOrder } from "../services/finance";
+import { haversineDistanceKm } from "../services/delivery-fee";
+import { calculateRouteWithVietmap } from "../services/vietmap.service";
+import {
+  getFreshDriverPresence,
+  listFreshDriverPresences,
+  setDriverOnlineStatus,
+  updateDriverPresence,
+} from "../services/driver-presence";
+import { acceptDispatch, rejectDispatch } from "../services/dispatch-engine";
 
 const driverRouter = Router();
 const claimableStatuses: OrderStatus[] = [
-  OrderStatus.PENDING,
   OrderStatus.CONFIRMED,
   OrderStatus.PREPARING,
 ];
@@ -31,6 +39,14 @@ driverRouter.use(requireAuth, requireRole(UserRole.DRIVER));
 
 const updateAvailabilitySchema = z.object({
   isOnline: z.boolean(),
+});
+const updateLocationSchema = z.object({
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+});
+const availableOrdersQuerySchema = z.object({
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
 });
 
 driverRouter.get(
@@ -71,17 +87,86 @@ driverRouter.patch(
       },
     });
 
+    setDriverOnlineStatus(req.user!.id, payload.isOnline);
+
     res.json({ data: updated });
+  }),
+);
+
+driverRouter.patch(
+  "/location",
+  asyncHandler(async (req, res) => {
+    const payload = updateLocationSchema.parse(req.body);
+
+    const profile = await prisma.driverProfile.findUnique({
+      where: { userId: req.user!.id },
+      select: { isOnline: true },
+    });
+
+    if (!profile) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy hồ sơ tài xế");
+    }
+
+    const presence = updateDriverPresence(req.user!.id, {
+      latitude: payload.latitude,
+      longitude: payload.longitude,
+      isOnline: profile.isOnline,
+    });
+
+    res.json({
+      data: {
+        latitude: presence.latitude,
+        longitude: presence.longitude,
+        isOnline: presence.isOnline,
+        updatedAt: new Date(presence.updatedAt).toISOString(),
+      },
+    });
   }),
 );
 
 driverRouter.get(
   "/orders/available",
-  asyncHandler(async (_req, res) => {
+  asyncHandler(async (req, res) => {
+    const query = availableOrdersQuerySchema.parse(req.query);
+    const profile = await prisma.driverProfile.findUnique({
+      where: { userId: req.user!.id },
+      select: { isOnline: true },
+    });
+
+    if (!profile?.isOnline) {
+      return res.json({ data: [] });
+    }
+
+    const hasLiveLocation = query.latitude != null && query.longitude != null;
+
+    if (hasLiveLocation) {
+      updateDriverPresence(req.user!.id, {
+        latitude: query.latitude!,
+        longitude: query.longitude!,
+        isOnline: profile.isOnline,
+      });
+    }
+
+    const requesterPresence = hasLiveLocation
+      ? {
+          latitude: query.latitude!,
+          longitude: query.longitude!,
+        }
+      : getFreshDriverPresence(req.user!.id);
+
+    // Only show orders in BROADCAST mode (fallback)
+    // Exclusive dispatch orders are sent via socket, not polled
+    const broadcastOrderIds = await prisma.orderDispatch.findMany({
+      where: { status: "BROADCAST" },
+      select: { orderId: true },
+    });
+    const broadcastIds = new Set(broadcastOrderIds.map((d) => d.orderId));
+
+    // Also show orders that have NO dispatch record (legacy/orphan)
     const available = await prisma.order.findMany({
       where: {
         status: {
-          in: [OrderStatus.PENDING, OrderStatus.CONFIRMED, OrderStatus.PREPARING],
+          in: [OrderStatus.CONFIRMED, OrderStatus.PREPARING],
         },
         driverId: null,
         OR: [
@@ -98,12 +183,36 @@ driverRouter.get(
         store: true,
         items: true,
         payment: true,
+        dispatch: { select: { status: true } },
       },
       orderBy: { createdAt: "asc" },
-      take: 50,
+      take: 200,
     });
 
-    res.json({ data: available });
+    // Filter: only broadcast or no-dispatch orders
+    const broadcastOrders = available.filter(
+      (order) => !order.dispatch || broadcastIds.has(order.id),
+    );
+
+    const payload = broadcastOrders.slice(0, 50).map((order) => {
+      let distanceToStoreKm: number | null = null;
+      if (requesterPresence && order.store.latitude != null && order.store.longitude != null) {
+        distanceToStoreKm = haversineDistanceKm(
+          requesterPresence.latitude,
+          requesterPresence.longitude,
+          order.store.latitude,
+          order.store.longitude,
+        );
+      }
+      return {
+        ...order,
+        dispatch: undefined,
+        distanceToStoreKm:
+          distanceToStoreKm == null ? null : Number(distanceToStoreKm.toFixed(2)),
+      };
+    });
+
+    res.json({ data: payload });
   }),
 );
 
@@ -124,6 +233,116 @@ driverRouter.get(
     });
 
     res.json({ data: myOrders });
+  }),
+);
+
+// ── Smart Dispatch: Accept exclusive offer ──────────────────────
+driverRouter.post(
+  "/orders/:orderId/accept-dispatch",
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const driverId = req.user!.id;
+
+    await acceptDispatch(orderId, driverId);
+
+    // Now claim the order (same logic as claim)
+    const profile = await prisma.driverProfile.findUnique({
+      where: { userId: driverId },
+      select: { isOnline: true },
+    });
+
+    if (!profile?.isOnline) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Bạn phải bật trạng thái online để nhận đơn");
+    }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const order = await tx.order.findUnique({
+        where: { id: orderId },
+        select: {
+          id: true,
+          driverId: true,
+          status: true,
+          paymentMethod: true,
+          paymentStatus: true,
+          codHoldStatus: true,
+          merchantPayout: true,
+          platformRevenue: true,
+        },
+      });
+
+      if (!order) {
+        throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+      }
+
+      if (order.driverId && order.driverId !== driverId) {
+        throw new HttpError(StatusCodes.CONFLICT, "Đơn hàng đã được tài xế khác nhận");
+      }
+
+      if (!claimableStatuses.includes(order.status)) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng không sẵn sàng để nhận");
+      }
+
+      if (
+        order.paymentMethod === PaymentMethod.SEPAY_QR &&
+        order.paymentStatus !== PaymentStatus.SUCCEEDED
+      ) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Chưa thanh toán online cho đơn này");
+      }
+
+      if (order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.NONE) {
+        const { creditWallet } = await ensureDriverWallets(tx, driverId);
+        const requiredCredit = order.merchantPayout + order.platformRevenue;
+        if (creditWallet.availableBalance < requiredCredit) {
+          throw new HttpError(
+            StatusCodes.BAD_REQUEST,
+            `Số dư ví tín dụng không đủ. Cần ít nhất ${requiredCredit} VND`,
+          );
+        }
+
+        if (order.merchantPayout > 0) {
+          await holdWalletAmount(tx, {
+            walletId: creditWallet.id,
+            type: WalletTransactionType.COD_HOLD,
+            amount: order.merchantPayout,
+            orderId: order.id,
+            note: "Hold driver credit wallet for COD merchant settlement",
+          });
+        }
+      }
+
+      await tx.order.update({
+        where: { id: orderId },
+        data: {
+          driverId,
+          status: OrderStatus.PICKED_UP,
+          codHoldAmount:
+            order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.NONE
+              ? order.merchantPayout
+              : undefined,
+          codHoldStatus:
+            order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.NONE
+              ? CodHoldStatus.HELD
+              : undefined,
+        },
+      });
+
+      return tx.order.findUniqueOrThrow({
+        where: { id: orderId },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    res.json({ data: updated });
+  }),
+);
+
+// ── Smart Dispatch: Reject exclusive offer ──────────────────────
+driverRouter.post(
+  "/orders/:orderId/reject-dispatch",
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    await rejectDispatch(orderId, req.user!.id);
+    res.json({ message: "Đã từ chối đơn hàng" });
   }),
 );
 

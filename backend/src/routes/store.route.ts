@@ -54,6 +54,8 @@ const managerUpdateStoreSchema = z.object({
   address: z.string().min(4).max(300).optional(),
   etaMinutesMin: z.coerce.number().int().min(5).max(120).optional(),
   etaMinutesMax: z.coerce.number().int().min(5).max(180).optional(),
+  latitude: z.coerce.number().min(-90).max(90).optional(),
+  longitude: z.coerce.number().min(-180).max(180).optional(),
   isOpen: z.boolean().optional(),
 });
 
@@ -123,6 +125,15 @@ storeRouter.patch(
       );
     }
 
+    const hasLatitude = payload.latitude !== undefined;
+    const hasLongitude = payload.longitude !== undefined;
+    if (hasLatitude !== hasLongitude) {
+      throw new HttpError(
+        StatusCodes.BAD_REQUEST,
+        "latitude and longitude must be provided together",
+      );
+    }
+
     const updated = await prisma.store.update({
       where: { id: store.id },
       data: payload,
@@ -168,6 +179,8 @@ storeRouter.get(
         id: true,
         name: true,
         address: true,
+        latitude: true,
+        longitude: true,
         isOpen: true,
         rating: true,
         etaMinutesMin: true,

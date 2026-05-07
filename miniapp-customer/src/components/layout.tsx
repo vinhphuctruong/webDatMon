@@ -16,6 +16,7 @@ import AccountPage from "pages/account";
 import LoginPage from "pages/login";
 const StoreDetailPage = React.lazy(() => import("pages/store-detail"));
 const ProductDetailPage = React.lazy(() => import("pages/product-detail"));
+const NearbyStoresMapPage = React.lazy(() => import("pages/nearby-stores-map"));
 import { getSystemInfo } from "zmp-sdk";
 import { ScrollRestoration } from "./scroll-restoration";
 import { useHandlePayment, useSyncBackendState } from "hooks";
@@ -67,6 +68,7 @@ export const Layout: FC = () => {
               <Route path="/result" element={<CheckoutResultPage />}></Route>
               <Route path="/store" element={<StoreDetailPage />}></Route>
               <Route path="/product" element={<ProductDetailPage />}></Route>
+              <Route path="/nearby-stores-map" element={<NearbyStoresMapPage />}></Route>
             </Routes>
           </Suspense>
         </ErrorBoundary>
