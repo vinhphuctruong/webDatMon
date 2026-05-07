@@ -18,7 +18,6 @@ import RegisterAccountPage from "../pages/register-account";
 import ApplicationStatusPage from "../pages/application-status";
 import ForgotPasswordPage from "../pages/forgot-password";
 import { ScrollRestoration } from "./scroll-restoration";
-import { useSyncBackendState } from "hooks";
 import { ErrorBoundary } from "./error-boundary";
 
 const statusBarHeight = window.ZaloJavaScriptInterface?.getStatusBarHeight?.() ?? 0;
@@ -33,8 +32,6 @@ document.body.style.setProperty("--zaui-safe-area-inset-top", `${resolvedSafeTop
 document.body.style.setProperty("--tm-safe-area-inset-top", `${resolvedSafeTop}px`);
 
 export const Layout: FC = () => {
-  useSyncBackendState();
-
   return (
     <Box flex flexDirection="column" className="h-screen">
       <ScrollRestoration />
@@ -52,20 +49,23 @@ export const Layout: FC = () => {
           >
             <IncomingStoreOrderAlert />
             <Routes>
-              <Route path="/" element={<HomePage />}></Route>
-              <Route path="/orders" element={<OrdersPage />}></Route>
-              <Route path="/order-detail/:id" element={<OrderDetailPage />}></Route>
-              <Route path="/menu" element={<MenuPage />}></Route>
-              <Route path="/product-form" element={<ProductFormPage />}></Route>
-              <Route path="/wallet" element={<WalletPage />}></Route>
-              <Route path="/settings" element={<SettingsPage />}></Route>
-              <Route path="/profile" element={<ProfilePage />}></Route>
-              <Route path="/login" element={<LoginPage />}></Route>
-              <Route path="/welcome" element={<WelcomePage />}></Route>
-              <Route path="/register" element={<RegisterPage />}></Route>
-              <Route path="/register-account" element={<RegisterAccountPage />}></Route>
-              <Route path="/application-status" element={<ApplicationStatusPage />}></Route>
-              <Route path="/forgot-password" element={<ForgotPasswordPage />}></Route>
+              {/* Auth routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/welcome" element={<WelcomePage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/register-account" element={<RegisterAccountPage />} />
+              <Route path="/application-status" element={<ApplicationStatusPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+
+              {/* Protected routes */}
+              <Route path="/" element={<HomePage />} />
+              <Route path="/orders" element={<OrdersPage />} />
+              <Route path="/order-detail/:id" element={<OrderDetailPage />} />
+              <Route path="/menu" element={<MenuPage />} />
+              <Route path="/product-form" element={<ProductFormPage />} />
+              <Route path="/wallet" element={<WalletPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
             </Routes>
           </Suspense>
         </ErrorBoundary>

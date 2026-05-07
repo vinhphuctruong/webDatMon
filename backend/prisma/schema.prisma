@@ -175,6 +175,7 @@ model Store {
   etaMinutesMin Int       @default(20)
   etaMinutesMax Int       @default(35)
   isOpen        Boolean   @default(true)
+  autoAcceptOrders Boolean @default(false)
   managerId     String?   @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

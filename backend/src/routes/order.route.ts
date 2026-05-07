@@ -24,6 +24,7 @@ import { calculateUnitPrice } from "../utils/pricing";
 import { estimateDeliveryFee } from "../services/delivery-fee";
 import { validateVoucher } from "./voucher.route";
 import { startDispatch } from "../services/dispatch-engine";
+import { getIO } from "../socket";
 
 const orderRouter = Router();
 
@@ -265,6 +266,11 @@ orderRouter.post(
     }
 
     const selectedStore = cartItems[0].product.store;
+    const shouldAutoAcceptOrders = selectedStore.autoAcceptOrders === true;
+    const canAutoPromoteAtCreation =
+      payload.paymentMethod === PaymentMethod.COD
+      || (payload.paymentMethod === PaymentMethod.SEPAY_QR && payload.autoConfirmPayment);
+    const shouldConfirmOnCreate = shouldAutoAcceptOrders && canAutoPromoteAtCreation;
 
     if (!selectedStore.isOpen) {
       throw new HttpError(StatusCodes.BAD_REQUEST, "Cửa hàng hiện đang đóng cửa, không thể nhận đơn");
@@ -388,7 +394,7 @@ orderRouter.post(
           userId,
           storeId: selectedStore.id,
           addressId,
-          status: payload.paymentMethod === PaymentMethod.COD ? OrderStatus.CONFIRMED : OrderStatus.PENDING,
+          status: shouldConfirmOnCreate ? OrderStatus.CONFIRMED : OrderStatus.PENDING,
           paymentMethod: payload.paymentMethod,
           paymentStatus: PaymentStatus.PENDING,
           subtotal,
@@ -431,6 +437,7 @@ orderRouter.post(
         await confirmCashlessPayment(tx, {
           orderId: order.id,
           sepayTransactionId: createSePayReference("SEPAY-AUTO"),
+          promoteOrderStatus: shouldAutoAcceptOrders,
         });
       }
 
@@ -463,6 +470,13 @@ orderRouter.post(
     });
 
     const responseData = toOrderResponse(created);
+
+    try {
+      getIO().to(`store_${created.storeId}`).emit("new_order_to_store", responseData);
+    } catch (err) {
+      console.warn("[Socket] Unable to emit new_order_to_store", err);
+    }
+
     if (created.status === "CONFIRMED") {
       // Smart Dispatch: find best driver instead of broadcasting
       startDispatch(created.id).catch((err) => {
@@ -512,6 +526,12 @@ orderRouter.post(
         },
       });
     });
+
+    if (updated.status === OrderStatus.CONFIRMED) {
+      startDispatch(updated.id).catch((err) => {
+        console.error("[Dispatch] Failed to start dispatch for payment confirm", updated.id, err);
+      });
+    }
 
     res.json({ data: toOrderResponse(updated) });
   }),

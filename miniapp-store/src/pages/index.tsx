@@ -6,6 +6,9 @@ import { DashboardData } from "types/store";
 import { formatCurrency } from "utils/formatter";
 import { THU_DAU_MOT_CENTER, isWithinServiceArea, normalizeStoredCoordinates } from "utils/location";
 import { VietMapView } from "components/vietmap";
+import { useSetRecoilState, useRecoilValueLoadable } from "recoil";
+import { cartState, remoteStoresState, storesState } from "state";
+import { fetchCart } from "services/backend";
 
 const HomePage = () => {
   const [data, setData] = useState<DashboardData | null>(null);
@@ -13,10 +16,20 @@ const HomePage = () => {
   const { openSnackbar } = useSnackbar();
   const navigate = useNavigate();
 
+  // ── Backend sync — only runs after auth confirmed ──
+  const setCart = useSetRecoilState(cartState);
+  const setStores = useSetRecoilState(storesState);
+  const remoteStores = useRecoilValueLoadable(remoteStoresState);
+
   const loadData = async () => {
     try {
       const response = await fetchManagedStoreDashboard();
       setData(response.data);
+
+      // Auth succeeded → safe to sync backend data
+      fetchCart()
+        .then(setCart)
+        .catch((err) => console.warn("Sync cart failed", err));
     } catch (error: any) {
       if (error.status === 401 || error.message?.toLowerCase().includes("đăng nhập")) {
         navigate("/welcome", { replace: true });
@@ -35,6 +48,13 @@ const HomePage = () => {
       setLoading(false);
     }
   };
+
+  // Sync remote stores into local state (after auth)
+  useEffect(() => {
+    if (data && remoteStores.state === "hasValue") {
+      setStores(remoteStores.contents);
+    }
+  }, [data, remoteStores.state, remoteStores.contents]);
 
   useEffect(() => {
     loadData();

@@ -1,0 +1,2 @@
+ALTER TABLE "Store"
+ADD COLUMN "autoAcceptOrders" BOOLEAN NOT NULL DEFAULT false;

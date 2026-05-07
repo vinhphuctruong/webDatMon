@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Page, Box, Text, Tabs, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady } from "services/api";
+import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady, cancelOrder } from "services/api";
 import { formatCurrency } from "utils/formatter";
 
 const OrdersPage = () => {
@@ -29,11 +29,14 @@ const OrdersPage = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleAction = async (orderId: string, action: "CONFIRM" | "READY") => {
+  const handleAction = async (orderId: string, action: "CONFIRM" | "READY" | "REJECT") => {
     try {
       if (action === "CONFIRM") {
         await confirmStoreOrder(orderId);
         openSnackbar({ text: "Đã nhận đơn", type: "success" });
+      } else if (action === "REJECT") {
+        await cancelOrder(orderId, "Quán từ chối đơn");
+        openSnackbar({ text: "Đã từ chối đơn", type: "success" });
       } else {
         await markStoreOrderReady(orderId);
         openSnackbar({ text: "Đã báo sẵn sàng", type: "success" });
@@ -96,13 +99,22 @@ const OrdersPage = () => {
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {order.status === "PENDING" && (
-                    <button 
-                      className="tm-interactive"
-                      onClick={(e) => { e.stopPropagation(); handleAction(order.id, "CONFIRM"); }}
-                      style={{ flex: "1 1 auto", minWidth: 100, padding: "12px", borderRadius: 12, background: "linear-gradient(135deg, var(--tm-primary), var(--tm-primary-dark))", color: "#fff", fontWeight: 700, border: "none", boxShadow: "var(--tm-shadow-floating)" }}
-                    >
-                      Nhận đơn
-                    </button>
+                    <>
+                      <button 
+                        className="tm-interactive"
+                        onClick={(e) => { e.stopPropagation(); handleAction(order.id, "REJECT"); }}
+                        style={{ flex: "1 1 auto", minWidth: 100, padding: "12px", borderRadius: 12, background: "#fff1f2", color: "#e11d48", fontWeight: 700, border: "1px solid #fecdd3" }}
+                      >
+                        Từ chối
+                      </button>
+                      <button 
+                        className="tm-interactive"
+                        onClick={(e) => { e.stopPropagation(); handleAction(order.id, "CONFIRM"); }}
+                        style={{ flex: "1 1 auto", minWidth: 100, padding: "12px", borderRadius: 12, background: "linear-gradient(135deg, var(--tm-primary), var(--tm-primary-dark))", color: "#fff", fontWeight: 700, border: "none", boxShadow: "var(--tm-shadow-floating)" }}
+                      >
+                        Nhận đơn
+                      </button>
+                    </>
                   )}
                   {order.status === "CONFIRMED" && (
                     <button 

@@ -52,6 +52,12 @@ export async function rejectDispatchOrder(orderId: string) {
   }, { auth: true });
 }
 
+export async function pickupOrder(orderId: string) {
+  return apiFetch<{ data: any }>(`/drivers/orders/${orderId}/pickup`, {
+    method: "POST",
+  }, { auth: true });
+}
+
 export async function completeOrder(orderId: string) {
   return apiFetch<{ data: any }>(`/drivers/orders/${orderId}/complete`, {
     method: "POST",

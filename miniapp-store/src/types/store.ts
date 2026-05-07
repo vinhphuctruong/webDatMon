@@ -8,6 +8,7 @@ export interface StoreInfo {
   etaMinutesMax: number;
   latitude: number | null;
   longitude: number | null;
+  autoAcceptOrders?: boolean;
 }
 
 export interface DashboardSummary {

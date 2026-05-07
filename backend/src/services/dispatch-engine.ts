@@ -181,6 +181,14 @@ async function scoreCandidate(
 /* ── Start Dispatch ───────────────────────────────────── */
 
 export async function startDispatch(orderId: string) {
+  const existingDispatch = await prisma.orderDispatch.findUnique({
+    where: { orderId },
+    select: { id: true },
+  });
+  if (existingDispatch) {
+    return;
+  }
+
   const order = await prisma.order.findUnique({
     where: { id: orderId },
     include: { store: true, items: true, payment: true },

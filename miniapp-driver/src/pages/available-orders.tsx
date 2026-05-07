@@ -356,14 +356,15 @@ const AvailableOrdersPage: FC = () => {
             <button
               onClick={() => setIncomingOrder(null)}
               style={{
-                border: "1px solid var(--tm-border)",
+                border: "2px solid #fecdd3",
                 borderRadius: 10,
-                background: "#fff",
+                background: "#fff1f2",
+                color: "#e53935",
                 padding: "10px 12px",
-                fontWeight: 600,
+                fontWeight: 700,
               }}
             >
-              Để sau
+              Từ chối
             </button>
             <button
               onClick={() => {

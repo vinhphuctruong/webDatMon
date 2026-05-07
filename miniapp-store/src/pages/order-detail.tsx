@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useParams, useNavigate } from "react-router";
-import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady } from "services/api";
+import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady, cancelOrder } from "services/api";
 import { formatCurrency } from "utils/formatter";
 import { VietMapView, MapMarker } from "components/vietmap";
 import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
@@ -36,12 +36,17 @@ const OrderDetailPage = () => {
     loadOrder();
   }, [id]);
 
-  const handleAction = async (action: "CONFIRM" | "READY") => {
+  const handleAction = async (action: "CONFIRM" | "READY" | "REJECT") => {
     if (!order) return;
     try {
       if (action === "CONFIRM") {
         await confirmStoreOrder(order.id);
         openSnackbar({ text: "Đã nhận đơn", type: "success" });
+      } else if (action === "REJECT") {
+        await cancelOrder(order.id, "Quán từ chối đơn");
+        openSnackbar({ text: "Đã từ chối đơn", type: "success" });
+        navigate("/orders");
+        return;
       } else {
         await markStoreOrderReady(order.id);
         openSnackbar({ text: "Đã báo sẵn sàng", type: "success" });
@@ -192,8 +197,9 @@ const OrderDetailPage = () => {
               Báo món đã xong
             </button>
           )}
-          {(order.status === "PENDING" || order.status === "CONFIRMED") && (
+          {order.status === "PENDING" && (
             <button 
+              onClick={() => handleAction("REJECT")}
               style={{ padding: "14px", borderRadius: 12, background: "#fee2e2", color: "#ef4444", fontWeight: 700, border: "none", fontSize: 16 }}
             >
               Từ chối đơn

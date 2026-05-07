@@ -33,6 +33,7 @@ const adminCreateStoreSchema = z.object({
   latitude: z.coerce.number().optional(),
   longitude: z.coerce.number().optional(),
   isOpen: z.boolean().optional().default(true),
+  autoAcceptOrders: z.boolean().optional().default(false),
   managerName: z.string().min(2).max(120),
   managerEmail: z.string().email(),
   managerPassword: z.string().min(8).max(64),
@@ -47,6 +48,7 @@ const adminUpdateStoreSchema = z.object({
   latitude: z.coerce.number().optional(),
   longitude: z.coerce.number().optional(),
   isOpen: z.boolean().optional(),
+  autoAcceptOrders: z.boolean().optional(),
 });
 
 const managerUpdateStoreSchema = z.object({
@@ -57,6 +59,7 @@ const managerUpdateStoreSchema = z.object({
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),
   isOpen: z.boolean().optional(),
+  autoAcceptOrders: z.boolean().optional(),
 });
 
 function slugify(input: string): string {
@@ -182,6 +185,7 @@ storeRouter.get(
         latitude: true,
         longitude: true,
         isOpen: true,
+        autoAcceptOrders: true,
         rating: true,
         etaMinutesMin: true,
         etaMinutesMax: true,
@@ -439,7 +443,7 @@ storeRouter.get(
       where: { id: storeId },
       select: {
         id: true, name: true, address: true,
-        rating: true, isOpen: true,
+        rating: true, isOpen: true, autoAcceptOrders: true,
         etaMinutesMin: true, etaMinutesMax: true,
         latitude: true, longitude: true,
       },
@@ -510,6 +514,7 @@ storeRouter.post(
           latitude: payload.latitude,
           longitude: payload.longitude,
           isOpen: payload.isOpen,
+          autoAcceptOrders: payload.autoAcceptOrders,
           managerId: manager.id,
         },
         include: {

@@ -1,4 +1,4 @@
-import { PaymentStatus, UserRole, WalletTransactionType } from "@prisma/client";
+import { OrderStatus, PaymentStatus, UserRole, WalletTransactionType } from "@prisma/client";
 import { Router } from "express";
 import { StatusCodes } from "http-status-codes";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import {
   createSePayReference,
   creditWalletAvailable,
 } from "../services/finance";
+import { startDispatch } from "../services/dispatch-engine";
 
 const paymentRouter = Router();
 
@@ -24,6 +25,7 @@ paymentRouter.post(
   "/sepay/webhook",
   asyncHandler(async (req, res) => {
     const payload = webhookSchema.parse(req.body);
+    let confirmedOrderIdForDispatch: string | null = null;
 
     await prisma.$transaction(async (tx) => {
       const payment = await tx.orderPayment.findUnique({
@@ -49,11 +51,14 @@ paymentRouter.post(
           return;
         }
 
-        await confirmCashlessPayment(tx, {
+        const updatedOrder = await confirmCashlessPayment(tx, {
           orderId: payment.orderId,
           sepayTransactionId:
             payload.sepayTransactionId ?? payment.sepayTransactionId ?? createSePayReference("SEPAYTXN"),
         });
+        if (updatedOrder.status === OrderStatus.CONFIRMED) {
+          confirmedOrderIdForDispatch = updatedOrder.id;
+        }
         return;
       }
 
@@ -96,6 +101,16 @@ paymentRouter.post(
         },
       });
     });
+
+    if (confirmedOrderIdForDispatch) {
+      startDispatch(confirmedOrderIdForDispatch).catch((err) => {
+        console.error(
+          "[Dispatch] Failed to start dispatch after SePay webhook",
+          confirmedOrderIdForDispatch,
+          err,
+        );
+      });
+    }
 
     res.status(StatusCodes.NO_CONTENT).send();
   }),
@@ -185,6 +200,12 @@ paymentRouter.post(
         },
       });
     });
+
+    if (updatedOrder.status === OrderStatus.CONFIRMED) {
+      startDispatch(updatedOrder.id).catch((err) => {
+        console.error("[Dispatch] Failed to start dispatch after manual SePay confirm", updatedOrder.id, err);
+      });
+    }
 
     res.json({ data: updatedOrder });
   }),

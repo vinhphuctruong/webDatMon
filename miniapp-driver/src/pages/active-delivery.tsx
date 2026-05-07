@@ -1,6 +1,6 @@
 import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Modal, Page, Text, useSnackbar } from "zmp-ui";
-import { fetchMyOrders, completeOrder, reportFailedDelivery } from "services/driver-api";
+import { fetchMyOrders, completeOrder, pickupOrder, reportFailedDelivery } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
 import { VietMapView, MapMarker } from "components/vietmap";
 import {
@@ -70,8 +70,10 @@ const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
     return [(storeLng + customerLng) / 2, (storeLat + customerLat) / 2];
   }, [storeLng, customerLng, storeLat, customerLat, driverLat, driverLng]);
 
-  const targetLat = order.status === "PICKED_UP" ? customerLat : storeLat;
-  const targetLng = order.status === "PICKED_UP" ? customerLng : storeLng;
+  // Only navigate to customer when driver has actually picked up food
+  const isPickedUp = order.status === "PICKED_UP";
+  const targetLat = isPickedUp ? customerLat : storeLat;
+  const targetLng = isPickedUp ? customerLng : storeLng;
 
   const distance =
     driverLat && driverLng
@@ -80,7 +82,9 @@ const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
 
   const eta = calculateETA(distance);
 
-  const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${driverLat || ""},${driverLng || ""}&destination=${targetLat},${targetLng}`;
+  const googleMapsUrl = driverLat && driverLng
+    ? `https://www.google.com/maps/dir/?api=1&origin=${driverLat},${driverLng}&destination=${targetLat},${targetLng}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`;
 
   return (
     <div style={{ marginBottom: 10, position: "relative" }}>
@@ -107,23 +111,36 @@ const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
         }}
       >
         <div style={{ fontSize: 10, color: "var(--tm-text-secondary)", fontWeight: 600 }}>
-          ETA tới {order.status === "PICKED_UP" ? "khách" : "quán"}
+          ETA tới {isPickedUp ? "khách" : "quán"}
         </div>
         <div style={{ fontSize: 13, fontWeight: 800, color: "var(--tm-primary)" }}>{eta}</div>
         <div style={{ fontSize: 10, color: "var(--tm-text-tertiary)" }}>{displayDistance(distance)}</div>
       </div>
 
       <button
-        onClick={() => {
-          import("zmp-sdk/apis").then(({ openWebview }) => {
-            openWebview({
-              url: googleMapsUrl,
-              config: { style: "normal" },
-            });
-          }).catch(() => {
-            // Fallback nếu SDK không hỗ trợ
-            window.open(googleMapsUrl, "_blank");
-          });
+        onClick={async () => {
+          const url = `https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`;
+
+          // Try openOutApp first (may open in browser or native app)
+          try {
+            const { openOutApp } = await import("zmp-sdk/apis");
+            await openOutApp({ url });
+            return;
+          } catch (e1) {
+            console.warn("openOutApp failed:", e1);
+          }
+
+          // Fallback: openWebview
+          try {
+            const { openWebview } = await import("zmp-sdk/apis");
+            await openWebview({ url, config: { style: "normal" } });
+            return;
+          } catch (e2) {
+            console.warn("openWebview failed:", e2);
+          }
+
+          // Last resort
+          window.location.href = url;
         }}
         style={{
           width: "100%",
@@ -153,14 +170,17 @@ const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
 
 const statusLabels: Record<string, string> = {
   PICKED_UP: "Đang giao tới khách",
-  CONFIRMED: "Quán đã xác nhận",
+  CONFIRMED: "Đang tới quán lấy hàng",
   PREPARING: "Quán đang chuẩn bị",
+  DRIVER_ASSIGNED: "Đang tới quán lấy hàng",
+  ASSIGNED: "Đang tới quán lấy hàng",
 };
 
 const ActiveDeliveryPage: FC = () => {
   const [activeOrders, setActiveOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [completing, setCompleting] = useState<string | null>(null);
+  const [pickingUp, setPickingUp] = useState<string | null>(null);
   const [failModal, setFailModal] = useState<{ orderId: string; visible: boolean }>({ orderId: "", visible: false });
   const [failReason, setFailReason] = useState("");
   const [failing, setFailing] = useState(false);
@@ -198,6 +218,19 @@ const ActiveDeliveryPage: FC = () => {
       snackbar.openSnackbar({ type: "error", text: error.message || "Không thể hoàn tất đơn" });
     } finally {
       setCompleting(null);
+    }
+  };
+
+  const handlePickup = async (orderId: string) => {
+    setPickingUp(orderId);
+    try {
+      await pickupOrder(orderId);
+      snackbar.openSnackbar({ type: "success", text: "Đã lấy hàng từ quán, bắt đầu giao!" });
+      loadOrders();
+    } catch (error: any) {
+      snackbar.openSnackbar({ type: "error", text: error.message || "Không thể cập nhật trạng thái" });
+    } finally {
+      setPickingUp(null);
     }
   };
 
@@ -322,26 +355,49 @@ const ActiveDeliveryPage: FC = () => {
                   >
                     Thất bại
                   </button>
-                  <button
-                    className="tm-interactive animate-pulse-soft"
-                    onClick={() => handleComplete(order.id)}
-                    disabled={completing === order.id}
-                    style={{
-                      background: "linear-gradient(135deg, #10b981, #047857)",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: 14,
-                      padding: "12px",
-                      fontWeight: 800,
-                      fontSize: 16,
-                      boxShadow: "var(--tm-shadow-floating)",
-                      opacity: completing === order.id ? 0.7 : 1,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {completing === order.id ? "Đang xử lý..." : "Đã giao"}
-                  </button>
+                  {order.status === "PICKED_UP" ? (
+                    <button
+                      className="tm-interactive animate-pulse-soft"
+                      onClick={() => handleComplete(order.id)}
+                      disabled={completing === order.id}
+                      style={{
+                        background: "linear-gradient(135deg, #10b981, #047857)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 14,
+                        padding: "12px",
+                        fontWeight: 800,
+                        fontSize: 16,
+                        boxShadow: "var(--tm-shadow-floating)",
+                        opacity: completing === order.id ? 0.7 : 1,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {completing === order.id ? "Đang xử lý..." : "ĐÃ GIAO"}
+                    </button>
+                  ) : (
+                    <button
+                      className="tm-interactive animate-pulse-soft"
+                      onClick={() => handlePickup(order.id)}
+                      disabled={pickingUp === order.id}
+                      style={{
+                        background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                        color: "#fff",
+                        border: "none",
+                        borderRadius: 14,
+                        padding: "12px",
+                        fontWeight: 800,
+                        fontSize: 14,
+                        boxShadow: "var(--tm-shadow-floating)",
+                        opacity: pickingUp === order.id ? 0.7 : 1,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {pickingUp === order.id ? "Đang xử lý..." : "ĐÃ LẤY HÀNG"}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

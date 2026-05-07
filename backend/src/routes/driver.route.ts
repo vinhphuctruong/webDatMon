@@ -31,8 +31,6 @@ const claimableStatuses: OrderStatus[] = [
 ];
 const completableStatuses: OrderStatus[] = [
   OrderStatus.PICKED_UP,
-  OrderStatus.CONFIRMED,
-  OrderStatus.PREPARING,
 ];
 
 driverRouter.use(requireAuth, requireRole(UserRole.DRIVER));
@@ -314,7 +312,7 @@ driverRouter.post(
         where: { id: orderId },
         data: {
           driverId,
-          status: OrderStatus.PICKED_UP,
+          // Don't change status to PICKED_UP - driver needs to go to store first
           codHoldAmount:
             order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.NONE
               ? order.merchantPayout
@@ -422,7 +420,7 @@ driverRouter.post(
         where: { id: orderId },
         data: {
           driverId: req.user!.id,
-          status: OrderStatus.PICKED_UP,
+          // Don't change status to PICKED_UP - driver needs to go to store first
           codHoldAmount:
             order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.NONE
               ? order.merchantPayout
@@ -443,6 +441,45 @@ driverRouter.post(
         },
       });
     });
+
+    res.json({ data: updated });
+  }),
+);
+
+// ── Mark food picked up from store ──────────────────────────────
+driverRouter.post(
+  "/orders/:orderId/pickup",
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+      select: { id: true, driverId: true, status: true },
+    });
+
+    if (!order) {
+      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+    }
+
+    if (order.driverId !== req.user!.id) {
+      throw new HttpError(StatusCodes.FORBIDDEN, "Bạn không được giao đơn hàng này");
+    }
+
+    if (order.status === OrderStatus.PICKED_UP) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng đã được lấy rồi");
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.PICKED_UP },
+      include: { store: true, items: true },
+    });
+
+    // Notify customer
+    try {
+      const io = (await import("../socket")).getIO();
+      io.to(`order_${orderId}`).emit("order_status", { orderId, status: "PICKED_UP" });
+    } catch (_) {}
 
     res.json({ data: updated });
   }),

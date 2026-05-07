@@ -516,6 +516,7 @@ export async function settleDeliveredOrder(tx: PrismaTx, options: SettleOrderOpt
 interface ConfirmCashlessPaymentInput {
   orderId: string;
   sepayTransactionId?: string;
+  promoteOrderStatus?: boolean;
 }
 
 export async function confirmCashlessPayment(
@@ -526,6 +527,11 @@ export async function confirmCashlessPayment(
     where: { id: input.orderId },
     include: {
       payment: true,
+      store: {
+        select: {
+          autoAcceptOrders: true,
+        },
+      },
     },
   });
 
@@ -584,11 +590,17 @@ export async function confirmCashlessPayment(
     },
   });
 
+  const shouldPromoteOrderStatus =
+    input.promoteOrderStatus ?? order.store?.autoAcceptOrders ?? false;
+
   return tx.order.update({
     where: { id: order.id },
     data: {
       paymentStatus: PaymentStatus.SUCCEEDED,
-      status: order.status === OrderStatus.PENDING ? OrderStatus.CONFIRMED : order.status,
+      status:
+        shouldPromoteOrderStatus && order.status === OrderStatus.PENDING
+          ? OrderStatus.CONFIRMED
+          : order.status,
     },
   });
 }

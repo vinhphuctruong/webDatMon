@@ -319,11 +319,12 @@ export const IncomingOrderAlert: FC = () => {
               onClick={handleRejectDispatch}
               style={{
                 flex: 1,
-                border: "1px solid #e0e0e0",
+                border: "2px solid #fecdd3",
                 borderRadius: 12,
-                background: "#fff",
+                background: "#fff1f2",
+                color: "#e53935",
                 padding: "12px",
-                fontWeight: 600,
+                fontWeight: 700,
                 fontSize: 15,
               }}
             >
@@ -377,14 +378,15 @@ export const IncomingOrderAlert: FC = () => {
               onClick={() => setBroadcastOrder(null)}
               style={{
                 flex: 1,
-                border: "1px solid var(--tm-border)",
+                border: "2px solid #fecdd3",
                 borderRadius: 10,
-                background: "#fff",
+                background: "#fff1f2",
+                color: "#e53935",
                 padding: "10px 12px",
-                fontWeight: 600,
+                fontWeight: 700,
               }}
             >
-              Để sau
+              Từ chối
             </button>
             <button
               onClick={handleClaimBroadcast}

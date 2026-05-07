@@ -69,20 +69,23 @@ export const useSyncBackendState = () => {
   const setCart = useSetRecoilState(cartState);
   const setStores = useSetRecoilState(storesState);
   const remoteStores = useRecoilValueLoadable(remoteStoresState);
+  const hasSession = !!localStorage.getItem("zaui_food_session");
 
   useEffect(() => {
+    if (!hasSession) return;
     fetchCart()
       .then(setCart)
       .catch((error) => {
         console.warn("Sync cart from backend failed", error);
       });
-  }, []);
+  }, [hasSession]);
 
   useEffect(() => {
+    if (!hasSession) return;
     if (remoteStores.state === "hasValue") {
       setStores(remoteStores.contents);
     }
-  }, [remoteStores.state, remoteStores.contents]);
+  }, [hasSession, remoteStores.state, remoteStores.contents]);
 };
 
 export function useToBeImplemented() {

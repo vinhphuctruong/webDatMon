@@ -1,4 +1,4 @@
-import React, { FC, Suspense, useState } from "react";
+import React, { FC, Suspense, useEffect, useState } from "react";
 import { Box, Page, Text, useNavigate, useSnackbar } from "zmp-ui";
 import { useToBeImplemented } from "hooks";
 import { useSetRecoilState, useRecoilValue, useRecoilValueLoadable } from "recoil";
@@ -15,6 +15,8 @@ import {
   clearApiSession,
   resumeAutoDemoLogin,
   isAutoDemoLoginDisabled,
+  fetchManagedStore,
+  updateManagedStore,
 } from "services/api";
 
 const ProfileHeader: FC = () => {
@@ -146,6 +148,109 @@ const MembershipCard: FC = () => {
               Đổi thưởng →
             </span>
           </div>
+        </div>
+      </div>
+    </Box>
+  );
+};
+
+const StoreOrderModeCard: FC = () => {
+  const snackbar = useSnackbar();
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [autoAcceptOrders, setAutoAcceptOrders] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadStoreMode = async () => {
+      try {
+        const response = await fetchManagedStore();
+        if (!active) return;
+        setAutoAcceptOrders(response?.data?.autoAcceptOrders === true);
+      } catch (_error) {
+        if (!active) return;
+        setAutoAcceptOrders(false);
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadStoreMode();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const handleToggleAutoAccept = async () => {
+    if (saving) return;
+    const nextValue = !autoAcceptOrders;
+    setSaving(true);
+    try {
+      await updateManagedStore({ autoAcceptOrders: nextValue });
+      setAutoAcceptOrders(nextValue);
+      snackbar.openSnackbar({
+        type: "success",
+        text: nextValue
+          ? "Đã bật tự động nhận đơn"
+          : "Đã tắt tự động nhận đơn, quán sẽ nhận tay",
+      });
+    } catch (error: any) {
+      snackbar.openSnackbar({
+        type: "error",
+        text: error?.message || "Không thể cập nhật chế độ nhận đơn",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Box style={{ padding: "16px 16px 0" }}>
+      <div className="tm-card" style={{ padding: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <Text.Title style={{ fontSize: 16, marginBottom: 4 }}>
+              Tự động nhận đơn
+            </Text.Title>
+            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>
+              {loading
+                ? "Đang tải thiết lập..."
+                : autoAcceptOrders
+                  ? "Bật: đơn mới sẽ tự nhận và vào chuẩn bị ngay."
+                  : "Tắt: đơn mới cần quán nhận hoặc từ chối thủ công."}
+            </Text>
+          </div>
+          <button
+            onClick={handleToggleAutoAccept}
+            disabled={loading || saving}
+            className="tm-interactive"
+            style={{
+              width: 60,
+              height: 32,
+              borderRadius: 20,
+              border: "none",
+              background: autoAcceptOrders ? "var(--tm-primary)" : "#d1d5db",
+              position: "relative",
+              opacity: loading || saving ? 0.7 : 1,
+            }}
+          >
+            <span
+              style={{
+                position: "absolute",
+                top: 3,
+                left: autoAcceptOrders ? 31 : 3,
+                width: 26,
+                height: 26,
+                borderRadius: "50%",
+                background: "#fff",
+                transition: "left 0.2s ease",
+                boxShadow: "0 2px 8px rgba(0, 0, 0, 0.2)",
+              }}
+            />
+          </button>
         </div>
       </div>
     </Box>
@@ -309,6 +414,7 @@ const ProfilePage: FC = () => {
       </Suspense>
       <StatsRow />
       <MembershipCard />
+      <StoreOrderModeCard />
       
       <MenuSections />
     </Page>
