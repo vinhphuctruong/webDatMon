@@ -32,6 +32,7 @@ const HomePage = () => {
         .catch((err) => console.warn("Sync cart failed", err));
     } catch (error: any) {
       if (error.status === 401 || error.message?.toLowerCase().includes("đăng nhập")) {
+        localStorage.removeItem("zaui_food_session");
         navigate("/welcome", { replace: true });
       } else if (error.status === 403) {
         // Not a STORE_MANAGER. Check if they have a pending application

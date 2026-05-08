@@ -7,6 +7,7 @@ import { Box, Header, Page, Text, useNavigate } from "zmp-ui";
 import { cartState, locationState, selectedStoreState } from "state";
 import { ApiOrder, fetchOrderById } from "services/backend";
 import { THU_DAU_MOT_CENTER, calculateDistance, calculateETA, displayDistance } from "utils/location";
+import { formatStoreOrderCode } from "utils/order-code";
 
 interface TrackingSnapshot {
   customerLat: number;
@@ -484,7 +485,9 @@ const CheckoutResultPage: FC = () => {
   const stepDelivering: "done" | "active" | "pending" =
     status === "DELIVERED" ? "done" : status === "PICKED_UP" ? "active" : "pending";
 
-  const orderCode = localState?.localOrderId || (liveOrder?.id ? liveOrder.id.slice(0, 8) : undefined);
+  const orderCode = liveOrder 
+    ? formatStoreOrderCode(liveOrder) 
+    : (localState?.localOrderId ? localState.localOrderId : undefined);
   const liveMessage = hasAssignedDriver
     ? `Tài xế ${liveOrder?.driver?.name} đang xử lý đơn của bạn.`
     : "Đơn đã tạo thành công. Hệ thống đang tìm tài xế gần nhất.";

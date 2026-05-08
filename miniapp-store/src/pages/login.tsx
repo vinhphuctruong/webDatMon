@@ -16,9 +16,18 @@ const LoginPage = () => {
   const isRegisterIntent = queryParams.get("intent") === "register";
 
   useEffect(() => {
-    const session = localStorage.getItem("zaui_food_session");
-    if (session) {
-      navigate("/");
+    const raw = localStorage.getItem("zaui_food_session");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.accessToken) {
+          navigate("/");
+          return;
+        }
+      } catch (e) {
+        // ignore
+      }
+      localStorage.removeItem("zaui_food_session");
     }
   }, []);
 

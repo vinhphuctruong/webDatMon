@@ -2,6 +2,7 @@ import React, { FC, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text } from "zmp-ui";
 import { fetchMyOrders } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
+import { formatStoreOrderCode } from "utils/order-code";
 
 const OrdersPage: FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
@@ -72,7 +73,7 @@ const OrdersPage: FC = () => {
               <div key={order.id} className="tm-order-card animate-fade-in">
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                   <div>
-                    <Text style={{ fontWeight: 700, fontSize: 14 }}>#{order.id.slice(0, 8)}</Text>
+                    <Text style={{ fontWeight: 700, fontSize: 14 }}>#{formatStoreOrderCode(order)}</Text>
                     <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>{date}</Text>
                   </div>
                   <span

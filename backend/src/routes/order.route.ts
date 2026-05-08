@@ -658,6 +658,7 @@ orderRouter.patch(
     const payload = updateStatusSchema.parse(req.body);
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const existing = await tx.order.findUnique({ where: { id: orderId } });
       if (!existing) {
         throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
@@ -705,6 +706,7 @@ orderRouter.post(
     const user = req.user!;
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
 
@@ -747,6 +749,7 @@ orderRouter.post(
     const user = req.user!;
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
 
@@ -786,6 +789,7 @@ orderRouter.post(
     const user = req.user!;
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
 
@@ -838,6 +842,7 @@ orderRouter.post(
     const user = req.user!;
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       
@@ -880,6 +885,7 @@ orderRouter.post(
     const user = req.user!;
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
       

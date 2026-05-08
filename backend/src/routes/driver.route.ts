@@ -254,6 +254,7 @@ driverRouter.post(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         select: {
@@ -359,6 +360,7 @@ driverRouter.post(
     }
 
     const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({
         where: { id: orderId },
         select: {
@@ -467,6 +469,10 @@ driverRouter.post(
 
     if (order.status === OrderStatus.PICKED_UP) {
       throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng đã được lấy rồi");
+    }
+
+    if (order.status !== OrderStatus.PREPARING) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Quán chưa báo món xong, không thể lấy hàng");
     }
 
     const updated = await prisma.order.update({

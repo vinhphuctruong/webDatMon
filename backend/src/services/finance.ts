@@ -301,6 +301,8 @@ export function createSePayQrContent(input: {
 }
 
 async function getOrderForSettlement(tx: PrismaTx, orderId: string) {
+  await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+
   const order = await tx.order.findUnique({
     where: { id: orderId },
     include: {
@@ -523,6 +525,8 @@ export async function confirmCashlessPayment(
   tx: PrismaTx,
   input: ConfirmCashlessPaymentInput,
 ) {
+  await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+
   const order = await tx.order.findUnique({
     where: { id: input.orderId },
     include: {
@@ -614,6 +618,8 @@ export async function cancelOrderWithSettlementRollback(
   tx: PrismaTx,
   input: CancelOrderSettlementInput,
 ) {
+  await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${input.orderId} FOR UPDATE`;
+
   const order = await tx.order.findUnique({
     where: { id: input.orderId },
     include: {

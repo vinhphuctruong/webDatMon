@@ -4,6 +4,7 @@ import { claimOrder, fetchAvailableOrders, syncDriverLocation } from "services/d
 import { DisplayPrice } from "components/display/price";
 import { MapMarker, VietMapView } from "components/vietmap";
 import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
+import { formatStoreOrderCode } from "utils/order-code";
 import { getLocation } from "zmp-sdk";
 
 type ViewMode = "list" | "map";
@@ -266,7 +267,7 @@ const AvailableOrdersPage: FC = () => {
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
                   <div>
                     <Text style={{ fontWeight: 700, fontSize: 14 }}>🏪 {order.store?.name || "Quán"}</Text>
-                    <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>#{order.id.slice(0, 8)}</Text>
+                    <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>#{formatStoreOrderCode(order)}</Text>
                   </div>
                   <span
                     style={{
@@ -341,7 +342,7 @@ const AvailableOrdersPage: FC = () => {
         <Box p={4}>
           <Text style={{ fontWeight: 700, marginBottom: 6 }}>{incomingOrder?.store?.name || "Đơn giao hàng mới"}</Text>
           <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 6 }}>
-            #{incomingOrder?.id?.slice(0, 8)} · {incomingOrder?.paymentMethod === "COD" ? "COD" : "Online"}
+            #{incomingOrder ? formatStoreOrderCode(incomingOrder) : "..."} · {incomingOrder?.paymentMethod === "COD" ? "COD" : "Online"}
           </Text>
           {incomingOrder?.distanceToStoreKm != null && (
             <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 4 }}>

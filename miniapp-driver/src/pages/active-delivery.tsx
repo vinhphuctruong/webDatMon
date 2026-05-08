@@ -11,6 +11,7 @@ import {
   normalizeStoredCoordinates,
 } from "utils/location";
 import { getLocation } from "zmp-sdk";
+import { formatStoreOrderCode } from "utils/order-code";
 
 const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
   const normalizedStoreCoordinates = normalizeStoredCoordinates(
@@ -295,7 +296,7 @@ const ActiveDeliveryPage: FC = () => {
                   {statusLabels[order.status] || order.status}
                 </span>
                 <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-                  #{order.id.slice(0, 8)}
+                  #{formatStoreOrderCode(order)}
                 </Text>
               </div>
 

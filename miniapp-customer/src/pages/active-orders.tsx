@@ -6,6 +6,7 @@ import { cancelOrder } from "services/api";
 import { initSocket } from "services/socket";
 import { VietMapView, MapMarker } from "components/vietmap";
 import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
+import { formatStoreOrderCode } from "utils/order-code";
 
 
 import { calculateDistance } from "utils/location";
@@ -82,7 +83,7 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void }> = ({ order, onC
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
         <div>
           <Text style={{ fontWeight: 600, fontSize: 14, color: "var(--tm-text-primary)" }}>
-            #{order.id.slice(0, 8)}
+            #{formatStoreOrderCode(order)}
           </Text>
           <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>
             {dateStr}

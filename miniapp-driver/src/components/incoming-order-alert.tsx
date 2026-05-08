@@ -7,6 +7,7 @@ import { hasSession } from "services/api";
 import { initSocket } from "services/socket";
 import { DisplayPrice } from "./display/price";
 import { requestNotificationPermission, showNativeNotification } from "utils/notification";
+import { formatStoreOrderCode } from "utils/order-code";
 
 const POLL_INTERVAL_MS = 5000;
 const LOCATION_TIMEOUT_MS = 4000;
@@ -362,7 +363,7 @@ export const IncomingOrderAlert: FC = () => {
             {broadcastOrder?.store?.name || "Đơn giao hàng mới"}
           </Text>
           <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 6 }}>
-            #{broadcastOrder?.id?.slice(0, 8)} · {broadcastOrder?.paymentMethod === "COD" ? "COD" : "Online"}
+            #{broadcastOrder ? formatStoreOrderCode(broadcastOrder) : "..."} · {broadcastOrder?.paymentMethod === "COD" ? "COD" : "Online"}
           </Text>
           {broadcastOrder?.distanceToStoreKm != null && (
             <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 6 }}>
