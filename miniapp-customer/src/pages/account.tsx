@@ -276,15 +276,28 @@ const AccountPage: FC = () => {
                     borderRadius: "50%",
                     overflow: "hidden",
                     border: "2px solid var(--tm-border)",
-                    background: "#f1f5f3",
+                    background: "#cbd5e1",
                     flexShrink: 0,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center"
                   }}
                 >
+                  {!avatarPreview && (
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="#ffffff">
+                      <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
+                    </svg>
+                  )}
                   {avatarPreview ? (
                     <img
                       src={avatarPreview}
                       alt="Avatar"
                       style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.onerror = null;
+                        target.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' fill='%23cbd5e1'/><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' fill='%23ffffff'/></svg>";
+                      }}
                     />
                   ) : null}
                 </div>

@@ -1,8 +1,8 @@
 import React, { FC, useEffect, useState } from "react";
-import { Box, Header, Page, Text, useSnackbar, useNavigate, Modal, Input } from "zmp-ui";
+import { Box, Header, Page, Text, useSnackbar, useNavigate } from "zmp-ui";
 import { DisplayPrice } from "components/display/price";
 import { fetchOrders } from "services/backend";
-import { cancelOrder, submitReview } from "services/api";
+import { cancelOrder } from "services/api";
 import { formatStoreOrderCode } from "utils/order-code";
 
 const OrderCard: FC<{ order: any; onCancelSuccess: () => void }> = ({ order, onCancelSuccess }) => {
@@ -41,25 +41,6 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void }> = ({ order, onC
       snackbar.openSnackbar({ type: "error", text: error instanceof Error ? error.message : "Hủy đơn thất bại" });
     } finally {
       setCancelling(false);
-    }
-  };
-
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState("");
-  const [submittingReview, setSubmittingReview] = useState(false);
-
-  const handleReview = async () => {
-    setSubmittingReview(true);
-    try {
-      await submitReview(order.id, { rating, comment });
-      snackbar.openSnackbar({ type: "success", text: "Cảm ơn bạn đã đánh giá!" });
-      setReviewModalVisible(false);
-      onCancelSuccess();
-    } catch (error) {
-      snackbar.openSnackbar({ type: "error", text: error instanceof Error ? error.message : "Đánh giá thất bại" });
-    } finally {
-      setSubmittingReview(false);
     }
   };
 
@@ -114,17 +95,10 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void }> = ({ order, onC
               {cancelling ? "Đang hủy..." : "Hủy đơn"}
             </button>
           )}
-          {order.status === "DELIVERED" && !order.review && (
-            <button
-              onClick={() => setReviewModalVisible(true)}
-              style={{
-                background: "#fef9e7", color: "var(--tm-warning)",
-                border: "none", borderRadius: 12, padding: "5px 14px",
-                fontSize: 12, fontWeight: 600, cursor: "pointer",
-              }}
-            >
-              Đánh giá
-            </button>
+          {order.review && (
+            <span style={{ color: "#f59e0b", fontSize: 12, fontWeight: 600, display: "flex", alignItems: "center" }}>
+              ⭐ {order.review.rating}/5
+            </span>
           )}
           <button
             onClick={() => navigate("/")}
@@ -139,53 +113,6 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void }> = ({ order, onC
           </button>
         </div>
       </div>
-      
-      <Modal
-        visible={reviewModalVisible}
-        title="Đánh giá đơn hàng"
-        onClose={() => setReviewModalVisible(false)}
-      >
-        <Box p={4}>
-          <Text style={{ textAlign: "center", marginBottom: 16 }}>
-            Trải nghiệm của bạn với đơn hàng này như thế nào?
-          </Text>
-          <div style={{ display: "flex", justifyContent: "center", gap: 8, marginBottom: 24 }}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <span
-                key={star}
-                onClick={() => setRating(star)}
-                style={{
-                  fontSize: 32,
-                  cursor: "pointer",
-                  color: star <= rating ? "#ffb800" : "#e5e7eb",
-                  transition: "color 0.2s"
-                }}
-              >
-                ★
-              </span>
-            ))}
-          </div>
-          <Input.TextArea
-            placeholder="Chia sẻ thêm về món ăn và dịch vụ (không bắt buộc)"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            rows={3}
-            style={{ marginBottom: 24 }}
-          />
-          <button
-            onClick={handleReview}
-            disabled={submittingReview}
-            style={{
-              width: "100%", padding: 12, borderRadius: 12,
-              background: "var(--tm-primary)", color: "#fff",
-              fontWeight: 600, border: "none",
-              opacity: submittingReview ? 0.7 : 1
-            }}
-          >
-            {submittingReview ? "Đang gửi..." : "Gửi đánh giá"}
-          </button>
-        </Box>
-      </Modal>
     </div>
   );
 };
@@ -198,7 +125,8 @@ const OrdersPage: FC = () => {
     try {
       const data = await fetchOrders();
       const historyData = (data || []).filter((o: any) => 
-        ["DELIVERED", "CANCELLED", "FAILED"].includes(o.status)
+        (o.status === "DELIVERED" && o.customerConfirmedAt && o.review) ||
+        ["CANCELLED", "FAILED"].includes(o.status)
       );
       setOrders(historyData);
     } catch (error) {

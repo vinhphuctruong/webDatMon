@@ -444,13 +444,26 @@ export async function resetPasswordWithOtp(payload: {
   return response;
 }
 
-export async function submitReview(orderId: string, payload: { rating: number; comment?: string }) {
+export async function submitReview(orderId: string, payload: {
+  storeRating: number;
+  driverRating?: number;
+  productRatings?: { productId: string; rating: number }[];
+  comment?: string;
+}) {
   return apiFetch<{ data: any; message?: string }>(
     `/orders/${orderId}/reviews`,
     {
       method: "POST",
       body: JSON.stringify(payload),
     },
+    { auth: true },
+  );
+}
+
+export async function confirmReceived(orderId: string) {
+  return apiFetch<{ data: any; message?: string }>(
+    `/orders/${orderId}/confirm-received`,
+    { method: "POST" },
     { auth: true },
   );
 }

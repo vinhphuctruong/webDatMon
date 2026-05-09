@@ -140,6 +140,8 @@ model User {
 
   reviews                  Review[]
   productReviews           ProductReview[]
+  givenDriverReviews       DriverReview[]    @relation("CustomerDriverReviews")
+  receivedDriverReviews    DriverReview[]    @relation("DriverReceivedReviews")
 
   @@unique([email, role])
 }
@@ -318,21 +320,28 @@ model Order {
   codHoldStatus       CodHoldStatus       @default(NONE)
   note                String?
   deliveryAddress     Json
-  estimatedDeliveryAt DateTime?
-  completedAt         DateTime?
-  placedAt            DateTime            @default(now())
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
-  user                User                @relation(fields: [userId], references: [id], onDelete: Restrict)
-  driver              User?               @relation("OrderDriver", fields: [driverId], references: [id], onDelete: SetNull)
-  store               Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
-  address             Address?            @relation(fields: [addressId], references: [id], onDelete: SetNull)
-  items               OrderItem[]
-  payment             OrderPayment?
-  walletTransactions  WalletTransaction[]
-  dispatch            OrderDispatch?
+  
+  // Cancellation Request
+  cancelRequestStatus CancelRequestStatus @default(NONE)
+  cancelReason        String?
+
+  estimatedDeliveryAt   DateTime?
+  completedAt           DateTime?
+  customerConfirmedAt   DateTime?
+  placedAt              DateTime            @default(now())
+  createdAt             DateTime            @default(now())
+  updatedAt             DateTime            @updatedAt
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Restrict)
+  driver                User?               @relation("OrderDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  store                 Store               @relation(fields: [storeId], references: [id], onDelete: Restrict)
+  address               Address?            @relation(fields: [addressId], references: [id], onDelete: SetNull)
+  items                 OrderItem[]
+  payment               OrderPayment?
+  walletTransactions    WalletTransaction[]
+  dispatch              OrderDispatch?
 
   review              Review?
+  driverReview        DriverReview?
   productReviews      ProductReview[]
 
   @@index([userId, createdAt])
@@ -676,4 +685,23 @@ model VoucherUsage {
 
   @@index([voucherId])
   @@index([userId, voucherId])
+}
+
+// ── Driver Review System ────────────────────────
+model DriverReview {
+  id        String   @id @default(uuid())
+  orderId   String   @unique
+  userId    String
+  driverId  String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  user      User     @relation("CustomerDriverReviews", fields: [userId], references: [id], onDelete: Cascade)
+  driver    User     @relation("DriverReceivedReviews", fields: [driverId], references: [id], onDelete: Cascade)
+
+  @@index([driverId])
+  @@index([userId])
 }

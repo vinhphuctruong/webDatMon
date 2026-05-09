@@ -59,60 +59,7 @@ const updateStatusSchema = z.object({
   cancelReason: z.string().max(255).optional(),
 });
 
-function toOrderResponse(order: {
-  id: string;
-  status: OrderStatus;
-  paymentMethod: PaymentMethod;
-  paymentStatus: PaymentStatus;
-  subtotal: number;
-  deliveryFee: number;
-  platformFee: number;
-  discount: number;
-  voucherCode: string | null;
-  total: number;
-  merchantCommission: number;
-  driverCommission: number;
-  merchantPayout: number;
-  driverPayout: number;
-  platformRevenue: number;
-  codHoldAmount: number;
-  codHoldStatus: string;
-  note: string | null;
-  deliveryAddress: unknown;
-  estimatedDeliveryAt: Date | null;
-  completedAt: Date | null;
-  placedAt: Date;
-  createdAt: Date;
-  userId: string;
-  driverId: string | null;
-  store: {
-    id: string;
-    name: string;
-    address: string;
-    etaMinutesMin: number;
-    etaMinutesMax: number;
-  };
-  payment?: {
-    id: string;
-    method: PaymentMethod;
-    status: PaymentStatus;
-    amount: number;
-    sepayReferenceCode: string | null;
-    sepayQrContent: string | null;
-    sepayTransactionId: string | null;
-    paidAt: Date | null;
-    createdAt: Date;
-  } | null;
-  items: {
-    id: string;
-    productId: string;
-    productName: string;
-    unitPrice: number;
-    quantity: number;
-    lineTotal: number;
-    selectedOptions: unknown;
-  }[];
-}) {
+function toOrderResponse(order: any) {
   return {
     id: order.id,
     status: order.status,
@@ -137,6 +84,7 @@ function toOrderResponse(order: {
     deliveryAddress: order.deliveryAddress,
     estimatedDeliveryAt: order.estimatedDeliveryAt,
     completedAt: order.completedAt,
+    customerConfirmedAt: order.customerConfirmedAt ?? null,
     placedAt: order.placedAt,
     createdAt: order.createdAt,
     userId: order.userId,
@@ -156,6 +104,8 @@ function toOrderResponse(order: {
         }
       : null,
     items: order.items,
+    review: order.review ?? null,
+    driverReview: order.driverReview ?? null,
   };
 }
 
@@ -580,6 +530,7 @@ orderRouter.get(
           items: true,
           payment: true,
           review: true,
+          driverReview: true,
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -912,8 +863,47 @@ orderRouter.post(
   }),
 );
 
-const reviewSchema = z.object({
-  rating: z.number().int().min(1).max(5),
+/* ── Confirm Received ─────────────────────────────────── */
+
+orderRouter.post(
+  "/:orderId/confirm-received",
+  requireRole(UserRole.CUSTOMER),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const user = req.user!;
+
+    const order = await prisma.order.findUnique({
+      where: { id: orderId },
+    });
+
+    if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+    if (order.userId !== user.id) throw new HttpError(StatusCodes.FORBIDDEN, "Đây không phải đơn hàng của bạn");
+    if (order.status !== OrderStatus.DELIVERED) {
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Chỉ có thể xác nhận nhận hàng khi đơn đã giao");
+    }
+    if (order.customerConfirmedAt) {
+      throw new HttpError(StatusCodes.CONFLICT, "Bạn đã xác nhận nhận hàng rồi");
+    }
+
+    const updated = await prisma.order.update({
+      where: { id: orderId },
+      data: { customerConfirmedAt: new Date() },
+      include: { store: true, items: true, payment: true, review: true, driverReview: true },
+    });
+
+    res.json({ data: toOrderResponse(updated), message: "Xác nhận nhận hàng thành công" });
+  }),
+);
+
+/* ── Comprehensive Review (Store + Driver + Products) ── */
+
+const comprehensiveReviewSchema = z.object({
+  storeRating: z.number().int().min(1).max(5),
+  driverRating: z.number().int().min(1).max(5).optional(),
+  productRatings: z.array(z.object({
+    productId: z.string().min(1),
+    rating: z.number().int().min(1).max(5),
+  })).optional(),
   comment: z.string().max(1000).optional(),
 });
 
@@ -922,13 +912,13 @@ orderRouter.post(
   requireRole(UserRole.CUSTOMER),
   asyncHandler(async (req, res) => {
     const { orderId } = req.params;
-    const payload = reviewSchema.parse(req.body);
+    const payload = comprehensiveReviewSchema.parse(req.body);
     const user = req.user!;
 
     const result = await prisma.$transaction(async (tx) => {
       const order = await tx.order.findUnique({
         where: { id: orderId },
-        include: { items: true, review: true },
+        include: { items: true, review: true, driverReview: true },
       });
 
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
@@ -936,32 +926,54 @@ orderRouter.post(
       if (order.status !== OrderStatus.DELIVERED) {
         throw new HttpError(StatusCodes.BAD_REQUEST, "Chỉ có thể đánh giá đơn hàng đã giao thành công");
       }
+      if (!order.customerConfirmedAt) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Vui lòng xác nhận đã nhận hàng trước khi đánh giá");
+      }
       if (order.review) {
         throw new HttpError(StatusCodes.CONFLICT, "Bạn đã đánh giá đơn hàng này rồi");
       }
 
+      // 1. Store review
       const review = await tx.review.create({
         data: {
           orderId: order.id,
           userId: user.id,
           storeId: order.storeId,
-          rating: payload.rating,
+          rating: payload.storeRating,
           comment: payload.comment,
         },
       });
 
+      // 2. Driver review (if driver assigned and driverRating provided)
+      let driverReview = null;
+      if (order.driverId && payload.driverRating && !order.driverReview) {
+        driverReview = await tx.driverReview.create({
+          data: {
+            orderId: order.id,
+            userId: user.id,
+            driverId: order.driverId,
+            rating: payload.driverRating,
+          },
+        });
+      }
+
+      // 3. Product reviews
       const uniqueProductIds = Array.from(new Set(order.items.map(item => item.productId)));
+      const productRatingsMap = new Map(payload.productRatings?.map(p => [p.productId, p.rating]) ?? []);
+
       for (const productId of uniqueProductIds) {
+        const productRating = productRatingsMap.get(productId) ?? payload.storeRating;
         await tx.productReview.create({
           data: {
             orderId: order.id,
             productId: productId,
             userId: user.id,
-            rating: payload.rating,
+            rating: productRating,
           },
         });
       }
 
+      // 4. Update store average rating
       const storeAggregate = await tx.review.aggregate({
         _avg: { rating: true },
         where: { storeId: order.storeId },
@@ -971,6 +983,7 @@ orderRouter.post(
         data: { rating: storeAggregate._avg.rating ?? 0 },
       });
 
+      // 5. Update product average ratings
       for (const productId of uniqueProductIds) {
         const productAggregate = await tx.productReview.aggregate({
           _avg: { rating: true },
@@ -982,10 +995,10 @@ orderRouter.post(
         });
       }
 
-      return review;
+      return { review, driverReview };
     });
 
-    res.json({ data: result, message: "Đánh giá thành công" });
+    res.json({ data: result, message: "Đánh giá thành công! Cảm ơn bạn." });
   }),
 );
 

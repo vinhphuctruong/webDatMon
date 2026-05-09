@@ -8,70 +8,9 @@ import { requireAuth } from "../middlewares/auth";
 
 export const reviewRouter = Router();
 
-const createReviewSchema = z.object({
-  orderId: z.string().uuid(),
-  rating: z.number().int().min(1).max(5),
-  comment: z.string().max(500).optional(),
-});
-
-reviewRouter.post(
-  "/",
-  requireAuth,
-  asyncHandler(async (req, res) => {
-    const userId = req.user!.id;
-    const { orderId, rating, comment } = createReviewSchema.parse(req.body);
-
-    const order = await prisma.order.findUnique({
-      where: { id: orderId },
-      include: { items: true },
-    });
-
-    if (!order) {
-      throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
-    }
-    if (order.userId !== userId) {
-      throw new HttpError(StatusCodes.FORBIDDEN, "Bạn không có quyền đánh giá đơn hàng này");
-    }
-    if (order.status !== "DELIVERED") {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "Chỉ có thể đánh giá đơn hàng đã giao thành công");
-    }
-
-    const existingReview = await prisma.review.findUnique({
-      where: { orderId },
-    });
-    if (existingReview) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng này đã được đánh giá");
-    }
-
-    // Create review and update store/product rating in a transaction
-    const review = await prisma.$transaction(async (tx) => {
-      const newReview = await tx.review.create({
-        data: {
-          orderId,
-          userId,
-          storeId: order.storeId,
-          rating,
-          comment,
-        },
-      });
-
-      // Simple rating update for store (average of all reviews)
-      const storeReviews = await tx.review.aggregate({
-        where: { storeId: order.storeId },
-        _avg: { rating: true },
-      });
-      await tx.store.update({
-        where: { id: order.storeId },
-        data: { rating: storeReviews._avg.rating || rating },
-      });
-
-      return newReview;
-    });
-
-    res.status(StatusCodes.CREATED).json({ data: review });
-  })
-);
-
+/**
+ * GET /reviews/my-reviews — Lấy danh sách đánh giá của tôi
+ */
 reviewRouter.get(
   "/my-reviews",
   requireAuth,
@@ -79,9 +18,100 @@ reviewRouter.get(
     const userId = req.user!.id;
     const reviews = await prisma.review.findMany({
       where: { userId },
-      include: { store: { select: { name: true } }, order: { select: { items: true } } },
+      include: {
+        store: { select: { name: true } },
+        order: { select: { items: true, driverReview: true } },
+      },
       orderBy: { createdAt: "desc" },
     });
     res.json({ data: reviews });
+  })
+);
+
+/**
+ * GET /reviews/store/:storeId — Lấy đánh giá của cửa hàng
+ */
+reviewRouter.get(
+  "/store/:storeId",
+  asyncHandler(async (req, res) => {
+    const { storeId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const skip = (page - 1) * limit;
+
+    const [reviews, total, aggregate] = await Promise.all([
+      prisma.review.findMany({
+        where: { storeId },
+        skip,
+        take: limit,
+        include: {
+          user: { select: { name: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.review.count({ where: { storeId } }),
+      prisma.review.aggregate({
+        where: { storeId },
+        _avg: { rating: true },
+      }),
+    ]);
+
+    res.json({
+      data: reviews,
+      stats: {
+        totalReviews: total,
+        averageRating: aggregate._avg.rating ?? 0,
+      },
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  })
+);
+
+/**
+ * GET /reviews/driver/:driverId — Lấy đánh giá tài xế
+ */
+reviewRouter.get(
+  "/driver/:driverId",
+  asyncHandler(async (req, res) => {
+    const { driverId } = req.params;
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = Math.min(parseInt(req.query.limit as string) || 20, 50);
+    const skip = (page - 1) * limit;
+
+    const [reviews, total, aggregate] = await Promise.all([
+      prisma.driverReview.findMany({
+        where: { driverId },
+        skip,
+        take: limit,
+        include: {
+          user: { select: { name: true, avatarUrl: true } },
+        },
+        orderBy: { createdAt: "desc" },
+      }),
+      prisma.driverReview.count({ where: { driverId } }),
+      prisma.driverReview.aggregate({
+        where: { driverId },
+        _avg: { rating: true },
+      }),
+    ]);
+
+    res.json({
+      data: reviews,
+      stats: {
+        totalReviews: total,
+        averageRating: aggregate._avg.rating ?? 0,
+      },
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
   })
 );

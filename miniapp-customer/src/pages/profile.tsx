@@ -40,12 +40,20 @@ const ProfileHeader: FC = () => {
           }}
         >
           {avatarUrl ? (
-            <img src={avatarUrl} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            <img 
+              src={avatarUrl} 
+              style={{ width: "100%", height: "100%", objectFit: "cover" }} 
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                target.onerror = null;
+                target.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' fill='%23cbd5e1'/><path d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z' fill='%23ffffff'/></svg>";
+              }}
+            />
           ) : (
             <div
-              style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+              style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#cbd5e1" }}
             >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="rgba(255,255,255,0.7)">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="#ffffff">
                 <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
               </svg>
             </div>

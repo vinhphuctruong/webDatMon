@@ -76,6 +76,7 @@ export const IncomingOrderAlert: FC = () => {
   // Broadcast fallback (legacy)
   const [broadcastOrder, setBroadcastOrder] = useState<any | null>(null);
   const knownOrderIdsRef = useRef<Set<string>>(new Set());
+  const rejectedBroadcastIdsRef = useRef<Set<string>>(new Set());
 
   const secondsLeft = useCountdown(dispatchOffer?.expiresAt || null);
 
@@ -108,13 +109,19 @@ export const IncomingOrderAlert: FC = () => {
       const nextOrders = response.data || [];
 
       if (!broadcastOrder && nextOrders.length > 0) {
-        const nearest = nextOrders
-          .slice()
-          .sort(
-            (a: any, b: any) =>
-              (a.distanceToStoreKm ?? Infinity) - (b.distanceToStoreKm ?? Infinity),
-          )[0];
-        setBroadcastOrder(nearest);
+        const availableNextOrders = nextOrders.filter(
+          (o: any) => !rejectedBroadcastIdsRef.current.has(o.id)
+        );
+
+        if (availableNextOrders.length > 0) {
+          const nearest = availableNextOrders
+            .slice()
+            .sort(
+              (a: any, b: any) =>
+                (a.distanceToStoreKm ?? Infinity) - (b.distanceToStoreKm ?? Infinity),
+            )[0];
+          setBroadcastOrder(nearest);
+        }
       }
 
       knownOrderIdsRef.current = new Set(nextOrders.map((o: any) => o.id));
@@ -161,7 +168,7 @@ export const IncomingOrderAlert: FC = () => {
 
       // ── Broadcast fallback (old flow for orphan orders) ──
       const handleBroadcast = (order: any) => {
-        if (!knownOrderIdsRef.current.has(order.id)) {
+        if (!knownOrderIdsRef.current.has(order.id) && !rejectedBroadcastIdsRef.current.has(order.id)) {
           setBroadcastOrder(order);
           knownOrderIdsRef.current.add(order.id);
           showNativeNotification("Có đơn tự do gần bạn!", {
@@ -254,6 +261,13 @@ export const IncomingOrderAlert: FC = () => {
       setClaiming(false);
     }
   }, [broadcastOrder, claiming, navigate, snackbar]);
+
+  const handleRejectBroadcast = useCallback(() => {
+    if (broadcastOrder?.id) {
+      rejectedBroadcastIdsRef.current.add(broadcastOrder.id);
+    }
+    setBroadcastOrder(null);
+  }, [broadcastOrder]);
 
   /* ── Render ──────────────────────────────────────── */
 
@@ -356,7 +370,7 @@ export const IncomingOrderAlert: FC = () => {
       <Modal
         visible={showBroadcast}
         title="Đơn tự do gần bạn"
-        onClose={() => setBroadcastOrder(null)}
+        onClose={handleRejectBroadcast}
       >
         <Box p={4}>
           <Text style={{ fontWeight: 700, marginBottom: 6 }}>
@@ -376,7 +390,7 @@ export const IncomingOrderAlert: FC = () => {
 
           <div style={{ display: "flex", gap: 10 }}>
             <button
-              onClick={() => setBroadcastOrder(null)}
+              onClick={handleRejectBroadcast}
               style={{
                 flex: 1,
                 border: "2px solid #fecdd3",
