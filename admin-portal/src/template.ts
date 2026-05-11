@@ -94,10 +94,14 @@ export const APP_HTML = `
           <div class="form-grid">
             <div class="field"><label>Mã voucher</label><input name="code" required placeholder="TMFOOD30" maxlength="30"/></div>
             <div class="field"><label>Mô tả</label><input name="description" required placeholder="Giảm 30K cho đơn từ 99K"/></div>
+            <div class="field"><label>Nhóm</label><select name="scope"><option value="ORDER">Giảm đơn</option><option value="SHIPPING">Freeship</option></select></div>
             <div class="field"><label>Loại giảm</label><select name="discountType"><option value="FIXED">Cố định (VNĐ)</option><option value="PERCENT">Phần trăm (%)</option></select></div>
             <div class="field"><label>Giá trị giảm</label><input name="discountValue" type="number" min="1" required placeholder="30000"/></div>
             <div class="field"><label>Giảm tối đa (% only)</label><input name="maxDiscount" type="number" min="0" placeholder="25000"/></div>
             <div class="field"><label>Đơn tối thiểu</label><input name="minOrderValue" type="number" min="0" value="0" placeholder="99000"/></div>
+            <div class="field"><label>Săn voucher?</label><select name="isClaimable"><option value="true">Có (hiển thị để lưu)</option><option value="false">Không (chỉ phát)</option></select></div>
+            <div class="field"><label>Số lượt lưu tối đa</label><input name="maxClaimTotal" type="number" min="1" placeholder="1000 (để trống = vô hạn)"/></div>
+            <div class="field"><label>Auto cho khách mới</label><select name="autoGrantOnRegister"><option value="false">Không</option><option value="true">Có</option></select></div>
             <div class="field"><label>Tổng lượt dùng</label><input name="maxUsageTotal" type="number" min="1" placeholder="100"/></div>
             <div class="field"><label>Lượt/người</label><input name="maxUsagePerUser" type="number" min="1" value="1"/></div>
             <div class="field"><label>Hết hạn</label><input name="expiresAt" type="date" required/></div>
@@ -105,7 +109,7 @@ export const APP_HTML = `
           <div class="form-actions"><button class="btn btn-primary" type="submit">Tạo voucher</button></div>
         </form>
       </div>
-      <div class="panel" style="margin-top:20px"><div class="panel-head"><h3>Danh sách voucher</h3></div><div class="panel-body"><table><thead><tr><th>Mã</th><th>Mô tả</th><th>Giảm</th><th>Đơn tối thiểu</th><th>Đã dùng</th><th>Hết hạn</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody id="vouchers-body"></tbody></table></div></div>
+      <div class="panel" style="margin-top:20px"><div class="panel-head"><h3>Danh sách voucher</h3></div><div class="panel-body"><table><thead><tr><th>Mã</th><th>Mô tả</th><th>Nhóm</th><th>Giảm</th><th>Đơn tối thiểu</th><th>Đã lưu</th><th>Đã dùng</th><th>Hết hạn</th><th>Trạng thái</th><th>Hành động</th></tr></thead><tbody id="vouchers-body"></tbody></table></div></div>
     </section>
 
     <!-- CATEGORIES -->

@@ -141,6 +141,51 @@ async function issueTokens(user: { id: string; email: string; role: UserRole }) 
   return { accessToken, refreshToken };
 }
 
+async function autoGrantVouchersForNewCustomer(userId: string) {
+  const now = new Date();
+  const vouchers = await prisma.voucher.findMany({
+    where: {
+      isActive: true,
+      autoGrantOnRegister: true,
+      startsAt: { lte: now },
+      expiresAt: { gte: now },
+    },
+    select: { id: true },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+  if (!vouchers.length) return;
+
+  for (const voucher of vouchers) {
+    try {
+      await prisma.$transaction(async (tx) => {
+        const existed = await tx.voucherClaim.findUnique({
+          where: { voucherId_userId: { voucherId: voucher.id, userId } },
+          select: { id: true },
+        });
+        if (existed) return;
+
+        const current = await tx.voucher.findUnique({
+          where: { id: voucher.id },
+          select: { maxClaimTotal: true, claimedCount: true },
+        });
+        if (!current) return;
+        if (current.maxClaimTotal != null && current.claimedCount >= current.maxClaimTotal) return;
+
+        await tx.voucherClaim.create({
+          data: { voucherId: voucher.id, userId, source: "AUTO" },
+        });
+        await tx.voucher.update({
+          where: { id: voucher.id },
+          data: { claimedCount: { increment: 1 } },
+        });
+      });
+    } catch {
+      // best-effort, không chặn đăng ký
+    }
+  }
+}
+
 function slugify(input: string): string {
   return input
     .normalize("NFD")
@@ -180,6 +225,8 @@ authRouter.post(
         role: true,
       },
     });
+
+    await autoGrantVouchersForNewCustomer(user.id);
 
     const tokens = await issueTokens(user);
 
@@ -228,6 +275,8 @@ authRouter.post(
         role: true,
       },
     });
+
+    await autoGrantVouchersForNewCustomer(user.id);
 
     const tokens = await issueTokens(user);
 

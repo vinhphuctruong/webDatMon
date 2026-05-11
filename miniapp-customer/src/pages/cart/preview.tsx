@@ -1,8 +1,9 @@
 ﻿import { DisplayPrice } from "components/display/price";
-import React, { FC, useState } from "react";
+import { Sheet } from "components/fullscreen-sheet";
+import React, { FC, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   useRecoilValue,
-  useRecoilState,
   useResetRecoilState,
   useSetRecoilState,
   useRecoilValueLoadable,
@@ -17,6 +18,7 @@ import {
   locationState,
   manualCustomerContactState,
   orderNoteState,
+  platformFeeState,
   selectedStoreState,
   totalPriceState,
   totalQuantityState,
@@ -28,7 +30,13 @@ import {
   addOrderToHistory,
   orderHistoryState,
 } from "services/features";
-import { readSession, validateVoucherApi } from "services/api";
+import {
+  fetchMyVouchers,
+  readSession,
+  validateVoucherApi,
+  VoucherInfo,
+  VoucherValidation,
+} from "services/api";
 import { THU_DAU_MOT_CENTER } from "utils/location";
 
 export const CartPreview: FC = () => {
@@ -36,17 +44,20 @@ export const CartPreview: FC = () => {
   const snackbar = useSnackbar();
   const quantity = useRecoilValue(totalQuantityState);
   const itemsTotal = useRecoilValue(totalPriceState);
+  const platformFee = useRecoilValue(platformFeeState);
   const deliveryFeeLoadable = useRecoilValueLoadable(deliveryFeeState);
   const deliveryFee =
     deliveryFeeLoadable.state === "hasValue" ? deliveryFeeLoadable.contents : 18000;
 
-  // Voucher state — backend validated
-  const [appliedVoucherCode, setAppliedVoucherCode] = useState<string | null>(null);
-  const [appliedVoucherDesc, setAppliedVoucherDesc] = useState("");
-  const [voucherDiscount, setVoucherDiscount] = useState(0);
-  const [validatingVoucher, setValidatingVoucher] = useState(false);
+  // Voucher state — chọn từ danh sách, backend validate
+  const [voucherSheetVisible, setVoucherSheetVisible] = useState(false);
+  const [voucherList, setVoucherList] = useState<VoucherInfo[]>([]);
+  const [voucherListLoading, setVoucherListLoading] = useState(false);
+  const [voucherListError, setVoucherListError] = useState<string | null>(null);
+  const [validatingVoucherCode, setValidatingVoucherCode] = useState<string | null>(null);
 
-  const payableTotal = Math.max(0, itemsTotal + deliveryFee - voucherDiscount);
+  const [appliedVoucher, setAppliedVoucher] = useState<VoucherValidation | null>(null);
+  const voucherDiscount = appliedVoucher?.discount ?? 0;
   const note = useRecoilValue(orderNoteState);
   const user = useRecoilValueLoadable(userState);
   const manualCustomerContactLoadable = useRecoilValueLoadable(manualCustomerContactState);
@@ -77,37 +88,80 @@ export const CartPreview: FC = () => {
   const hasLocationLoadable = useRecoilValueLoadable(hasConfirmedLocationState);
   const hasLocation = hasLocationLoadable.state === "hasValue" ? hasLocationLoadable.contents : false;
   const [submitting, setSubmitting] = useState(false);
-  const [voucherInput, setVoucherInput] = useState("");
-  const [showVoucher, setShowVoucher] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"COD" | "SEPAY_QR">("COD");
 
-  const applyVoucher = async () => {
-    const code = voucherInput.trim().toUpperCase();
-    if (!code) return;
+  const shippingDiscount = appliedVoucher?.scope === "SHIPPING" ? voucherDiscount : 0;
+  const orderDiscount = appliedVoucher?.scope === "ORDER" ? voucherDiscount : 0;
+  const discountedDeliveryFee = Math.max(0, deliveryFee - shippingDiscount);
+  const payableTotal = Math.max(0, itemsTotal + discountedDeliveryFee + platformFee - orderDiscount);
 
-    setValidatingVoucher(true);
+  const removeVoucher = () => {
+    setAppliedVoucher(null);
+  };
+
+  const eligibleForVoucher = (voucher: VoucherInfo) => {
+    if (itemsTotal < voucher.minOrderValue) return false;
+    if (voucher.scope === "SHIPPING" && !hasLocation) return false;
+    return true;
+  };
+
+  const voucherGroups = useMemo(() => {
+    const shipping = voucherList.filter((v) => v.scope === "SHIPPING");
+    const order = voucherList.filter((v) => v.scope === "ORDER");
+    return { shipping, order };
+  }, [voucherList]);
+
+  const loadVoucherList = async () => {
+    setVoucherListError(null);
+    setVoucherListLoading(true);
     try {
-      const result = await validateVoucherApi(code, itemsTotal);
-      setAppliedVoucherCode(code);
-      setAppliedVoucherDesc(result.description);
-      setVoucherDiscount(result.discount);
-      setShowVoucher(false);
-      snackbar.openSnackbar({
-        type: "success",
-        text: `Áp dụng mã ${code} — Giảm ${(result.discount / 1000).toFixed(0)}K `,
-      });
+      const res = await fetchMyVouchers();
+      setVoucherList(res);
     } catch (err: any) {
-      const msg = err?.message || "Mã voucher không hợp lệ";
-      snackbar.openSnackbar({ type: "error", text: msg });
+      const msg = err?.message || "Không tải được danh sách voucher";
+      setVoucherListError(msg);
     } finally {
-      setValidatingVoucher(false);
+      setVoucherListLoading(false);
     }
   };
 
-  const removeVoucher = () => {
-    setAppliedVoucherCode(null);
-    setAppliedVoucherDesc("");
-    setVoucherDiscount(0);
+  useEffect(() => {
+    if (!voucherSheetVisible) return;
+    if (voucherList.length > 0 || voucherListLoading) return;
+    loadVoucherList();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voucherSheetVisible]);
+
+  const openVoucherSheet = async () => {
+    const session = await readSession();
+    if (!session) {
+      snackbar.openSnackbar({ type: "error", text: "Vui lòng đăng nhập để sử dụng voucher" });
+      navigate("/login?required=1");
+      return;
+    }
+    setVoucherSheetVisible(true);
+  };
+
+  const applyVoucherFromList = async (voucher: VoucherInfo) => {
+    if (!eligibleForVoucher(voucher)) return;
+    setValidatingVoucherCode(voucher.code);
+    try {
+      const result = await validateVoucherApi(voucher.code, itemsTotal, deliveryFee);
+      setAppliedVoucher(result);
+      setVoucherSheetVisible(false);
+      snackbar.openSnackbar({
+        type: "success",
+        text:
+          result.scope === "SHIPPING"
+            ? `Áp dụng ${result.code} — Giảm phí ship ${(result.discount / 1000).toFixed(0)}K`
+            : `Áp dụng ${result.code} — Giảm ${(result.discount / 1000).toFixed(0)}K`,
+      });
+    } catch (err: any) {
+      const msg = err?.message || "Voucher không hợp lệ";
+      snackbar.openSnackbar({ type: "error", text: msg });
+    } finally {
+      setValidatingVoucherCode(null);
+    }
   };
 
   const placeOrder = async () => {
@@ -151,7 +205,7 @@ export const CartPreview: FC = () => {
 
       const orderPayload = {
         ...(note.trim() ? { note: note.trim() } : {}),
-        ...(appliedVoucherCode ? { voucherCode: appliedVoucherCode } : {}),
+        ...(appliedVoucher?.code ? { voucherCode: appliedVoucher.code } : {}),
         paymentMethod,
         autoConfirmPayment: paymentMethod === "SEPAY_QR",
         deliveryAddress: {
@@ -227,7 +281,7 @@ export const CartPreview: FC = () => {
       setRefreshActiveOrders((v) => v + 1);
 
       resetCart();
-      setAppliedVoucherCode(null);
+      setAppliedVoucher(null);
       navigate("/result", {
         replace: true,
         state: {
@@ -283,9 +337,9 @@ export const CartPreview: FC = () => {
       padding: '16px', zIndex: 100, borderTopLeftRadius: 20, borderTopRightRadius: 20,
       flexShrink: 0,
     }}>
-      {/* Voucher section — backend validated */}
+      {/* Voucher section — chọn từ danh sách (không nhập tay) */}
       <div style={{ marginBottom: 8 }}>
-        {appliedVoucherCode ? (
+        {appliedVoucher?.code ? (
           <div style={{
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             padding: '6px 10px', borderRadius: 8,
@@ -295,7 +349,9 @@ export const CartPreview: FC = () => {
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
               <span style={{ fontSize: 12 }}></span>
               <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>
-                {appliedVoucherCode} · Giảm <DisplayPrice>{voucherDiscount}</DisplayPrice>
+                {appliedVoucher.code}
+                {appliedVoucher.scope === "SHIPPING" ? " · Freeship " : " · Giảm "}
+                <DisplayPrice>{voucherDiscount}</DisplayPrice>
               </Text>
             </div>
             <button
@@ -309,49 +365,18 @@ export const CartPreview: FC = () => {
             </button>
           </div>
         ) : (
-          <div>
-            {showVoucher ? (
-              <div style={{ display: 'flex', gap: 6 }}>
-                <input
-                  value={voucherInput}
-                  onChange={(e) => setVoucherInput(e.target.value)}
-                  placeholder="Nhập mã voucher..."
-                  disabled={validatingVoucher}
-                  style={{
-                    flex: 1, padding: '6px 10px', borderRadius: 8,
-                    border: '1px solid var(--tm-border)', fontSize: 12,
-                    fontFamily: 'Inter, sans-serif', outline: 'none',
-                  }}
-                  onKeyDown={(e) => e.key === "Enter" && applyVoucher()}
-                />
-                <button
-                  onClick={applyVoucher}
-                  disabled={validatingVoucher}
-                  style={{
-                    padding: '6px 12px', borderRadius: 8, border: 'none',
-                    background: validatingVoucher ? '#ccc' : 'var(--tm-primary)', color: '#fff',
-                    fontSize: 12, fontWeight: 600, cursor: validatingVoucher ? 'wait' : 'pointer',
-                    fontFamily: 'Inter, sans-serif',
-                  }}
-                >
-                  {validatingVoucher ? "..." : "Áp dụng"}
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setShowVoucher(true)}
-                style={{
-                  width: '100%', padding: '7px', borderRadius: 8,
-                  border: '1px dashed var(--tm-border)', background: 'transparent',
-                  color: 'var(--tm-primary)', fontSize: 12, fontWeight: 500,
-                  cursor: 'pointer', fontFamily: 'Inter, sans-serif',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-                }}
-              >
-                 Nhập mã voucher giảm giá
-              </button>
-            )}
-          </div>
+          <button
+            onClick={openVoucherSheet}
+            style={{
+              width: '100%', padding: '7px', borderRadius: 8,
+              border: '1px dashed var(--tm-border)', background: 'transparent',
+              color: 'var(--tm-primary)', fontSize: 12, fontWeight: 500,
+              cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}
+          >
+            Chọn voucher
+          </button>
         )}
       </div>
 
@@ -409,14 +434,30 @@ export const CartPreview: FC = () => {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
           <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)' }}>Phí giao hàng</Text>
           <Text size="xxxSmall" style={{ color: deliveryFee === 0 && !hasLocation ? '#f59e0b' : 'var(--tm-text-primary)', fontWeight: 500 }}>
-            {deliveryFee === 0 && !hasLocation ? 'Chưa xác định' : <DisplayPrice>{deliveryFee}</DisplayPrice>}
+            {deliveryFee === 0 && !hasLocation ? 'Chưa xác định' : <DisplayPrice>{discountedDeliveryFee}</DisplayPrice>}
           </Text>
         </div>
-        {voucherDiscount > 0 && (
+        {shippingDiscount > 0 && (
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-            <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>Voucher giảm</Text>
+            <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>Voucher freeship</Text>
             <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>
-              -<DisplayPrice>{voucherDiscount}</DisplayPrice>
+              -<DisplayPrice>{shippingDiscount}</DisplayPrice>
+            </Text>
+          </div>
+        )}
+        {platformFee > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+            <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)' }}>Phí nền tảng</Text>
+            <Text size="xxxSmall" style={{ color: 'var(--tm-text-primary)', fontWeight: 500 }}>
+              <DisplayPrice>{platformFee}</DisplayPrice>
+            </Text>
+          </div>
+        )}
+        {orderDiscount > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
+            <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>Voucher giảm đơn</Text>
+            <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>
+              -<DisplayPrice>{orderDiscount}</DisplayPrice>
             </Text>
           </div>
         )}
@@ -471,6 +512,126 @@ export const CartPreview: FC = () => {
       >
         {submitting ? "Đang tạo đơn..." : !hasLocation ? " Chọn địa chỉ giao hàng" : "Đặt giao ngay"}
       </button>
+
+      {/* Voucher Sheet */}
+      {createPortal(
+        <Sheet visible={voucherSheetVisible} onClose={() => setVoucherSheetVisible(false)} autoHeight>
+          <div style={{ padding: 16, paddingBottom: 24 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <Text style={{ fontSize: 18, fontWeight: 700 }}>Chọn voucher</Text>
+              <button
+                onClick={() => loadVoucherList()}
+                disabled={voucherListLoading}
+                style={{
+                  background: "transparent",
+                  border: "1px solid var(--tm-border)",
+                  padding: "6px 10px",
+                  borderRadius: 10,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  cursor: voucherListLoading ? "wait" : "pointer",
+                }}
+              >
+                {voucherListLoading ? "Đang tải..." : "Tải lại"}
+              </button>
+            </div>
+
+            <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)", marginBottom: 12 }}>
+              Điều kiện áp dụng: tổng tiền món (chưa gồm phí) ≥ giá trị đơn tối thiểu.
+            </Text>
+
+            {voucherListError && (
+              <div style={{ padding: 10, borderRadius: 10, border: "1px solid #fecaca", background: "#fff1f2", marginBottom: 12 }}>
+                <Text size="xSmall" style={{ color: "#991b1b" }}>{voucherListError}</Text>
+              </div>
+            )}
+
+            {voucherList.length === 0 && !voucherListLoading && !voucherListError && (
+              <Text size="small" style={{ color: "var(--tm-text-secondary)" }}>
+                Hiện chưa có voucher khả dụng.
+              </Text>
+            )}
+
+            {(["shipping", "order"] as const).map((groupKey) => {
+              const isShipping = groupKey === "shipping";
+              const group = isShipping ? voucherGroups.shipping : voucherGroups.order;
+              if (group.length === 0) return null;
+
+              return (
+                <div key={groupKey} style={{ marginTop: 12 }}>
+                  <Text style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                    {isShipping ? "Freeship" : "Giảm giá đơn hàng"}
+                  </Text>
+
+                  {group.map((voucher) => {
+                    const eligible = eligibleForVoucher(voucher);
+                    const selected = appliedVoucher?.code === voucher.code;
+                    const isValidating = validatingVoucherCode === voucher.code;
+                    const minK = (voucher.minOrderValue / 1000).toFixed(0);
+                    const hsd = new Date(voucher.expiresAt).toLocaleDateString("vi-VN");
+                    const disabledReason =
+                      itemsTotal < voucher.minOrderValue
+                        ? `Đơn tối thiểu ${minK}K`
+                        : voucher.scope === "SHIPPING" && !hasLocation
+                          ? "Chọn địa chỉ để áp dụng freeship"
+                          : "";
+
+                    return (
+                      <div
+                        key={voucher.code}
+                        onClick={() => applyVoucherFromList(voucher)}
+                        className="tm-card"
+                        style={{
+                          padding: 12,
+                          marginBottom: 10,
+                          cursor: eligible ? "pointer" : "not-allowed",
+                          opacity: eligible ? 1 : 0.45,
+                          border: selected ? "2px solid var(--tm-primary)" : "1px solid var(--tm-border)",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 10 }}>
+                          <div style={{ flex: 1 }}>
+                            <Text style={{ fontWeight: 800, letterSpacing: 0.3 }}>{voucher.code}</Text>
+                            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 2 }}>
+                              {voucher.description}
+                            </Text>
+                            <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)", marginTop: 6 }}>
+                              HSD: {hsd} · Đơn tối thiểu {minK}K
+                            </Text>
+                            {!eligible && disabledReason && (
+                              <Text size="xxxSmall" style={{ color: "#b45309", marginTop: 4 }}>
+                                {disabledReason}
+                              </Text>
+                            )}
+                          </div>
+                          <button
+                            disabled={!eligible || isValidating}
+                            style={{
+                              padding: "8px 10px",
+                              borderRadius: 10,
+                              border: "none",
+                              background: eligible ? "var(--tm-primary)" : "#d1d5db",
+                              color: "#fff",
+                              fontSize: 12,
+                              fontWeight: 800,
+                              cursor: eligible ? (isValidating ? "wait" : "pointer") : "not-allowed",
+                              whiteSpace: "nowrap",
+                              minWidth: 72,
+                            }}
+                          >
+                            {isValidating ? "..." : selected ? "Đang dùng" : "Dùng"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </Sheet>,
+        document.body,
+      )}
     </div>
   );
 };

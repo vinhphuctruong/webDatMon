@@ -1,12 +1,8 @@
-﻿import React, { FC } from "react";
-import { useRecoilValue, useSetRecoilState } from "recoil";
+﻿import React, { FC, useEffect, useMemo, useState } from "react";
+import { useRecoilValue } from "recoil";
 import { notificationsState } from "state";
-import { Box, Header, Page, Text, useNavigate, useSnackbar } from "zmp-ui";
-import {
-  vouchersState,
-  appliedVoucherCodeState,
-  Voucher,
-} from "services/features";
+import { Box, Button, Header, Page, Text, useNavigate, useSnackbar } from "zmp-ui";
+import { claimVoucherApi, fetchMyVouchers, fetchVoucherMarket, readSession, type MyVoucherItem, type VoucherMarketItem } from "services/api";
 
 const promoGradients = [
   "tm-promo-gradient-1",
@@ -14,83 +10,62 @@ const promoGradients = [
   "tm-promo-gradient-3",
 ];
 
-const VoucherCard: FC<{ voucher: Voucher; onApply: (code: string) => void }> = ({
-  voucher,
-  onApply,
-}) => {
-  const isExpired = new Date(voucher.expiresAt) < new Date();
-  const expiresFormatted = new Date(voucher.expiresAt).toLocaleDateString("vi-VN", {
-    day: "2-digit",
-    month: "2-digit",
-  });
-
-  return (
-    <div
-      className="tm-voucher animate-slide-up"
-      style={{ opacity: voucher.used || isExpired ? 0.5 : 1 }}
-    >
-      <div className="tm-voucher-left">
-        <div style={{ textAlign: "center" }}>
-          <Text style={{ fontSize: 20 }}></Text>
-          <Text
-            size="xxxSmall"
-            style={{ color: "var(--tm-primary)", fontWeight: 700, marginTop: 2, fontSize: 9 }}
-          >
-            {voucher.code}
-          </Text>
-        </div>
-      </div>
-      <div className="tm-voucher-right">
-        <Text
-          size="small"
-          style={{ fontWeight: 600, color: "var(--tm-text-primary)", marginBottom: 2 }}
-        >
-          {voucher.description}
-        </Text>
-        <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-          {voucher.used
-            ? "Đã sử dụng"
-            : isExpired
-            ? "Đã hết hạn"
-            : `HSD: ${expiresFormatted} · Đơn tối thiểu ${(voucher.minOrderValue / 1000).toFixed(0)}K`}
-        </Text>
-        {!voucher.used && !isExpired && (
-          <div style={{ marginTop: 8 }}>
-            <button
-              onClick={() => onApply(voucher.code)}
-              style={{
-                background: "var(--tm-primary)",
-                color: "#fff",
-                borderRadius: 16,
-                padding: "5px 14px",
-                fontSize: 11,
-                fontWeight: 600,
-                border: "none",
-                cursor: "pointer",
-                fontFamily: "Inter, sans-serif",
-              }}
-            >
-              Sử dụng
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
 const NotificationPage: FC = () => {
   const notifications = useRecoilValue(notificationsState);
-  const vouchers = useRecoilValue(vouchersState);
-  const setAppliedCode = useSetRecoilState(appliedVoucherCodeState);
   const navigate = useNavigate();
   const snackbar = useSnackbar();
 
-  const handleApplyVoucher = (code: string) => {
-    setAppliedCode(code);
+  const [loading, setLoading] = useState(false);
+  const [market, setMarket] = useState<VoucherMarketItem[]>([]);
+  const [mine, setMine] = useState<MyVoucherItem[]>([]);
+  const [sessionReady, setSessionReady] = useState<boolean | null>(null);
+  const [claimingCode, setClaimingCode] = useState<string | null>(null);
+
+  const loadAll = async () => {
+    setLoading(true);
+    try {
+      const session = await readSession();
+      if (!session) {
+        setSessionReady(false);
+        setMarket([]);
+        setMine([]);
+        return;
+      }
+      setSessionReady(true);
+      const [mkt, my] = await Promise.all([fetchVoucherMarket(), fetchMyVouchers()]);
+      setMarket(mkt);
+      setMine(my);
+    } catch (err: any) {
+      snackbar.openSnackbar({ type: "error", text: err?.message || "Không tải được voucher" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadAll();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const myCodeSet = useMemo(() => new Set(mine.map((v) => v.code)), [mine]);
+
+  const handleClaim = async (code: string) => {
+    setClaimingCode(code);
+    try {
+      await claimVoucherApi(code);
+      snackbar.openSnackbar({ type: "success", text: `Đã lưu voucher ${code}` });
+      await loadAll();
+    } catch (err: any) {
+      snackbar.openSnackbar({ type: "error", text: err?.message || "Không lưu được voucher" });
+    } finally {
+      setClaimingCode(null);
+    }
+  };
+
+  const handleUseHint = (code: string) => {
     snackbar.openSnackbar({
       type: "success",
-      text: `Đã chọn mã ${code}. Vào giỏ hàng để đặt đơn! `,
+      text: `Đã lưu ${code}. Vào giỏ hàng → bấm “Chọn voucher” để sử dụng.`,
     });
     navigate("/cart");
   };
@@ -170,21 +145,164 @@ const NotificationPage: FC = () => {
 
       {/* Voucher section */}
       <Box style={{ padding: "0 16px 16px" }}>
-        <div className="tm-section-header" style={{ paddingLeft: 0, paddingRight: 0 }}>
-          <span className="tm-section-title"> Voucher của bạn</span>
-          <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-            {vouchers.filter((v) => !v.used).length} mã khả dụng
-          </Text>
-        </div>
-        <div className="space-y-3">
-          {vouchers.map((voucher, i) => (
-            <VoucherCard
-              key={voucher.code}
-              voucher={voucher}
-              onApply={handleApplyVoucher}
-            />
-          ))}
-        </div>
+        {sessionReady === false ? (
+          <div className="tm-card" style={{ padding: 14 }}>
+            <Text style={{ fontWeight: 700, marginBottom: 6 }}>Đăng nhập để săn voucher</Text>
+            <Text size="small" style={{ color: "var(--tm-text-secondary)", marginBottom: 12 }}>
+              Bạn cần đăng nhập để lưu voucher và sử dụng khi đặt hàng.
+            </Text>
+            <Button onClick={() => navigate("/login?required=1")} style={{ width: "100%", background: "var(--tm-primary)" }}>
+              Đăng nhập
+            </Button>
+          </div>
+        ) : (
+          <>
+            {/* Market */}
+            <div className="tm-section-header" style={{ paddingLeft: 0, paddingRight: 0 }}>
+              <span className="tm-section-title"> Săn voucher</span>
+              <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
+                {loading ? "Đang tải..." : `${market.length} mã`}
+              </Text>
+            </div>
+
+            {market.length === 0 && !loading ? (
+              <Text size="small" style={{ color: "var(--tm-text-secondary)" }}>
+                Hiện chưa có voucher để săn.
+              </Text>
+            ) : (
+              <div className="space-y-3">
+                {market.map((v) => {
+                  const expiresFormatted = new Date(v.expiresAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+                  const minK = (v.minOrderValue / 1000).toFixed(0);
+                  const already = v.hasClaimed || myCodeSet.has(v.code);
+                  const soldOut = Boolean(v.isSoldOut);
+                  const disabled = already || soldOut || claimingCode === v.code;
+                  const btnText = soldOut ? "Hết lượt" : already ? "Đã lưu" : claimingCode === v.code ? "..." : "Lưu";
+                  const remainingText = v.maxClaimTotal != null ? ` · Còn ${v.remainingClaims ?? 0}` : " · Vô hạn";
+
+                  return (
+                    <div key={v.code} className="tm-voucher animate-slide-up" style={{ opacity: soldOut ? 0.5 : 1 }}>
+                      <div className="tm-voucher-left">
+                        <div style={{ textAlign: "center" }}>
+                          <Text style={{ fontSize: 20 }}></Text>
+                          <Text size="xxxSmall" style={{ color: "var(--tm-primary)", fontWeight: 700, marginTop: 2, fontSize: 9 }}>
+                            {v.code}
+                          </Text>
+                        </div>
+                      </div>
+                      <div className="tm-voucher-right">
+                        <Text size="small" style={{ fontWeight: 600, color: "var(--tm-text-primary)", marginBottom: 2 }}>
+                          {v.description}
+                        </Text>
+                        <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>
+                          HSD: {expiresFormatted} · Đơn tối thiểu {minK}K{remainingText}
+                        </Text>
+                        <div style={{ marginTop: 8, display: "flex", gap: 8 }}>
+                          <button
+                            onClick={() => (already ? handleUseHint(v.code) : handleClaim(v.code))}
+                            disabled={disabled}
+                            style={{
+                              background: disabled ? "#d1d5db" : "var(--tm-primary)",
+                              color: "#fff",
+                              borderRadius: 16,
+                              padding: "5px 14px",
+                              fontSize: 11,
+                              fontWeight: 600,
+                              border: "none",
+                              cursor: disabled ? "not-allowed" : "pointer",
+                              fontFamily: "Inter, sans-serif",
+                            }}
+                          >
+                            {btnText}
+                          </button>
+                          {already && (
+                            <button
+                              onClick={() => handleUseHint(v.code)}
+                              style={{
+                                background: "var(--tm-primary-light)",
+                                color: "var(--tm-primary)",
+                                borderRadius: 16,
+                                padding: "5px 14px",
+                                fontSize: 11,
+                                fontWeight: 700,
+                                border: "none",
+                                cursor: "pointer",
+                                fontFamily: "Inter, sans-serif",
+                              }}
+                            >
+                              Dùng
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* My vouchers */}
+            <div className="tm-section-header" style={{ paddingLeft: 0, paddingRight: 0, marginTop: 14 }}>
+              <span className="tm-section-title"> Voucher của bạn</span>
+              <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
+                {mine.filter((v) => !v.used && !v.isExpired && !v.notStarted).length} mã khả dụng
+              </Text>
+            </div>
+
+            {mine.length === 0 && !loading ? (
+              <Text size="small" style={{ color: "var(--tm-text-secondary)" }}>
+                Bạn chưa lưu voucher nào. Hãy săn voucher ở phía trên.
+              </Text>
+            ) : (
+              <div className="space-y-3">
+                {mine.map((v) => {
+                  const expiresFormatted = new Date(v.expiresAt).toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit" });
+                  const minK = (v.minOrderValue / 1000).toFixed(0);
+                  const statusText = v.used ? "Đã sử dụng" : v.isExpired ? "Đã hết hạn" : v.notStarted ? "Chưa bắt đầu" : `HSD: ${expiresFormatted} · Đơn tối thiểu ${minK}K`;
+                  const faded = v.used || v.isExpired || v.notStarted;
+                  return (
+                    <div key={v.code} className="tm-voucher animate-slide-up" style={{ opacity: faded ? 0.5 : 1 }}>
+                      <div className="tm-voucher-left">
+                        <div style={{ textAlign: "center" }}>
+                          <Text style={{ fontSize: 20 }}></Text>
+                          <Text size="xxxSmall" style={{ color: "var(--tm-primary)", fontWeight: 700, marginTop: 2, fontSize: 9 }}>
+                            {v.code}
+                          </Text>
+                        </div>
+                      </div>
+                      <div className="tm-voucher-right">
+                        <Text size="small" style={{ fontWeight: 600, color: "var(--tm-text-primary)", marginBottom: 2 }}>
+                          {v.description}
+                        </Text>
+                        <Text size="xxxSmall" style={{ color: "var(--tm-text-tertiary)" }}>{statusText}</Text>
+                        {!faded && (
+                          <div style={{ marginTop: 8 }}>
+                            <button
+                              onClick={() => handleUseHint(v.code)}
+                              style={{
+                                background: "var(--tm-primary)",
+                                color: "#fff",
+                                borderRadius: 16,
+                                padding: "5px 14px",
+                                fontSize: 11,
+                                fontWeight: 600,
+                                border: "none",
+                                cursor: "pointer",
+                                fontFamily: "Inter, sans-serif",
+                              }}
+                            >
+                              Sử dụng
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </>
+        )}
       </Box>
     </Page>
   );

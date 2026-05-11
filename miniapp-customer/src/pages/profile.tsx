@@ -1,4 +1,4 @@
-import React, { FC, Suspense, useState } from "react";
+import React, { FC, Suspense, useEffect, useState } from "react";
 import { Box, Page, Text, useNavigate, useSnackbar } from "zmp-ui";
 import { useToBeImplemented } from "hooks";
 import { useSetRecoilState, useRecoilValue, useRecoilValueLoadable } from "recoil";
@@ -13,8 +13,10 @@ import {
 } from "services/features";
 import {
   clearApiSession,
+  fetchMyProfile,
   resumeAutoDemoLogin,
   isAutoDemoLoginDisabled,
+  readSession,
 } from "services/api";
 
 const ProfileHeader: FC = () => {
@@ -164,7 +166,7 @@ interface MenuItemData {
   icon: string;
   label: string;
   tone?: "default" | "danger";
-  action?: "logout" | "login_demo" | "partner_onboarding" | "register_store" | "account" | "active_orders";
+  action?: "logout" | "login_demo" | "login" | "partner_onboarding" | "register_store" | "account" | "active_orders";
 }
 
 const MenuItem: FC<{ item: MenuItemData; onClick: () => void }> = ({ item, onClick }) => (
@@ -203,22 +205,70 @@ const MenuSections: FC = () => {
   const navigate = useNavigate();
   const snackbar = useSnackbar();
   const [autoLoginDisabled, setAutoLoginDisabled] = useState(isAutoDemoLoginDisabled());
+  const [hasSession, setHasSession] = useState<boolean>(false);
   const setCart = useSetRecoilState(cartState);
   const setOrderHistory = useSetRecoilState(orderHistoryState);
   const setFavorites = useSetRecoilState(favoriteIdsState);
   const setAppliedVoucherCode = useSetRecoilState(appliedVoucherCodeState);
   const onClick = useToBeImplemented();
 
+  useEffect(() => {
+    // Không chỉ dựa vào localStorage vì session có thể:
+    // - còn lưu trong zmp-sdk storage (getStorage) từ lần trước
+    // - token đã hết hạn nhưng vẫn còn trong storage
+    // => cần verify bằng /auth/me, fail thì clear session.
+    let active = true;
+
+    const checkAuth = async () => {
+      const session = await readSession();
+      if (!active) return;
+      if (!session) {
+        setHasSession(false);
+        return;
+      }
+
+      try {
+        await fetchMyProfile();
+        if (!active) return;
+        setHasSession(true);
+      } catch (_error) {
+        // Token invalid/expired -> dọn session để UI trở về trạng thái chưa đăng nhập
+        clearApiSession();
+        if (!active) return;
+        setHasSession(false);
+      }
+    };
+
+    void checkAuth();
+
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        void checkAuth();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+
+    return () => {
+      active = false;
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, []);
+
   const handleLogout = () => {
+    if (!hasSession) {
+      snackbar.openSnackbar({ type: "info", text: "Bạn chưa đăng nhập" });
+      return;
+    }
     clearApiSession();
     setCart([]);
     setOrderHistory([]);
     setFavorites([]);
     setAppliedVoucherCode(null);
     setAutoLoginDisabled(true);
+    setHasSession(false);
     snackbar.openSnackbar({
       type: "success",
-      text: "Đã đăng xuất. Ứng dụng sẽ không tự đăng nhập lại demo",
+      text: "Đã đăng xuất",
     });
     navigate("/");
   };
@@ -246,9 +296,9 @@ const MenuSections: FC = () => {
     { icon: "", label: "Hỗ trợ & góp ý" },
     { icon: "", label: "Điều khoản sử dụng" },
     { icon: "ℹ", label: "Về TM Food" },
-    autoLoginDisabled
-      ? { icon: "", label: "Đăng nhập lại demo", action: "login_demo" as const }
-      : { icon: "", label: "Đăng xuất", tone: "danger", action: "logout" as const },
+    hasSession
+      ? { icon: "", label: "Đăng xuất", tone: "danger", action: "logout" as const }
+      : { icon: "", label: "Đăng nhập / Đăng ký", action: "login" as const },
   ];
 
   const resolveMenuClick = (item: MenuItemData) => {
@@ -257,6 +307,9 @@ const MenuSections: FC = () => {
     }
     if (item.action === "login_demo") {
       return handleResumeDemoLogin;
+    }
+    if (item.action === "login") {
+      return () => navigate("/login?mode=login");
     }
     if (item.action === "account") {
       return () => navigate("/account");

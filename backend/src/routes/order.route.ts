@@ -313,7 +313,7 @@ orderRouter.post(
     let voucherId: string | undefined;
     if (payload.voucherCode) {
       const code = payload.voucherCode.trim().toUpperCase();
-      const result = await validateVoucher(code, userId, subtotal);
+      const result = await validateVoucher(code, userId, subtotal, deliveryFee);
       discount = result.discount;
       voucherCode = result.voucher.code;
       voucherId = result.voucher.id;

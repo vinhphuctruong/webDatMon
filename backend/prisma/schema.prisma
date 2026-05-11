@@ -41,6 +41,17 @@ enum DiscountType {
   FIXED
 }
 
+enum VoucherScope {
+  ORDER
+  SHIPPING
+}
+
+enum VoucherClaimSource {
+  MARKET
+  ADMIN
+  AUTO
+}
+
 enum PaymentMethod {
   SEPAY_QR
   COD
@@ -141,6 +152,7 @@ model User {
   sepayTopupRequest SePayTopupRequest[]
   storeApplications StoreApplication[] @relation("UserStoreApplications")
   reviewedStoreApplications StoreApplication[] @relation("ReviewedStoreApplications")
+  voucherClaims      VoucherClaim[]
 
   resetPasswordOtp       String?
   resetPasswordOtpExpiry DateTime?
@@ -665,6 +677,11 @@ model Voucher {
   id              String        @id @default(uuid())
   code            String        @unique
   description     String
+  scope           VoucherScope  @default(ORDER)
+  isClaimable     Boolean       @default(true)  /// có hiển thị để khách "săn" / lưu hay không
+  maxClaimTotal   Int?          /// tổng lượt LƯU tối đa (null = vô hạn)
+  claimedCount    Int           @default(0)     /// tổng lượt đã LƯU
+  autoGrantOnRegister Boolean   @default(false) /// tự động lưu cho khách mới khi đăng ký
   discountType    DiscountType  @default(FIXED)
   discountValue   Int           /// Giá trị giảm (VNĐ nếu FIXED, % nếu PERCENT)
   maxDiscount     Int?          /// Giảm tối đa (chỉ dùng cho PERCENT)
@@ -679,9 +696,25 @@ model Voucher {
   updatedAt       DateTime      @updatedAt
 
   usages          VoucherUsage[]
+  claims          VoucherClaim[]
 
   @@index([code])
   @@index([isActive, startsAt, expiresAt])
+}
+
+model VoucherClaim {
+  id        String             @id @default(uuid())
+  voucherId String
+  userId    String
+  source    VoucherClaimSource @default(MARKET)
+  claimedAt DateTime           @default(now())
+
+  voucher   Voucher            @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([voucherId, userId])
+  @@index([userId, claimedAt])
+  @@index([voucherId, claimedAt])
 }
 
 model VoucherUsage {

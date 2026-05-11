@@ -32,6 +32,7 @@
     "morgan": "^1.10.0",
     "nodemailer": "^8.0.5",
     "socket.io": "^4.8.3",
+    "tm-food-root": "file:..",
     "zod": "^3.23.8"
   },
   "devDependencies": {

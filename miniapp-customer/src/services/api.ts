@@ -506,6 +506,7 @@ export interface VoucherInfo {
   id: string;
   code: string;
   description: string;
+  scope: "ORDER" | "SHIPPING";
   discountType: "FIXED" | "PERCENT";
   discountValue: number;
   maxDiscount?: number | null;
@@ -514,9 +515,28 @@ export interface VoucherInfo {
   expiresAt: string;
 }
 
+export interface VoucherMarketItem extends VoucherInfo {
+  maxUsageTotal?: number | null;
+  usedCount?: number;
+  maxClaimTotal?: number | null;
+  claimedCount?: number;
+  remainingClaims?: number | null;
+  isSoldOut?: boolean;
+  hasClaimed?: boolean;
+}
+
+export interface MyVoucherItem extends VoucherInfo {
+  claimedAt: string;
+  used: boolean;
+  usedCountForUser: number;
+  isExpired: boolean;
+  notStarted: boolean;
+}
+
 export interface VoucherValidation {
   code: string;
   description: string;
+  scope: "ORDER" | "SHIPPING";
   discountType: "FIXED" | "PERCENT";
   discountValue: number;
   maxDiscount?: number | null;
@@ -525,20 +545,35 @@ export interface VoucherValidation {
   expiresAt: string;
 }
 
-export async function fetchVouchers(): Promise<VoucherInfo[]> {
-  const res = await apiFetch<{ data: VoucherInfo[] }>("/vouchers");
+export async function fetchVoucherMarket(): Promise<VoucherMarketItem[]> {
+  const res = await apiFetch<{ data: VoucherMarketItem[] }>("/vouchers/market", undefined, { auth: true });
   return res.data;
+}
+
+export async function fetchMyVouchers(): Promise<MyVoucherItem[]> {
+  const res = await apiFetch<{ data: MyVoucherItem[] }>("/vouchers/my", undefined, { auth: true });
+  return res.data;
+}
+
+export async function claimVoucherApi(code: string) {
+  const res = await apiFetch<{ message: string; data?: any }>(
+    "/vouchers/claim",
+    { method: "POST", body: JSON.stringify({ code }) },
+    { auth: true },
+  );
+  return res;
 }
 
 export async function validateVoucherApi(
   code: string,
   subtotal: number,
+  deliveryFee: number,
 ): Promise<VoucherValidation> {
   const res = await apiFetch<{ data: VoucherValidation }>(
     "/vouchers/validate",
     {
       method: "POST",
-      body: JSON.stringify({ code, subtotal }),
+      body: JSON.stringify({ code, subtotal, deliveryFee }),
     },
     { auth: true },
   );

@@ -52,6 +52,11 @@ export interface OverviewPayload {
 
 export interface Voucher {
   id: string; code: string; description: string;
+  scope?: "ORDER" | "SHIPPING";
+  isClaimable?: boolean;
+  maxClaimTotal?: number | null;
+  claimedCount?: number;
+  autoGrantOnRegister?: boolean;
   discountType: "FIXED" | "PERCENT"; discountValue: number;
   maxDiscount: number | null; minOrderValue: number;
   maxUsageTotal: number | null; maxUsagePerUser: number;

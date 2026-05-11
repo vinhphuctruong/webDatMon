@@ -4,7 +4,7 @@ import { ActiveOrdersContent } from "./active-orders";
 import { Sheet } from "components/fullscreen-sheet";
 import { DisplayPrice } from "components/display/price";
 import { fetchOrders } from "services/backend";
-import { requestCancelOrder, submitReview } from "services/api";
+import { confirmReceived, requestCancelOrder, submitReview } from "services/api";
 import { formatStoreOrderCode } from "utils/order-code";
 
 /* ── Star Rating Component ────────────────── */
@@ -112,7 +112,7 @@ const ReviewSheet: FC<{
           textAlign: "center",
           padding: "12px 0 16px",
           background: "linear-gradient(135deg, #fef9e7, #fff7ed)",
-          borderRadius: 16,
+          borderRadius: 0,
           marginBottom: 20,
         }}>
           <span style={{ fontSize: 36 }}>⭐</span>
@@ -124,32 +124,42 @@ const ReviewSheet: FC<{
           </Text>
         </div>
 
-        <div style={{ padding: "12px 14px", background: "#f9fafb", borderRadius: 14, marginBottom: 16 }}>
+        <div style={{ padding: "12px 14px", background: "#f9fafb", borderRadius: 0, marginBottom: 16 }}>
           <StarRating value={storeRating} onChange={setStoreRating} label={` ${order.store?.name || "Quán"}`} size={30} />
           <Input.TextArea
             placeholder="Nhận xét về quán..."
             value={storeComment}
             onChange={(e) => setStoreComment(e.target.value)}
             rows={2}
-            style={{ borderRadius: 12, marginTop: 8 }}
+            style={{
+              borderRadius: 0,
+              marginTop: 8,
+              border: "1px solid #d1d5db",
+              background: "#fff",
+            }}
           />
         </div>
 
         {order.driverId && (
-          <div style={{ padding: "12px 14px", background: "#f9fafb", borderRadius: 14, marginBottom: 16 }}>
+          <div style={{ padding: "12px 14px", background: "#f9fafb", borderRadius: 0, marginBottom: 16 }}>
             <StarRating value={driverRating} onChange={setDriverRating} label=" Tài xế" size={30} />
             <Input.TextArea
               placeholder="Nhận xét về tài xế..."
               value={driverComment}
               onChange={(e) => setDriverComment(e.target.value)}
               rows={2}
-              style={{ borderRadius: 12, marginTop: 8 }}
+              style={{
+                borderRadius: 0,
+                marginTop: 8,
+                border: "1px solid #d1d5db",
+                background: "#fff",
+              }}
             />
           </div>
         )}
 
         {order.items && order.items.length > 0 && (
-          <div style={{ padding: "12px 14px", background: "#f9fafb", borderRadius: 14, marginBottom: 20 }}>
+          <div style={{ padding: "12px 14px", background: "#f9fafb", borderRadius: 0, marginBottom: 20 }}>
             <Text size="xSmall" style={{ fontWeight: 600, color: "var(--tm-text-secondary)", marginBottom: 8 }}>
                Đánh giá món ăn
             </Text>
@@ -170,7 +180,13 @@ const ReviewSheet: FC<{
                     value={pData.comment}
                     onChange={(e) => setProductRatings(prev => ({ ...prev, [item.productId]: { ...pData, comment: e.target.value } }))}
                     rows={1}
-                    style={{ borderRadius: 10, marginTop: 4, fontSize: 13 }}
+                    style={{
+                      borderRadius: 0,
+                      marginTop: 4,
+                      fontSize: 13,
+                      border: "1px solid #d1d5db",
+                      background: "#fff",
+                    }}
                   />
                 </div>
               );
@@ -203,6 +219,7 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void; onReview: (order:
   const snackbar = useSnackbar();
   const navigate = useNavigate();
   const [cancelling, setCancelling] = useState(false);
+  const [startingReview, setStartingReview] = useState(false);
 
   const requestCancelReason = () => {
     const input = window.prompt("Vui lòng nhập lý do hủy đơn", "Khách hàng đổi ý");
@@ -264,6 +281,27 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void; onReview: (order:
     }
   };
 
+  const handleStartReview = async () => {
+    setStartingReview(true);
+    try {
+      // Backend chỉ cho đánh giá khi khách đã "xác nhận nhận hàng"
+      // (customerConfirmedAt). Để UX giống ShopeeFood: nếu đơn đã giao mà
+      // chưa bấm "Đã nhận", tự động xác nhận trước rồi mở sheet đánh giá.
+      if (order.status === "DELIVERED" && !order.customerConfirmedAt) {
+        await confirmReceived(order.id);
+        onCancelSuccess(); // refresh list để cập nhật customerConfirmedAt
+      }
+      onReview(order);
+    } catch (error) {
+      snackbar.openSnackbar({
+        type: "error",
+        text: error instanceof Error ? error.message : "Không thể mở đánh giá",
+      });
+    } finally {
+      setStartingReview(false);
+    }
+  };
+
   return (
     <div className="tm-card" style={{ padding: "14px 16px", marginBottom: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
@@ -322,15 +360,17 @@ const OrderCard: FC<{ order: any; onCancelSuccess: () => void; onReview: (order:
           )}
           {order.status === "DELIVERED" && !order.review && (
             <button
-              onClick={() => onReview(order)}
+              onClick={handleStartReview}
+              disabled={startingReview}
               style={{
                 background: "linear-gradient(135deg, #f59e0b, #d97706)",
                 color: "#fff",
                 border: "none", borderRadius: 12, padding: "5px 14px",
                 fontSize: 12, fontWeight: 600, cursor: "pointer",
+                opacity: startingReview ? 0.7 : 1,
               }}
             >
-              Đánh giá
+              {startingReview ? "Đang mở..." : "Đánh giá"}
             </button>
           )}
           <button
@@ -401,14 +441,15 @@ const OrdersPage: FC = () => {
     loadOrders();
   }, [selectedOrderForReview]); // re-fetch when review sheet closes
 
+  // UX kiểu ShopeeFood:
+  // - Đơn đã giao (DELIVERED) chuyển sang "Lịch sử" ngay.
+  // - Đơn đang xử lý ở tab "Đang diễn ra".
   const activeOrders = allOrders.filter((o: any) =>
-    ["PENDING", "CONFIRMED", "PREPARING", "READY", "PICKED_UP"].includes(o.status) ||
-    (o.status === "DELIVERED" && !o.customerConfirmedAt)
+    ["PENDING", "CONFIRMED", "PREPARING", "READY", "PICKED_UP"].includes(o.status)
   );
 
-  const historyOrders = allOrders.filter((o: any) => 
-    (o.status === "DELIVERED" && o.customerConfirmedAt) ||
-    ["CANCELLED", "FAILED"].includes(o.status)
+  const historyOrders = allOrders.filter((o: any) =>
+    ["DELIVERED", "CANCELLED", "FAILED"].includes(o.status)
   );
 
   return (

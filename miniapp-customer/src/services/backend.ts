@@ -421,10 +421,10 @@ export async function fetchVouchers() {
   return res.data || [];
 }
 
-export async function validateVoucher(code: string, subtotal: number) {
+export async function validateVoucher(code: string, subtotal: number, deliveryFee: number) {
   const res = await apiFetch<{ data: any }>('/vouchers/validate', {
     method: 'POST',
-    body: JSON.stringify({ code, subtotal }),
+    body: JSON.stringify({ code, subtotal, deliveryFee }),
   }, { auth: true });
   return res.data;
 }

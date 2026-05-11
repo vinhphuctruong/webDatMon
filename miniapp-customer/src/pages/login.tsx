@@ -33,10 +33,11 @@ const LoginPage: FC = () => {
 
   const [mode, setMode] = useState<AuthMode>(() =>
     parseRequiredFromSearch(location.search)
-      ? "register_customer"
+      ? "login"
       : parseModeFromSearch(location.search),
   );
-  const [requireRegistration, setRequireRegistration] = useState<boolean>(() =>
+  // required=1: user must login to continue (coming from protected feature)
+  const [requireLogin, setRequireLogin] = useState<boolean>(() =>
     parseRequiredFromSearch(location.search),
   );
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -71,8 +72,9 @@ const LoginPage: FC = () => {
 
   useEffect(() => {
     const required = parseRequiredFromSearch(location.search);
-    setRequireRegistration(required);
-    setMode(required ? "register_customer" : parseModeFromSearch(location.search));
+    setRequireLogin(required);
+    // Khi đi từ tính năng cần đăng nhập (required=1) thì ưu tiên mở form đăng nhập trước
+    setMode(required ? "login" : parseModeFromSearch(location.search));
     
     // Check session asynchronously
     readSession().then((session) => {
@@ -326,426 +328,379 @@ const LoginPage: FC = () => {
     customerOtpEmail === customerEmail.trim().toLowerCase() &&
     customerOtpExpiresIn > 0;
 
+  const screen: React.CSSProperties = {
+    minHeight: "100vh",
+    background: "linear-gradient(180deg, #ecfdf5 0%, #ffffff 65%, #ffffff 100%)",
+    display: "flex",
+    justifyContent: "center",
+    padding: "28px 16px",
+  };
+
+  const card: React.CSSProperties = {
+    width: "100%",
+    maxWidth: 360,
+    marginTop: 24,
+    padding: 18,
+    borderRadius: 16,
+    background: "#ffffff",
+    border: "1px solid var(--tm-border)",
+    boxShadow: "var(--tm-shadow-md)",
+  };
+
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    borderRadius: 999,
+    border: "1px solid var(--tm-border)",
+    background: "#ffffff",
+    color: "var(--tm-text-primary)",
+    padding: "12px 14px",
+    outline: "none",
+    fontSize: 14,
+  };
+
+  const pillButton: React.CSSProperties = {
+    width: "100%",
+    border: "none",
+    borderRadius: 999,
+    padding: "12px 14px",
+    fontWeight: 800,
+    letterSpacing: 0.5,
+    cursor: "pointer",
+  };
+
   return (
-    <Page style={{ background: "var(--tm-bg)" }}>
-      <div className="tm-header-gradient" style={{ paddingBottom: 20 }}>
-        <Text.Title style={{ color: "#fff", fontWeight: 800, fontSize: 22 }}>
-          Đăng nhập hệ thống
-        </Text.Title>
-        <Text size="xSmall" style={{ color: "rgba(255,255,255,0.85)", marginTop: 6 }}>
-          Đăng nhập hoặc tạo tài khoản để đặt hàng.
-        </Text>
-        {requireRegistration ? (
-          <Text size="xSmall" style={{ color: "#e6fff3", marginTop: 6, fontWeight: 600 }}>
-            Vui lòng hoàn tất email, số điện thoại và mật khẩu để tiếp tục sử dụng ứng dụng.
-          </Text>
-        ) : null}
-      </div>
-
-      <div style={{ padding: "16px", display: "grid", gap: 12 }}>
-        <div className="tm-card" style={{ padding: 10, display: "flex", gap: 8 }}>
-          {[
-            ...(isLoggedIn ? [] : [
-              { key: "login", label: "Đăng nhập" },
-              { key: "register_customer", label: "Đăng ký mới" },
-            ]),
-          ].map((tab) => {
-            const active = mode === (tab.key as AuthMode);
-            return (
-              <button
-                key={tab.key}
-                type="button"
-                onClick={() => setMode(tab.key as AuthMode)}
-                style={{
-                  flex: 1,
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "10px 8px",
-                  fontWeight: 700,
-                  fontSize: 12,
-                  color: active ? "#fff" : "var(--tm-text-secondary)",
-                  background: active
-                    ? "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)"
-                    : "#f1f5f3",
-                  cursor: "pointer",
-                }}
-              >
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {mode === "login" && (
-          <form className="tm-card" style={{ padding: 16 }} onSubmit={handleLogin}>
-            <Text.Title style={{ fontSize: 18 }}>Đăng nhập khách hàng</Text.Title>
-            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 12 }}>
-              Đăng nhập bằng Email và mật khẩu đã đăng ký.
+    <Page style={{ background: "transparent" }}>
+      <div style={screen}>
+        <div style={{ width: "100%", maxWidth: 360 }}>
+          <div style={{ textAlign: "center" }}>
+            <Text.Title style={{ color: "var(--tm-text-primary)", fontWeight: 900, fontSize: 22 }}>
+              {mode === "register_customer" ? "Đăng ký tài khoản" : mode === "forgot_password" ? "Quên mật khẩu" : "Đăng nhập"}
+            </Text.Title>
+            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 6 }}>
+              {mode === "register_customer"
+                ? "Tạo tài khoản để đặt hàng và theo dõi đơn."
+                : mode === "forgot_password"
+                  ? "Nhập email để nhận OTP và đặt lại mật khẩu."
+                  : "Đăng nhập để tiếp tục đặt hàng."}
             </Text>
+            {requireLogin ? (
+              <Text size="xSmall" style={{ color: "var(--tm-primary)", marginTop: 6, fontWeight: 800 }}>
+                Vui lòng đăng nhập để tiếp tục sử dụng tính năng này.
+              </Text>
+            ) : null}
+          </div>
 
-            <div style={{ display: "grid", gap: 10 }}>
-              <input
-                type="email"
-                placeholder="Email"
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
-              />
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+          <div style={card}>
+            {mode === "login" && (
+              <form onSubmit={handleLogin} style={{ display: "grid", gap: 12 }}>
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  style={inputStyle}
+                />
                 <input
                   type={showLoginPassword ? "text" : "password"}
                   placeholder="Mật khẩu"
                   value={loginPassword}
                   onChange={(e) => setLoginPassword(e.target.value)}
-                  style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
+                  style={inputStyle}
                 />
+
+                <button
+                  type="submit"
+                  disabled={loginSubmitting}
+                  style={{
+                    ...pillButton,
+                    background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
+                    color: "#fff",
+                    opacity: loginSubmitting ? 0.7 : 1,
+                  }}
+                >
+                  {loginSubmitting ? "ĐANG ĐĂNG NHẬP..." : "ĐĂNG NHẬP"}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setShowLoginPassword((prev) => !prev)}
                   style={{
-                    border: "1px solid var(--tm-border)",
-                    borderRadius: 10,
-                    padding: "10px 12px",
-                    fontWeight: 600,
+                    border: "none",
+                    background: "transparent",
                     color: "var(--tm-text-secondary)",
-                    background: "#fff",
+                    fontWeight: 700,
+                    fontSize: 12,
                     cursor: "pointer",
-                    minWidth: 68,
+                    textAlign: "center",
                   }}
                 >
-                  {showLoginPassword ? "Ẩn" : "Hiện"}
+                  {showLoginPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                 </button>
-              </div>
-              <button
-                type="submit"
-                disabled={loginSubmitting}
-                style={{
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "12px 14px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
-                  cursor: "pointer",
-                  opacity: loginSubmitting ? 0.7 : 1,
-                }}
-              >
-                {loginSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("forgot_password")}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--tm-primary)",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  padding: "4px 0",
-                  textAlign: "right",
-                }}
-              >
-                Quên mật khẩu?
-              </button>
-            </div>
-          </form>
-        )}
 
-        {mode === "forgot_password" && (
-          <form className="tm-card" style={{ padding: 16 }} onSubmit={handleForgotPassword}>
-            <Text.Title style={{ fontSize: 18 }}>Quên mật khẩu</Text.Title>
-            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 12 }}>
-              {!fpOtpRequested || fpOtpExpiresIn <= 0
-                ? "Bước 1/3: Nhập email đã đăng ký để nhận mã OTP."
-                : !fpOtpVerified
-                  ? "Bước 2/3: Nhập mã OTP đã gửi đến email của bạn."
-                  : "Bước 3/3: Nhập mật khẩu mới cho tài khoản."}
-            </Text>
+                <button
+                  type="button"
+                  onClick={() => setMode("forgot_password")}
+                  style={{
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--tm-primary)",
+                    fontWeight: 600,
+                    fontSize: 12,
+                    cursor: "pointer",
+                    textAlign: "center",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Quên mật khẩu?
+                </button>
 
-            <div style={{ display: "grid", gap: 10 }}>
-              <input
-                type="email"
-                placeholder="Email đã đăng ký"
-                value={fpEmail}
-                onChange={(e) => setFpEmail(e.target.value)}
-                disabled={fpOtpRequested && fpOtpExpiresIn > 0}
-                style={{
-                  borderRadius: 10,
-                  border: "1px solid var(--tm-border)",
-                  padding: 12,
-                  opacity: fpOtpRequested && fpOtpExpiresIn > 0 ? 0.6 : 1,
-                }}
-              />
-
-              {fpOtpRequested && fpOtpExpiresIn > 0 && !fpOtpVerified && (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Nhập mã OTP (6 số)"
-                    value={fpOtpCode}
-                    onChange={(e) => setFpOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
-                  />
-                  <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-                    OTP có hiệu lực trong {fpOtpExpiresIn}s.
-                  </Text>
-                </>
-              )}
-
-              {fpOtpVerified && (
-                <div style={{
-                  display: "flex", alignItems: "center", gap: 8,
-                  padding: "10px 12px", borderRadius: 10,
-                  background: "var(--tm-primary-light)", border: "1px solid var(--tm-primary)",
-                }}>
-                  <span style={{ fontSize: 16 }}></span>
-                  <Text size="xSmall" style={{ color: "var(--tm-primary)", fontWeight: 600 }}>
-                    OTP đã xác nhận thành công
-                  </Text>
+                <div style={{ textAlign: "center", marginTop: 2 }}>
+                  <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)" }}>
+                    Chưa có tài khoản?
+                  </Text>{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode("register_customer")}
+                    style={{
+                      border: "1px solid var(--tm-primary)",
+                      background: "#ffffff",
+                      color: "var(--tm-primary)",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      padding: "10px 14px",
+                      borderRadius: 999,
+                      marginTop: 10,
+                      width: "100%",
+                    }}
+                  >
+                    ĐĂNG KÝ
+                  </button>
                 </div>
-              )}
+              </form>
+            )}
 
-              {fpOtpVerified && (
-                <>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
+            {mode === "forgot_password" && (
+              <form onSubmit={handleForgotPassword} style={{ display: "grid", gap: 12 }}>
+                <input
+                  type="email"
+                  placeholder="Email đã đăng ký"
+                  value={fpEmail}
+                  onChange={(e) => setFpEmail(e.target.value)}
+                  disabled={fpOtpRequested && fpOtpExpiresIn > 0}
+                  style={{ ...inputStyle, opacity: fpOtpRequested && fpOtpExpiresIn > 0 ? 0.6 : 1 }}
+                />
+
+                {fpOtpRequested && fpOtpExpiresIn > 0 && !fpOtpVerified && (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Mã OTP (6 số)"
+                      value={fpOtpCode}
+                      onChange={(e) => setFpOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      style={inputStyle}
+                    />
+                    <Text size="xxSmall" style={{ color: "rgba(255,255,255,0.82)", textAlign: "center" }}>
+                      OTP còn hiệu lực: {fpOtpExpiresIn}s
+                    </Text>
+                  </>
+                )}
+
+                {fpOtpVerified && (
+                  <>
                     <input
                       type={showFpPassword ? "text" : "password"}
                       placeholder="Mật khẩu mới (>= 8 ký tự)"
                       value={fpNewPassword}
                       onChange={(e) => setFpNewPassword(e.target.value)}
-                      style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
+                      style={inputStyle}
+                    />
+                    <input
+                      type={showFpPassword ? "text" : "password"}
+                      placeholder="Nhập lại mật khẩu mới"
+                      value={fpConfirmPassword}
+                      onChange={(e) => setFpConfirmPassword(e.target.value)}
+                      style={inputStyle}
                     />
                     <button
                       type="button"
                       onClick={() => setShowFpPassword((prev) => !prev)}
                       style={{
-                        border: "1px solid var(--tm-border)",
-                        borderRadius: 10,
-                        padding: "10px 12px",
-                        fontWeight: 600,
+                        border: "none",
+                        background: "transparent",
                         color: "var(--tm-text-secondary)",
-                        background: "#fff",
+                        fontWeight: 700,
+                        fontSize: 12,
                         cursor: "pointer",
-                        minWidth: 68,
+                        textAlign: "center",
                       }}
                     >
-                      {showFpPassword ? "Ẩn" : "Hiện"}
+                      {showFpPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                     </button>
-                  </div>
+                  </>
+                )}
 
-                  <input
-                    type={showFpPassword ? "text" : "password"}
-                    placeholder="Nhập lại mật khẩu mới"
-                    value={fpConfirmPassword}
-                    onChange={(e) => setFpConfirmPassword(e.target.value)}
-                    style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
-                  />
-                </>
-              )}
+                <button
+                  type="submit"
+                  disabled={fpSubmitting}
+                  style={{
+                    ...pillButton,
+                    background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
+                    color: "#fff",
+                    opacity: fpSubmitting ? 0.7 : 1,
+                  }}
+                >
+                  {fpSubmitting
+                    ? "ĐANG XỬ LÝ..."
+                    : fpOtpVerified
+                      ? "ĐẶT LẠI MẬT KHẨU"
+                      : fpOtpRequested && fpOtpExpiresIn > 0
+                        ? "XÁC NHẬN OTP"
+                        : "GỬI OTP"}
+                </button>
 
-              <button
-                type="submit"
-                disabled={fpSubmitting}
-                style={{
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "12px 14px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
-                  cursor: "pointer",
-                  opacity: fpSubmitting ? 0.7 : 1,
-                }}
-              >
-                {fpSubmitting
-                  ? fpOtpVerified
-                    ? "Đang đặt lại mật khẩu..."
-                    : fpOtpRequested && fpOtpExpiresIn > 0
-                      ? "Đang xác nhận OTP..."
-                      : "Đang gửi OTP..."
-                  : fpOtpVerified
-                    ? "Đặt lại mật khẩu"
-                    : fpOtpRequested && fpOtpExpiresIn > 0
-                      ? "Xác nhận OTP"
-                      : "Gửi mã OTP"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setFpOtpRequested(false);
-                  setFpOtpVerified(false);
-                  setFpOtpExpiresIn(0);
-                  setFpOtpCode("");
-                  setFpNewPassword("");
-                  setFpConfirmPassword("");
-                }}
-                style={{
-                  border: "none",
-                  background: "transparent",
-                  color: "var(--tm-text-secondary)",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  padding: "4px 0",
-                  textAlign: "center",
-                }}
-              >
-                ← Quay lại đăng nhập
-              </button>
-            </div>
-          </form>
-        )}
-
-        {mode === "register_customer" && (
-          <form className="tm-card" style={{ padding: 16 }} onSubmit={handleRegisterCustomer}>
-            <Text.Title style={{ fontSize: 18 }}>Đăng ký khách hàng</Text.Title>
-            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 12 }}>
-              {requireRegistration
-                ? "Bắt buộc hoàn tất thông tin để kích hoạt tài khoản sử dụng app."
-                : "Tạo tài khoản khách hàng và đăng nhập ngay."}
-            </Text>
-
-            <div style={{ display: "grid", gap: 10 }}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="text"
-                  placeholder="Họ tên"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  style={{ flex: 1, borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
-                />
                 <button
                   type="button"
                   onClick={() => {
-                    snackbar.openSnackbar({ type: "info", text: "Đang yêu cầu Zalo..." });
-                    getUserInfo({ autoRequestPermission: true })
-                      .then((res) => {
-                        const userInfoStr = JSON.stringify(res.userInfo || {});
-                        snackbar.openSnackbar({ type: "success", text: `Phản hồi: ${userInfoStr}` });
-                        
-                        const zaloName = res.userInfo?.name?.trim() || "";
-                        if (zaloName) {
-                          setCustomerName(zaloName);
-                        }
-                      })
-                      .catch((error: any) => {
-                        const errMsg = error?.message || JSON.stringify(error) || "Lỗi không xác định";
-                        openError(`Không thể lấy thông tin: ${errMsg}`);
-                      });
+                    setMode("login");
+                    setFpOtpRequested(false);
+                    setFpOtpVerified(false);
+                    setFpOtpExpiresIn(0);
+                    setFpOtpCode("");
+                    setFpNewPassword("");
+                    setFpConfirmPassword("");
                   }}
                   style={{
-                    padding: "0 12px",
-                    borderRadius: 10,
-                    border: "1px solid var(--tm-primary)",
-                    color: "var(--tm-primary)",
-                    background: "var(--tm-primary-light)",
-                    fontWeight: 600,
+                    border: "none",
+                    background: "transparent",
+                    color: "var(--tm-text-secondary)",
+                    fontWeight: 700,
                     fontSize: 12,
                     cursor: "pointer",
-                    whiteSpace: "nowrap"
+                    textAlign: "center",
+                    textDecoration: "underline",
                   }}
                 >
-                  Lấy từ Zalo
+                  ← Quay lại đăng nhập
                 </button>
-              </div>
-              <input
-                type="email"
-                placeholder="Email"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
-              />
+              </form>
+            )}
 
-              {customerOtpAwaitingConfirm ? (
+            {mode === "register_customer" && (
+              <form onSubmit={handleRegisterCustomer} style={{ display: "grid", gap: 12 }}>
                 <input
                   type="text"
-                  placeholder="Nhập OTP email (6 số)"
-                  value={customerOtpCode}
-                  onChange={(e) => setCustomerOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                  style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
+                  placeholder="Họ và tên"
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  style={inputStyle}
                 />
-              ) : (
-                <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-                  Nhấn "Đăng ký khách hàng" để hệ thống tự gửi OTP đến email ở trên.
-                </Text>
-              )}
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={customerEmail}
+                  onChange={(e) => setCustomerEmail(e.target.value)}
+                  style={inputStyle}
+                />
 
-              {customerOtpExpiresIn > 0 ? (
-                <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-                  OTP có hiệu lực trong {customerOtpExpiresIn}s.
-                </Text>
-              ) : null}
+                {customerOtpAwaitingConfirm ? (
+                  <>
+                    <input
+                      type="text"
+                      placeholder="Mã OTP (6 số)"
+                      value={customerOtpCode}
+                      onChange={(e) => setCustomerOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                      style={inputStyle}
+                    />
+                    <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", textAlign: "center" }}>
+                      OTP còn hiệu lực: {customerOtpExpiresIn}s
+                    </Text>
+                  </>
+                ) : (
+                  <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", textAlign: "center" }}>
+                    Nhấn “ĐĂNG KÝ” để nhận OTP qua email.
+                  </Text>
+                )}
 
-              <input
-                type="tel"
-                placeholder="Số điện thoại"
-                value={customerPhone}
-                onChange={(e) => setCustomerPhone(e.target.value)}
-                style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
-              />
+                <input
+                  type="tel"
+                  placeholder="Số điện thoại"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  style={inputStyle}
+                />
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
                 <input
                   type={showCustomerPassword ? "text" : "password"}
                   placeholder="Mật khẩu (>= 8 ký tự)"
                   value={customerPassword}
                   onChange={(e) => setCustomerPassword(e.target.value)}
-                  style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
+                  style={inputStyle}
                 />
+                <input
+                  type={showCustomerPassword ? "text" : "password"}
+                  placeholder="Nhập lại mật khẩu"
+                  value={customerPasswordConfirm}
+                  onChange={(e) => setCustomerPasswordConfirm(e.target.value)}
+                  style={inputStyle}
+                />
+
                 <button
                   type="button"
                   onClick={() => setShowCustomerPassword((prev) => !prev)}
                   style={{
-                    border: "1px solid var(--tm-border)",
-                    borderRadius: 10,
-                    padding: "10px 12px",
-                    fontWeight: 600,
+                    border: "none",
+                    background: "transparent",
                     color: "var(--tm-text-secondary)",
-                    background: "#fff",
+                    fontWeight: 700,
+                    fontSize: 12,
                     cursor: "pointer",
-                    minWidth: 68,
+                    textAlign: "center",
                   }}
                 >
-                  {showCustomerPassword ? "Ẩn" : "Hiện"}
+                  {showCustomerPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
                 </button>
-              </div>
 
-              <input
-                type={showCustomerPassword ? "text" : "password"}
-                placeholder="Nhập lại mật khẩu"
-                value={customerPasswordConfirm}
-                onChange={(e) => setCustomerPasswordConfirm(e.target.value)}
-                style={{ borderRadius: 10, border: "1px solid var(--tm-border)", padding: 12 }}
-              />
+                <button
+                  type="submit"
+                  disabled={customerSubmitting}
+                  style={{
+                    ...pillButton,
+                    background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
+                    color: "#fff",
+                    opacity: customerSubmitting ? 0.7 : 1,
+                  }}
+                >
+                  {customerSubmitting
+                    ? "ĐANG XỬ LÝ..."
+                    : customerOtpAwaitingConfirm
+                      ? "XÁC NHẬN OTP & ĐĂNG KÝ"
+                      : "ĐĂNG KÝ"}
+                </button>
 
-              <button
-                type="submit"
-                disabled={customerSubmitting}
-                style={{
-                  border: "none",
-                  borderRadius: 12,
-                  padding: "12px 14px",
-                  fontWeight: 700,
-                  color: "#fff",
-                  background: "linear-gradient(135deg, var(--tm-primary) 0%, var(--tm-primary-dark) 100%)",
-                  cursor: "pointer",
-                  opacity: customerSubmitting ? 0.7 : 1,
-                }}
-              >
-                {customerSubmitting
-                  ? customerOtpAwaitingConfirm
-                    ? "Đang xác nhận OTP..."
-                    : "Đang gửi OTP..."
-                  : customerOtpAwaitingConfirm
-                    ? "Xác nhận OTP & Đăng ký"
-                    : "Đăng ký khách hàng"}
-              </button>
-            </div>
-          </form>
-        )}
+                <div style={{ textAlign: "center", marginTop: 2 }}>
+                  <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)" }}>
+                    Đã có tài khoản?
+                  </Text>{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMode("login")}
+                    style={{
+                      border: "none",
+                      background: "transparent",
+                      color: "var(--tm-primary)",
+                      fontWeight: 900,
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      padding: 0,
+                    }}
+                  >
+                    Đăng nhập
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       </div>
     </Page>
   );

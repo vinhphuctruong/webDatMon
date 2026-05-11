@@ -163,17 +163,21 @@ function bindApproveReject(tb: HTMLElement, approveAttr: string, rejectAttr: str
 /* ── Render: Vouchers ──────────────────────────── */
 function renderVouchers() {
   const tb = $("#vouchers-body");
-  if (!appState.vouchers.length) { tb.innerHTML = `<tr><td colspan="8" class="muted-empty">Chưa có voucher.</td></tr>`; return; }
+  if (!appState.vouchers.length) { tb.innerHTML = `<tr><td colspan="10" class="muted-empty">Chưa có voucher.</td></tr>`; return; }
   tb.innerHTML = appState.vouchers.map(v => {
     const discountText = v.discountType === "FIXED" ? currency(v.discountValue) : `${v.discountValue}%` + (v.maxDiscount ? ` (max ${currency(v.maxDiscount)})` : "");
     const usageText = v.maxUsageTotal ? `${v.usedCount}/${v.maxUsageTotal}` : `${v.usedCount}/∞`;
+    const claimText = v.maxClaimTotal ? `${v.claimedCount ?? 0}/${v.maxClaimTotal}` : `${v.claimedCount ?? 0}/∞`;
     const isExpired = new Date(v.expiresAt) < new Date();
     const activeTag = !v.isActive ? '<span class="tag tag-danger">Tắt</span>' : isExpired ? '<span class="tag tag-warning">Hết hạn</span>' : '<span class="tag tag-success">Hoạt động</span>';
     return `<tr>
       <td><code>${esc(v.code)}</code></td><td>${esc(v.description)}</td>
+      <td>${esc(v.scope || "ORDER")}</td>
       <td>${discountText}</td><td>${currency(v.minOrderValue)}</td>
+      <td>${claimText}</td>
       <td>${usageText}</td><td>${fmtDate(v.expiresAt)}</td><td>${activeTag}</td>
       <td><div class="action-row">
+        <button class="btn btn-sm btn-primary" data-vissue="${v.id}">Phát</button>
         <button class="btn btn-sm ${v.isActive?'btn-secondary':'btn-success'}" data-vtoggle="${v.id}">${v.isActive?"Tắt":"Bật"}</button>
         <button class="btn btn-sm btn-danger-solid" data-vdelete="${v.id}">Xóa</button>
       </div></td></tr>`;
@@ -192,6 +196,30 @@ function renderVouchers() {
       btn.disabled = true;
       try { await api(`/vouchers/${btn.dataset.vdelete}`, { method: "DELETE" }); await loadVouchers(); flash("Đã xóa", "success"); }
       catch (e) { flash(errMsg(e), "error"); } finally { btn.disabled = false; }
+    });
+  });
+
+  tb.querySelectorAll<HTMLButtonElement>("button[data-vissue]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.vissue!; if (!id) return;
+      const raw = prompt("Nhập email khách (cách nhau dấu phẩy). Để trống = phát cho tất cả khách (giới hạn 5000):", "");
+      if (raw === null) return;
+      btn.disabled = true;
+      try {
+        const emails = raw.trim()
+          ? raw.split(",").map(s => s.trim().toLowerCase()).filter(Boolean)
+          : [];
+        const body = raw.trim()
+          ? { mode: "EMAILS", emails }
+          : { mode: "ALL_CUSTOMERS", limit: 5000 };
+        const r = await api<{ message: string; data: { created: number; skipped: number } }>(`/vouchers/${id}/issue`, { method: "POST", body: JSON.stringify(body) });
+        flash(r.message || `Đã phát ${body.mode === "EMAILS" ? "cho danh sách email" : "cho khách hàng"}`, "success");
+        await loadVouchers();
+      } catch (e) {
+        flash(errMsg(e), "error");
+      } finally {
+        btn.disabled = false;
+      }
     });
   });
 }
@@ -394,14 +422,18 @@ async function handleCreateVoucher(e: SubmitEvent) {
   const p: Record<string, unknown> = {
     code: String(fd.get("code")??"").trim(),
     description: String(fd.get("description")??"").trim(),
+    scope: String(fd.get("scope") ?? "ORDER"),
     discountType: String(fd.get("discountType")??"FIXED"),
     discountValue: Number(fd.get("discountValue")??0),
     minOrderValue: Number(fd.get("minOrderValue")??0),
     maxUsagePerUser: Number(fd.get("maxUsagePerUser")??1),
     expiresAt: String(fd.get("expiresAt")??""),
+    isClaimable: String(fd.get("isClaimable") ?? "true") === "true",
+    autoGrantOnRegister: String(fd.get("autoGrantOnRegister") ?? "false") === "true",
   };
   const maxD = String(fd.get("maxDiscount")??"").trim(); if (maxD) p.maxDiscount = Number(maxD);
   const maxU = String(fd.get("maxUsageTotal")??"").trim(); if (maxU) p.maxUsageTotal = Number(maxU);
+  const maxC = String(fd.get("maxClaimTotal") ?? "").trim(); if (maxC) p.maxClaimTotal = Number(maxC);
   try { await api("/vouchers", { method: "POST", body: JSON.stringify(p) }); form.reset(); flash("Đã tạo voucher", "success"); await loadVouchers(); }
   catch (e: any) { flash(errMsg(e), "error"); }
 }
