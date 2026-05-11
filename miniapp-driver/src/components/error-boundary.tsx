@@ -1,4 +1,4 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
+﻿import React, { Component, ErrorInfo, ReactNode } from "react";
 import { Box, Text, Button } from "zmp-ui";
 
 interface Props { children: ReactNode; }
@@ -23,7 +23,7 @@ export class ErrorBoundary extends Component<Props, State> {
       return (
         <Box className="flex-1 flex items-center justify-center" style={{ padding: 24, textAlign: "center", background: "var(--tm-bg)", minHeight: "80vh" }}>
           <div>
-            <Text style={{ fontSize: 56, marginBottom: 16 }}>🔧</Text>
+            <Text style={{ fontSize: 56, marginBottom: 16 }}></Text>
             <Text style={{ fontWeight: 700, fontSize: 20, marginBottom: 8 }}>Hệ thống đang bảo trì</Text>
             <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 20, lineHeight: 1.5 }}>
               Hiện tại máy chủ đang được bảo trì hoặc quá tải. Mong bạn thông cảm quay lại sau ít phút nhé.

@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useMemo, useState } from "react";
+﻿import React, { FC, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text } from "zmp-ui";
 import { fetchMyOrders } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
@@ -50,7 +50,7 @@ const OrdersPage: FC = () => {
           </Box>
         ) : orders.length === 0 ? (
           <div className="tm-empty-state tm-card" style={{ padding: "42px 20px" }}>
-            <span className="tm-empty-icon">📦</span>
+            <span className="tm-empty-icon"></span>
             <Text style={{ fontWeight: 700 }}>Chưa có đơn hàng nào</Text>
           </div>
         ) : (
@@ -91,7 +91,7 @@ const OrdersPage: FC = () => {
                 </div>
 
                 <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 4 }}>
-                  🏪 {order.store?.name} · {order.items?.length || 0} món
+                   {order.store?.name} · {order.items?.length || 0} món
                 </Text>
                 <Text
                   size="xSmall"

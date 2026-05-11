@@ -6,8 +6,8 @@ import { ScrollRestoration } from "./scroll-restoration";
 import { ErrorBoundary } from "./error-boundary";
 import { GpsRequiredOverlay } from "./gps-required-overlay";
 import { IncomingOrderAlert } from "./incoming-order-alert";
+import { OrderCancelNoticeListener } from "./order-cancel-notice-listener";
 import HomePage from "../pages/index";
-import AvailableOrdersPage from "../pages/available-orders";
 import ActiveDeliveryPage from "../pages/active-delivery";
 import OrdersPage from "../pages/orders";
 import WalletPage from "../pages/wallet";
@@ -53,9 +53,9 @@ export const Layout: FC = () => {
               <Route path="/*" element={
                 <GpsRequiredOverlay>
                   <IncomingOrderAlert />
+                  <OrderCancelNoticeListener />
                   <Routes>
                     <Route path="/" element={<HomePage />} />
-                    <Route path="/available" element={<AvailableOrdersPage />} />
                     <Route path="/delivering" element={<ActiveDeliveryPage />} />
                     <Route path="/orders" element={<OrdersPage />} />
                     <Route path="/wallet" element={<WalletPage />} />

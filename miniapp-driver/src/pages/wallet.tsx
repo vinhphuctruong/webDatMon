@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useMemo, useState } from "react";
+﻿import React, { FC, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text, Icon, Modal, Input, Button, useSnackbar } from "zmp-ui";
 import { 
   fetchMyWallets, 
@@ -126,7 +126,7 @@ const WalletPage: FC = () => {
           </Box>
         ) : !wallets ? (
           <div className="tm-empty-state tm-card" style={{ padding: "42px 20px" }}>
-            <span className="tm-empty-icon">💰</span>
+            <span className="tm-empty-icon"></span>
             <Text style={{ fontWeight: 700 }}>Chưa có thông tin ví</Text>
           </div>
         ) : (
@@ -135,7 +135,7 @@ const WalletPage: FC = () => {
             <div className="tm-card tm-interactive animate-slide-up" style={{ padding: 20, background: "linear-gradient(135deg, #1e293b, #0f172a)", color: "#fff", border: "none", boxShadow: "var(--tm-shadow-floating)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 24 }}>🏦</span>
+                  <span style={{ fontSize: 24 }}></span>
                   <div>
                     <Text style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>Ví tín dụng</Text>
                     <Text size="xxxSmall" style={{ color: "#94a3b8" }}>Dùng ký quỹ nhận đơn COD</Text>
@@ -166,7 +166,7 @@ const WalletPage: FC = () => {
             <div className="tm-card tm-interactive animate-slide-up" style={{ padding: 20, background: "linear-gradient(135deg, #064e3b, #022c22)", color: "#fff", border: "none", boxShadow: "var(--tm-shadow-floating)" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 24 }}>💵</span>
+                  <span style={{ fontSize: 24 }}></span>
                   <div>
                     <Text style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>Ví tiền mặt</Text>
                     <Text size="xxxSmall" style={{ color: "#a7f3d0" }}>Thu nhập giao hàng</Text>

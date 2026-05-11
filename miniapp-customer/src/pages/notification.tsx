@@ -1,4 +1,4 @@
-import React, { FC } from "react";
+﻿import React, { FC } from "react";
 import { useRecoilValue, useSetRecoilState } from "recoil";
 import { notificationsState } from "state";
 import { Box, Header, Page, Text, useNavigate, useSnackbar } from "zmp-ui";
@@ -31,7 +31,7 @@ const VoucherCard: FC<{ voucher: Voucher; onApply: (code: string) => void }> = (
     >
       <div className="tm-voucher-left">
         <div style={{ textAlign: "center" }}>
-          <Text style={{ fontSize: 20 }}>🎫</Text>
+          <Text style={{ fontSize: 20 }}></Text>
           <Text
             size="xxxSmall"
             style={{ color: "var(--tm-primary)", fontWeight: 700, marginTop: 2, fontSize: 9 }}
@@ -90,7 +90,7 @@ const NotificationPage: FC = () => {
     setAppliedCode(code);
     snackbar.openSnackbar({
       type: "success",
-      text: `Đã chọn mã ${code}. Vào giỏ hàng để đặt đơn! 🎉`,
+      text: `Đã chọn mã ${code}. Vào giỏ hàng để đặt đơn! `,
     });
     navigate("/cart");
   };
@@ -171,7 +171,7 @@ const NotificationPage: FC = () => {
       {/* Voucher section */}
       <Box style={{ padding: "0 16px 16px" }}>
         <div className="tm-section-header" style={{ paddingLeft: 0, paddingRight: 0 }}>
-          <span className="tm-section-title">🎟️ Voucher của bạn</span>
+          <span className="tm-section-title"> Voucher của bạn</span>
           <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
             {vouchers.filter((v) => !v.used).length} mã khả dụng
           </Text>

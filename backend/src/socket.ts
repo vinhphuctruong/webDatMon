@@ -3,7 +3,7 @@ import { Server, Socket } from "socket.io";
 import jwt from "jsonwebtoken";
 import { env } from "./config/env";
 import { prisma } from "./db/prisma";
-import { acceptDispatch, rejectDispatch, startDispatchTimer } from "./services/dispatch-engine";
+import { startDispatchTimer } from "./services/dispatch-engine";
 
 let io: Server;
 
@@ -19,23 +19,43 @@ export const initSocket = (httpServer: HttpServer) => {
     try {
       const token = socket.handshake.auth.token || socket.handshake.query.token;
       if (!token) {
+        console.warn("[SocketAuth] Missing token", {
+          ip: socket.handshake.address,
+          userAgent: socket.handshake.headers["user-agent"],
+        });
         return next(new Error("Authentication error"));
       }
 
-      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as { id: string; role: string };
+      const decoded = jwt.verify(token, env.JWT_ACCESS_SECRET) as {
+        sub?: string;
+        id?: string;
+        role?: string;
+      };
+      const userId = decoded.sub ?? decoded.id;
+      if (!userId) {
+        console.warn("[SocketAuth] Token payload missing user id", {
+          hasSub: Boolean(decoded.sub),
+          hasId: Boolean(decoded.id),
+        });
+        return next(new Error("Authentication error"));
+      }
       
       const user = await prisma.user.findUnique({
-        where: { id: decoded.id },
+        where: { id: userId },
         include: { managedStore: true }
       });
 
       if (!user) {
+        console.warn("[SocketAuth] User not found from token", { userId });
         return next(new Error("User not found"));
       }
 
       socket.data.user = user;
       next();
     } catch (err) {
+      console.warn("[SocketAuth] Verify token failed", {
+        error: err instanceof Error ? err.message : String(err),
+      });
       next(new Error("Authentication error"));
     }
   });
@@ -77,25 +97,10 @@ export const initSocket = (httpServer: HttpServer) => {
       }
     });
 
-    // Smart Dispatch: Driver accepts exclusive offer
-    socket.on("dispatch_accept", async (data: { orderId: string }) => {
-      if (user.role !== "DRIVER" || !data?.orderId) return;
-      try {
-        await acceptDispatch(data.orderId, user.id);
-      } catch (err: any) {
-        socket.emit("dispatch_error", { orderId: data.orderId, message: err.message });
-      }
-    });
-
-    // Smart Dispatch: Driver rejects exclusive offer
-    socket.on("dispatch_reject", async (data: { orderId: string }) => {
-      if (user.role !== "DRIVER" || !data?.orderId) return;
-      try {
-        await rejectDispatch(data.orderId, user.id);
-      } catch (err: any) {
-        console.error("[Socket] Dispatch reject error:", err);
-      }
-    });
+    // Dispatch accept/reject via socket is intentionally disabled.
+    // Driver must confirm from exclusive popup and call REST APIs:
+    //   POST /drivers/orders/:orderId/accept-dispatch
+    //   POST /drivers/orders/:orderId/reject-dispatch
 
     socket.on("join_order", (orderId: string) => {
       socket.join(`order_${orderId}`);

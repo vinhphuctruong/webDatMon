@@ -1,4 +1,4 @@
-import {
+﻿import {
   CodHoldStatus,
   DiscountType,
   OrderStatus,
@@ -64,12 +64,12 @@ const prisma = new PrismaClient();
 // ── Inline mock data (replaces missing mock/*.json files) ──────────────────
 
 const MOCK_CATEGORIES: MockCategory[] = [
-  { id: "com", name: "Cơm", icon: "🍚" },
-  { id: "bun-pho", name: "Bún / Phở", icon: "🍜" },
-  { id: "do-uong", name: "Đồ uống", icon: "🥤" },
-  { id: "an-vat", name: "Ăn vặt", icon: "🍿" },
-  { id: "banh-mi", name: "Bánh mì", icon: "🥖" },
-  { id: "mon-chay", name: "Món chay", icon: "🥬" },
+  { id: "com", name: "Cơm", icon: "" },
+  { id: "bun-pho", name: "Bún / Phở", icon: "" },
+  { id: "do-uong", name: "Đồ uống", icon: "" },
+  { id: "an-vat", name: "Ăn vặt", icon: "" },
+  { id: "banh-mi", name: "Bánh mì", icon: "" },
+  { id: "mon-chay", name: "Món chay", icon: "" },
 ];
 
 const MOCK_VARIANTS: MockVariant[] = [

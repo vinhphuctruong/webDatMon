@@ -1,4 +1,4 @@
-/* ─── TM Food Partner App ─── */
+﻿/* ─── TM Food Partner App ─── */
 const API_BASE          = "/api/v1";
 const STORE_SESSION_KEY = "zaui_food_store_session";
 
@@ -330,8 +330,8 @@ function renderProductsTable() {
   els.productsBody.innerHTML = state.products.map((p) => `
     <tr>
       <td>${p.imageUrl
-        ? `<img class="product-thumb" src="${p.imageUrl.startsWith("data:") ? p.imageUrl : p.imageUrl}" alt="${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="no-img" style="display:none">🍽️</div>`
-        : `<div class="no-img">🍽️</div>`
+        ? `<img class="product-thumb" src="${p.imageUrl.startsWith("data:") ? p.imageUrl : p.imageUrl}" alt="${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" /><div class="no-img" style="display:none"></div>`
+        : `<div class="no-img"></div>`
       }</td>
       <td>
         <strong>${p.name}</strong>
@@ -347,8 +347,8 @@ function renderProductsTable() {
       </td>
       <td>
         <div style="display:flex;gap:6px;">
-          <button class="secondary btn-sm" data-edit="${p.id}">✏️ Sửa</button>
-          <button class="danger btn-sm" data-del="${p.id}">🗑️</button>
+          <button class="secondary btn-sm" data-edit="${p.id}"> Sửa</button>
+          <button class="danger btn-sm" data-del="${p.id}"></button>
         </div>
       </td>
     </tr>
@@ -526,7 +526,7 @@ function renderOrders() {
     <tr>
       <td><code>${o.id.slice(0,8)}</code></td>
       <td style="max-width:200px;font-size:13px;">${(o.items||[]).map((i) => i.productName + " x" + i.quantity).join(", ").slice(0,80)}</td>
-      <td><span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? "💵 COD" : "📱 QR"}</span></td>
+      <td><span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? " COD" : " QR"}</span></td>
       <td><span class="status-badge status-${o.status}">${statusLabel(o.status)}</span></td>
       <td>${fmtVND(o.total)}</td>
       <td><strong style="color:#006e2f;">${fmtVND(o.merchantPayout)}</strong></td>
@@ -591,7 +591,7 @@ els.payoutForm.addEventListener("submit", async (e) => {
     await api("/wallets/payouts", { method: "POST", body: JSON.stringify(body) });
     els.payoutForm.reset();
     await loadWallet();
-    showToast("✅ Yêu cầu rút tiền đã được ghi nhận!");
+    showToast(" Yêu cầu rút tiền đã được ghi nhận!");
   } catch (err) { alert(`Rút tiền thất bại: ${err.message}`); }
 });
 
@@ -643,10 +643,10 @@ async function loadStore() {
     state.store = r.data;
     els.storeNameHeader.textContent = state.store.name;
     if (state.store.isOpen) {
-      els.storeStatusBadge.textContent = "🟢 Đang mở";
+      els.storeStatusBadge.textContent = " Đang mở";
       els.storeStatusBadge.className = "store-status-badge";
     } else {
-      els.storeStatusBadge.textContent = "🔴 Tạm đóng";
+      els.storeStatusBadge.textContent = " Tạm đóng";
       els.storeStatusBadge.className = "store-status-badge closed";
     }
   } catch (e) { console.error(e); }
@@ -687,7 +687,7 @@ els.registerForm.addEventListener("submit", async (e) => {
     const r = await api("/auth/register/store", { method: "POST", body: JSON.stringify(body) }, false);
     state.tokens = r.tokens; state.user = r.user; saveSession();
     await bootApp();
-    showToast("🏪 Đăng ký cửa hàng thành công! Chờ admin kích hoạt.");
+    showToast(" Đăng ký cửa hàng thành công! Chờ admin kích hoạt.");
   } catch (err) { els.authError.textContent = err.message; }
   finally { els.registerBtn.disabled = false; }
 });

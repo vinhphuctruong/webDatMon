@@ -1,4 +1,4 @@
-export const LOGIN_HTML = `
+﻿export const LOGIN_HTML = `
 <div class="login-wrapper" id="login-view">
   <div class="login-card">
     <div class="brand-logo"><div class="dot">TM</div><span>TM Food Admin</span></div>
@@ -19,18 +19,18 @@ export const APP_HTML = `
   <aside class="sidebar">
     <div class="sidebar-brand"><div class="dot">TM</div><span>TM Food</span></div>
     <nav class="sidebar-nav">
-      <button class="nav-btn active" data-tab="overview"><span class="icon">📊</span>Tổng quan</button>
-      <button class="nav-btn" data-tab="stores"><span class="icon">🏪</span>Cửa hàng</button>
-      <button class="nav-btn" data-tab="driver-applications"><span class="icon">🛵</span>Hồ sơ tài xế</button>
-      <button class="nav-btn" data-tab="store-applications"><span class="icon">📝</span>Hồ sơ cửa hàng</button>
-      <button class="nav-btn" data-tab="vouchers"><span class="icon">🎫</span>Voucher</button>
-      <button class="nav-btn" data-tab="categories"><span class="icon">📂</span>Danh mục</button>
-      <button class="nav-btn" data-tab="banners"><span class="icon">🖼️</span>Banner</button>
-      <button class="nav-btn" data-tab="users"><span class="icon">👥</span>Người dùng</button>
+      <button class="nav-btn active" data-tab="overview"><span class="icon"></span>Tổng quan</button>
+      <button class="nav-btn" data-tab="stores"><span class="icon"></span>Cửa hàng</button>
+      <button class="nav-btn" data-tab="driver-applications"><span class="icon"></span>Hồ sơ tài xế</button>
+      <button class="nav-btn" data-tab="store-applications"><span class="icon"></span>Hồ sơ cửa hàng</button>
+      <button class="nav-btn" data-tab="vouchers"><span class="icon"></span>Voucher</button>
+      <button class="nav-btn" data-tab="categories"><span class="icon"></span>Danh mục</button>
+      <button class="nav-btn" data-tab="banners"><span class="icon"></span>Banner</button>
+      <button class="nav-btn" data-tab="users"><span class="icon"></span>Người dùng</button>
     </nav>
     <div class="sidebar-footer">
       <div class="sidebar-user"><div class="avatar" id="user-avatar">A</div><div class="info"><div class="name" id="current-admin">Admin</div><div class="role">Quản trị viên</div></div></div>
-      <button class="btn-logout" id="logout-button">🚪 Đăng xuất</button>
+      <button class="btn-logout" id="logout-button"> Đăng xuất</button>
     </div>
   </aside>
   <div class="content-area">

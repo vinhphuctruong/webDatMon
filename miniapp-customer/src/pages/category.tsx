@@ -1,4 +1,4 @@
-import { ProductItem } from "components/product/item";
+﻿import { ProductItem } from "components/product/item";
 import React, { FC, Suspense } from "react";
 import { useRecoilValue } from "recoil";
 import {
@@ -36,7 +36,7 @@ const CategoryProducts: FC<{ categoryId: string }> = ({ categoryId }) => {
   if (productsByCategory.length === 0) {
     return (
       <div className="tm-empty-state" style={{ minHeight: 200 }}>
-        <span className="tm-empty-icon">🍽️</span>
+        <span className="tm-empty-icon"></span>
         <Text style={{ fontWeight: 600, color: 'var(--tm-text-primary)', marginBottom: 4 }}>
           Chưa có món nào
         </Text>

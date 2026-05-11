@@ -391,6 +391,28 @@ export async function cancelOrder(orderId: string, reason?: string) {
   );
 }
 
+export async function approveOrderCancelRequest(orderId: string, reason?: string) {
+  return apiFetch<{ data: any }>(
+    `/orders/${orderId}/cancel-request/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+    { auth: true },
+  );
+}
+
+export async function rejectOrderCancelRequest(orderId: string, reason?: string) {
+  return apiFetch<{ data: any }>(
+    `/orders/${orderId}/cancel-request/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify({ reason }),
+    },
+    { auth: true },
+  );
+}
+
 export async function requestForgotPasswordOtp(email: string) {
   const response = await request<{
     message?: string;

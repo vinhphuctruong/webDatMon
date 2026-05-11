@@ -59,7 +59,7 @@ export const ActiveOrderBanner: FC = () => {
         }}
         onClick={() => {
           if (activeOrdersCount > 1) {
-            navigate("/active-orders");
+            navigate("/orders");
           } else {
             navigate("/result", {
               state: {
@@ -93,7 +93,7 @@ export const ActiveOrderBanner: FC = () => {
             boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
           }}
         >
-          🛵
+          
         </div>
         <div style={{ flex: 1 }}>
           {activeOrdersCount > 1 ? (
@@ -117,7 +117,7 @@ export const ActiveOrderBanner: FC = () => {
           )}
         </div>
         <div style={{ color: "var(--tm-primary)", fontWeight: 700 }}>
-          ❯
+          
         </div>
       </div>
     </Box>

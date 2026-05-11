@@ -1,8 +1,15 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
-import { Page, Box, Text, Tabs, useSnackbar } from "zmp-ui";
+﻿import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { vibrate as zmpVibrate } from "zmp-sdk";
-import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady, cancelOrder } from "services/api";
+import {
+  approveOrderCancelRequest,
+  cancelOrder,
+  confirmStoreOrder,
+  fetchStoreOrders,
+  markStoreOrderReady,
+  rejectOrderCancelRequest,
+} from "services/api";
 import { formatCurrency } from "utils/formatter";
 import { formatStoreOrderCode } from "utils/order-code";
 
@@ -14,6 +21,17 @@ const OrdersPage = () => {
   const navigate = useNavigate();
   const knownPendingOrderIdsRef = useRef<Set<string>>(new Set());
   const didBootstrapOrdersRef = useRef(false);
+
+  const requestReason = (title: string, defaultReason: string) => {
+    const input = window.prompt(title, defaultReason);
+    if (input == null) return null;
+    const reason = input.trim();
+    if (reason.length < 2) {
+      openSnackbar({ text: "Lý do phải từ 2 ký tự", type: "warning" });
+      return null;
+    }
+    return reason;
+  };
 
   const playNewOrderAlert = useCallback(async () => {
     try {
@@ -97,8 +115,18 @@ const OrdersPage = () => {
         await confirmStoreOrder(orderId);
         openSnackbar({ text: "Đã nhận đơn", type: "success" });
       } else if (action === "REJECT") {
-        await cancelOrder(orderId, "Quán từ chối đơn");
-        openSnackbar({ text: "Đã từ chối đơn", type: "success" });
+        const target = orders.find((order) => order.id === orderId);
+        if (target?.cancelRequestStatus === "PENDING") {
+          const reason = requestReason("Nhập lý do từ chối yêu cầu hủy", "Quán từ chối yêu cầu huỷ");
+          if (!reason) return;
+          await rejectOrderCancelRequest(orderId, reason);
+          openSnackbar({ text: "Đã từ chối yêu cầu huỷ", type: "success" });
+        } else {
+          const reason = requestReason("Nhập lý do từ chối đơn", "Quán từ chối đơn");
+          if (!reason) return;
+          await cancelOrder(orderId, reason);
+          openSnackbar({ text: "Đã từ chối đơn", type: "success" });
+        }
       } else {
         await markStoreOrderReady(orderId);
         openSnackbar({ text: "Đã báo sẵn sàng", type: "success" });
@@ -109,10 +137,36 @@ const OrdersPage = () => {
     }
   };
 
+  const orderIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    orders.forEach((order, index) => {
+      if (order?.id) map.set(order.id, index);
+    });
+    return map;
+  }, [orders]);
+
   const filteredOrders = useMemo(() => {
-    if (activeTab === "ALL") return orders;
-    return orders.filter(o => o.status === activeTab);
-  }, [orders, activeTab]);
+    const list = activeTab === "ALL" ? [...orders] : orders.filter((o) => o.status === activeTab);
+    return list.sort((a, b) => {
+      const aHasCancelRequest = a?.cancelRequestStatus === "PENDING";
+      const bHasCancelRequest = b?.cancelRequestStatus === "PENDING";
+      if (aHasCancelRequest !== bHasCancelRequest) {
+        return aHasCancelRequest ? -1 : 1;
+      }
+      return (orderIndexMap.get(a?.id) ?? Number.MAX_SAFE_INTEGER) - (orderIndexMap.get(b?.id) ?? Number.MAX_SAFE_INTEGER);
+    });
+  }, [orders, activeTab, orderIndexMap]);
+
+  const tabItems = useMemo(
+    () => [
+      { key: "PENDING", label: `Mới (${orders.filter((o) => o.status === "PENDING").length})` },
+      { key: "CONFIRMED", label: `Chuẩn bị (${orders.filter((o) => o.status === "CONFIRMED").length})` },
+      { key: "PREPARING", label: `Chờ tài xế (${orders.filter((o) => o.status === "PREPARING").length})` },
+      { key: "PICKED_UP", label: "Đang giao" },
+      { key: "DELIVERED", label: "Hoàn thành" },
+    ],
+    [orders],
+  );
 
   return (
     <Page className="page-with-bg pb-20">
@@ -122,13 +176,41 @@ const OrdersPage = () => {
         </div>
       </Box>
       <Box p={4} pb={0} className="tm-content-pad" style={{ background: "#fff" }}>
-        <Tabs activeKey={activeTab} onChange={(k) => setActiveTab(k)}>
-          <Tabs.Tab key="PENDING" label={`Mới (${orders.filter(o => o.status === "PENDING").length})`} />
-          <Tabs.Tab key="CONFIRMED" label={`Chuẩn bị (${orders.filter(o => o.status === "CONFIRMED").length})`} />
-          <Tabs.Tab key="PREPARING" label={`Chờ tài xế (${orders.filter(o => o.status === "PREPARING").length})`} />
-          <Tabs.Tab key="PICKED_UP" label="Đang giao" />
-          <Tabs.Tab key="DELIVERED" label="Hoàn thành" />
-        </Tabs>
+        <div
+          style={{
+            display: "flex",
+            overflowX: "auto",
+            overflowY: "hidden",
+            gap: 8,
+            paddingBottom: 2,
+            borderBottom: "1px solid var(--tm-border)",
+            WebkitOverflowScrolling: "touch",
+          }}
+        >
+          {tabItems.map((tab) => {
+            const active = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className="tm-interactive"
+                style={{
+                  flex: "0 0 auto",
+                  border: "none",
+                  background: "transparent",
+                  color: active ? "var(--tm-primary)" : "var(--tm-text-secondary)",
+                  fontWeight: active ? 700 : 600,
+                  fontSize: 14,
+                  whiteSpace: "nowrap",
+                  padding: "10px 6px 11px",
+                  borderBottom: active ? "2px solid var(--tm-primary)" : "2px solid transparent",
+                }}
+              >
+                {tab.label}
+              </button>
+            );
+          })}
+        </div>
       </Box>
 
       <Box p={4} className="tm-content-pad">
@@ -140,6 +222,10 @@ const OrdersPage = () => {
           <div style={{ display: "grid", gap: 12 }}>
             {filteredOrders.map((order) => {
               const orderCode = formatStoreOrderCode(order);
+              const hasCancelRequest = order.cancelRequestStatus === "PENDING";
+              const canAcceptOrder = order.status === "PENDING" && !hasCancelRequest;
+              const canMarkReady = order.status === "CONFIRMED";
+              const canStoreCancel = (order.status === "CONFIRMED" || order.status === "PREPARING") && !hasCancelRequest;
               return (
               <div 
                 key={order.id} 
@@ -154,20 +240,75 @@ const OrdersPage = () => {
                 
                 <div style={{ paddingBottom: 12, borderBottom: "1px dashed var(--tm-border)" }}>
                   <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 4 }}>
-                    🕒 {new Date(order.createdAt).toLocaleString("vi-VN")}
+                     {new Date(order.createdAt).toLocaleString("vi-VN")}
                   </Text>
                   <Text size="small" style={{ fontWeight: 600, color: "var(--tm-text-primary)" }}>
-                    📦 {order.items.length} món
+                     {order.items.length} món
                   </Text>
                 </div>
 
+                {hasCancelRequest && (
+                  <div style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 12, padding: 12 }}>
+                    <Text style={{ fontWeight: 700, color: "#9a3412", marginBottom: 3 }}>
+                      Khách đang yêu cầu huỷ đơn
+                    </Text>
+                    <Text size="xSmall" style={{ color: "#9a3412", marginBottom: 10 }}>
+                      Đơn này được ưu tiên xử lý. Sau khi từ chối, đơn sẽ trở về vị trí ban đầu.
+                    </Text>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <button
+                        className="tm-interactive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleAction(order.id, "REJECT");
+                        }}
+                        style={{
+                          padding: "11px",
+                          borderRadius: 12,
+                          background: "#fff",
+                          color: "#374151",
+                          fontWeight: 700,
+                          border: "1px solid #d1d5db",
+                        }}
+                      >
+                        Giữ đơn
+                      </button>
+                      <button
+                        className="tm-interactive"
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const reason = requestReason("Nhập lý do duyệt hủy", "Quán duyệt yêu cầu huỷ");
+                          if (!reason) return;
+                          try {
+                            await approveOrderCancelRequest(order.id, reason);
+                            openSnackbar({ text: "Đã duyệt yêu cầu huỷ", type: "success" });
+                            loadOrders();
+                          } catch (error: any) {
+                            openSnackbar({ text: error.message || "Có lỗi xảy ra", type: "error" });
+                          }
+                        }}
+                        style={{
+                          padding: "11px",
+                          borderRadius: 12,
+                          background: "#ef4444",
+                          color: "#fff",
+                          fontWeight: 700,
+                          border: "none",
+                        }}
+                      >
+                        Duyệt huỷ
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {order.status === "PENDING" && (
+                  {canAcceptOrder && (
                     <>
                       <button 
                         className="tm-interactive"
                         onClick={(e) => { e.stopPropagation(); handleAction(order.id, "REJECT"); }}
-                        style={{ flex: "1 1 auto", minWidth: 100, padding: "12px", borderRadius: 12, background: "#fff1f2", color: "#e11d48", fontWeight: 700, border: "1px solid #fecdd3" }}
+                        style={{ flex: "1 1 auto", minWidth: 100, padding: "12px", borderRadius: 12, background: "#fff", color: "#b91c1c", fontWeight: 700, border: "1px solid #fca5a5" }}
                       >
                         Từ chối
                       </button>
@@ -180,7 +321,7 @@ const OrdersPage = () => {
                       </button>
                     </>
                   )}
-                  {order.status === "CONFIRMED" && (
+                  {canMarkReady && (
                     <button 
                       className="tm-interactive"
                       onClick={(e) => { e.stopPropagation(); handleAction(order.id, "READY"); }}
@@ -189,9 +330,41 @@ const OrdersPage = () => {
                       Báo xong
                     </button>
                   )}
-                  <button 
+                  {canStoreCancel && (
+                    <button
+                      className="tm-interactive"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        const reason = requestReason(
+                          "Nhập lý do hủy đơn",
+                          "Quán huỷ đơn trước khi tài xế lấy hàng",
+                        );
+                        if (!reason) return;
+                        try {
+                          await cancelOrder(order.id, reason);
+                          openSnackbar({ text: "Đã huỷ đơn", type: "success" });
+                          loadOrders();
+                        } catch (error: any) {
+                          openSnackbar({ text: error.message || "Có lỗi xảy ra", type: "error" });
+                        }
+                      }}
+                      style={{
+                        flex: "1 1 auto",
+                        minWidth: 100,
+                        padding: "12px",
+                        borderRadius: 12,
+                        background: "#fff",
+                        color: "#dc2626",
+                        fontWeight: 700,
+                        border: "1px solid #fca5a5",
+                      }}
+                    >
+                      Huỷ đơn bởi quán
+                    </button>
+                  )}
+                  <button
                     className="tm-interactive"
-                    style={{ flex: order.status === "PENDING" || order.status === "CONFIRMED" ? "0 1 auto" : "1 1 auto", minWidth: 80, padding: "12px", borderRadius: 12, background: "var(--tm-bg)", color: "var(--tm-text-primary)", fontWeight: 600, border: "none" }}
+                    style={{ marginLeft: "auto", minWidth: 88, padding: "12px", borderRadius: 12, background: "var(--tm-bg)", color: "var(--tm-text-primary)", fontWeight: 600, border: "none" }}
                   >
                     Chi tiết
                   </button>

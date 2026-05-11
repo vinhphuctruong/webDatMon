@@ -6,6 +6,7 @@ import { asyncHandler } from "../lib/async-handler";
 import { HttpError } from "../lib/http-error";
 import { requireAuth, requireRole } from "../middlewares/auth";
 import { prisma } from "../db/prisma";
+import { ensureDriverWallets } from "../services/finance";
 
 const adminRouter = Router();
 
@@ -261,6 +262,8 @@ adminRouter.post(
           role: true,
         },
       });
+
+      await ensureDriverWallets(tx, user.id);
 
       const reviewed = await tx.driverApplication.update({
         where: { id: application.id },

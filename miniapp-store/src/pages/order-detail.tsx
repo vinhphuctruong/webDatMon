@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from "react";
 import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useParams, useNavigate } from "react-router";
-import { fetchStoreOrders, confirmStoreOrder, markStoreOrderReady, cancelOrder } from "services/api";
+import {
+  approveOrderCancelRequest,
+  cancelOrder,
+  confirmStoreOrder,
+  fetchStoreOrders,
+  markStoreOrderReady,
+  rejectOrderCancelRequest,
+} from "services/api";
 import { formatCurrency } from "utils/formatter";
 import { VietMapView, MapMarker } from "components/vietmap";
 import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
@@ -13,6 +20,17 @@ const OrderDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const { openSnackbar } = useSnackbar();
   const navigate = useNavigate();
+
+  const requestReason = (title: string, defaultReason: string) => {
+    const input = window.prompt(title, defaultReason);
+    if (input == null) return null;
+    const reason = input.trim();
+    if (reason.length < 2) {
+      openSnackbar({ text: "Lý do phải từ 2 ký tự", type: "warning" });
+      return null;
+    }
+    return reason;
+  };
 
   const loadOrder = async () => {
     try {
@@ -44,8 +62,17 @@ const OrderDetailPage = () => {
         await confirmStoreOrder(order.id);
         openSnackbar({ text: "Đã nhận đơn", type: "success" });
       } else if (action === "REJECT") {
-        await cancelOrder(order.id, "Quán từ chối đơn");
-        openSnackbar({ text: "Đã từ chối đơn", type: "success" });
+        if (order.cancelRequestStatus === "PENDING") {
+          const reason = requestReason("Nhập lý do từ chối yêu cầu hủy", "Quán từ chối yêu cầu huỷ");
+          if (!reason) return;
+          await rejectOrderCancelRequest(order.id, reason);
+          openSnackbar({ text: "Đã từ chối yêu cầu huỷ", type: "success" });
+        } else {
+          const reason = requestReason("Nhập lý do từ chối đơn", "Quán từ chối đơn");
+          if (!reason) return;
+          await cancelOrder(order.id, reason);
+          openSnackbar({ text: "Đã từ chối đơn", type: "success" });
+        }
         navigate("/orders");
         return;
       } else {
@@ -183,6 +210,48 @@ const OrderDetailPage = () => {
         </div>
 
         <div style={{ display: "grid", gap: 12, marginTop: 16 }}>
+          {order.cancelRequestStatus === "PENDING" && (
+            <>
+              <button
+                onClick={async () => {
+                  const reason = requestReason("Nhập lý do duyệt hủy", "Quán duyệt yêu cầu huỷ");
+                  if (!reason) return;
+                  try {
+                    await approveOrderCancelRequest(order.id, reason);
+                    openSnackbar({ text: "Đã duyệt yêu cầu huỷ", type: "success" });
+                    navigate("/orders");
+                  } catch (error: any) {
+                    openSnackbar({ text: error.message || "Có lỗi xảy ra", type: "error" });
+                  }
+                }}
+                style={{
+                  padding: "14px",
+                  borderRadius: 12,
+                  background: "#fee2e2",
+                  color: "#ef4444",
+                  fontWeight: 700,
+                  border: "none",
+                  fontSize: 16,
+                }}
+              >
+                Duyệt huỷ đơn
+              </button>
+              <button
+                onClick={() => handleAction("REJECT")}
+                style={{
+                  padding: "14px",
+                  borderRadius: 12,
+                  background: "#dbeafe",
+                  color: "#1d4ed8",
+                  fontWeight: 700,
+                  border: "none",
+                  fontSize: 16,
+                }}
+              >
+                Từ chối yêu cầu huỷ
+              </button>
+            </>
+          )}
           {order.status === "PENDING" && (
             <button 
               onClick={() => handleAction("CONFIRM")}
@@ -205,6 +274,35 @@ const OrderDetailPage = () => {
               style={{ padding: "14px", borderRadius: 12, background: "#fee2e2", color: "#ef4444", fontWeight: 700, border: "none", fontSize: 16 }}
             >
               Từ chối đơn
+            </button>
+          )}
+          {(order.status === "CONFIRMED" || order.status === "PREPARING") && (
+            <button
+              onClick={async () => {
+                const reason = requestReason(
+                  "Nhập lý do hủy đơn",
+                  "Quán huỷ đơn trước khi tài xế lấy hàng",
+                );
+                if (!reason) return;
+                try {
+                  await cancelOrder(order.id, reason);
+                  openSnackbar({ text: "Đã huỷ đơn", type: "success" });
+                  navigate("/orders");
+                } catch (error: any) {
+                  openSnackbar({ text: error.message || "Có lỗi xảy ra", type: "error" });
+                }
+              }}
+              style={{
+                padding: "14px",
+                borderRadius: 12,
+                background: "#fff1f2",
+                color: "#e11d48",
+                fontWeight: 700,
+                border: "none",
+                fontSize: 16,
+              }}
+            >
+              Huỷ đơn
             </button>
           )}
         </div>

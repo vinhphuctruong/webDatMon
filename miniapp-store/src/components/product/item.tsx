@@ -1,4 +1,4 @@
-import { FinalPrice } from "components/display/final-price";
+﻿import { FinalPrice } from "components/display/final-price";
 import { DisplayPrice } from "components/display/price";
 import React, { FC } from "react";
 import { Product } from "types/product";
@@ -41,7 +41,7 @@ export const ProductItem: FC<{ product: Product }> = ({ product }) => {
               display: 'flex', alignItems: 'center', gap: 2,
               backdropFilter: 'blur(4px)',
             }}>
-              <span style={{ color: '#ffb800', fontSize: 10 }}>★</span>
+              <span style={{ color: '#ffb800', fontSize: 10 }}></span>
               <span style={{ color: '#fff', fontSize: 10, fontWeight: 600 }}>
                 {product.rating ?? 4.7}
               </span>

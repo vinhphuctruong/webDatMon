@@ -1,4 +1,4 @@
-import { FinalPrice } from "components/display/final-price";
+﻿import { FinalPrice } from "components/display/final-price";
 import { DisplayPrice } from "components/display/price";
 import { ProductPicker } from "components/product/picker";
 import { ProductSlideSkeleton } from "components/skeletons";
@@ -15,7 +15,7 @@ export const RecommendContent: FC = () => {
     <Box className="bg-white" style={{ padding: '16px 0' }}>
       <div className="tm-section-header" style={{ paddingTop: 0, paddingBottom: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 16 }}>🔥</span>
+          <span style={{ fontSize: 16 }}></span>
           <span className="tm-section-title">Deal hot hôm nay</span>
         </div>
         <span className="tm-section-link">Xem tất cả →</span>
@@ -57,7 +57,7 @@ export const RecommendContent: FC = () => {
                     }}>
                     {(product.rating ?? 0) > 0 ? (
                       <>
-                        <span style={{ color: '#ffb800', fontSize: 11 }}>★</span>
+                        <span style={{ color: '#ffb800', fontSize: 11 }}></span>
                         <span style={{ color: '#fff', fontSize: 11, fontWeight: 600 }}>
                           {product.rating}
                         </span>
@@ -141,7 +141,7 @@ export const RecommendFallback: FC = () => {
   return (
     <Box className="bg-white" style={{ padding: '16px 0' }}>
       <div className="tm-section-header" style={{ paddingTop: 0 }}>
-        <span className="tm-section-title">🔥 Deal hot hôm nay</span>
+        <span className="tm-section-title"> Deal hot hôm nay</span>
       </div>
       <Swiper slidesPerView={1.35} spaceBetween={12} style={{ paddingLeft: 16, paddingRight: 16 }}>
         {[...new Array(3)].map((_, i) => (

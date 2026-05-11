@@ -1,4 +1,4 @@
-import React from "react";
+﻿import React from "react";
 import { Box, Text } from "zmp-ui";
 
 interface Props {
@@ -37,7 +37,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
         className="flex-1 flex flex-col justify-center items-center"
         style={{ padding: 24, textAlign: "center", background: "var(--tm-bg)", minHeight: "80vh" }}
       >
-        <Text style={{ fontSize: 56, marginBottom: 16 }}>🔧</Text>
+        <Text style={{ fontSize: 56, marginBottom: 16 }}></Text>
         <Text style={{ fontWeight: 700, fontSize: 20, color: "var(--tm-text-primary)" }}>
           Hệ thống đang bảo trì
         </Text>

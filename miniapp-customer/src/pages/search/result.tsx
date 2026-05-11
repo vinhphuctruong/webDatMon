@@ -1,4 +1,4 @@
-import { FinalPrice } from "components/display/final-price";
+﻿import { FinalPrice } from "components/display/final-price";
 import { DisplayPrice } from "components/display/price";
 import { ProductPicker } from "components/product/picker";
 import { ProductSearchResultSkeleton } from "components/skeletons";
@@ -77,7 +77,7 @@ const SearchResultContent: FC = () => {
                         <FinalPrice>{product}</FinalPrice>
                       </Text>
                       <div className="tm-stats-row" style={{ marginTop: 4 }}>
-                        <span style={{ color: '#ffb800' }}>★</span>
+                        <span style={{ color: '#ffb800' }}></span>
                         <span>{product.rating ?? 4.7}</span>
                         <span className="tm-dot" />
                         <span>{product.eta ?? "20-30 phút"}</span>
@@ -98,7 +98,7 @@ const SearchResultContent: FC = () => {
         </Box>
       ) : (
         <div className="tm-empty-state" style={{ flex: 1 }}>
-          <span className="tm-empty-icon">🔍</span>
+          <span className="tm-empty-icon"></span>
           <Text style={{ fontWeight: 600, color: 'var(--tm-text-primary)', marginBottom: 4 }}>
             Không tìm thấy kết quả
           </Text>

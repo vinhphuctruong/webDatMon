@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef, useState } from "react";
+﻿import React, { FC, useEffect, useRef, useState } from "react";
 import vietmapgl from "@vietmap/vietmap-gl-js/dist/vietmap-gl";
 import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 
@@ -27,10 +27,10 @@ const DEFAULT_CENTER: [number, number] = [106.6519, 10.9804];
 const ROUTE_SOURCE_ID = "tm-route-source";
 const ROUTE_LAYER_ID = "tm-route-layer";
 
-const MARKER_CONFIG: Record<string, { emoji: string; color: string; size: number; pulse?: boolean }> = {
-  customer: { emoji: "📍", color: "#4285f4", size: 38, pulse: true },
-  store: { emoji: "🏪", color: "#00a96d", size: 36 },
-  driver: { emoji: "🏍️", color: "#ff6b35", size: 36, pulse: true },
+const MARKER_CONFIG: Record<string, { glyph: "pin" | "store" | "driver"; color: string; size: number; pulse?: boolean }> = {
+  customer: { glyph: "pin", color: "#4285f4", size: 38, pulse: true },
+  store: { glyph: "store", color: "#00a96d", size: 36 },
+  driver: { glyph: "driver", color: "#ff6b35", size: 36, pulse: true },
 };
 
 const POPUP_LABELS: Record<string, string> = {
@@ -224,11 +224,14 @@ function createMarkerElement(marker: MapMarker) {
   icon.style.width = `${size}px`;
   icon.style.height = `${size}px`;
   icon.style.background = marker.color || config.color;
-  icon.style.fontSize = `${Math.round(size * 0.45)}px`;
   if (config.pulse) {
     icon.style.animation = "tm-marker-pulse 2s ease-in-out infinite";
   }
-  icon.textContent = marker.icon || config.emoji;
+  if (marker.icon) {
+    icon.textContent = marker.icon;
+  } else {
+    icon.innerHTML = markerGlyphSvg(config.glyph, Math.round(size * 0.56));
+  }
 
   wrapper.appendChild(icon);
 
@@ -240,6 +243,34 @@ function createMarkerElement(marker: MapMarker) {
   }
 
   return wrapper;
+}
+
+function markerGlyphSvg(glyph: "pin" | "store" | "driver", iconSize: number) {
+  const common = `stroke="white" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" fill="none"`;
+  if (glyph === "store") {
+    return `
+      <svg class="tm-vietmap-marker-svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" aria-hidden="true">
+        <path ${common} d="M4 10h16v9H4z" />
+        <path ${common} d="M3 10l2-4h14l2 4" />
+        <path ${common} d="M9 19v-4h6v4" />
+      </svg>
+    `;
+  }
+  if (glyph === "driver") {
+    return `
+      <svg class="tm-vietmap-marker-svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" aria-hidden="true">
+        <circle ${common} cx="8" cy="17" r="2" />
+        <circle ${common} cx="18" cy="17" r="2" />
+        <path ${common} d="M3 16v-4h3l2-3h6l3 3h2a2 2 0 0 1 2 2v2" />
+      </svg>
+    `;
+  }
+  return `
+    <svg class="tm-vietmap-marker-svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" aria-hidden="true">
+      <path ${common} d="M12 21s-6-5.1-6-10a6 6 0 1 1 12 0c0 4.9-6 10-6 10z" />
+      <circle ${common} cx="12" cy="11" r="2.5" />
+    </svg>
+  `;
 }
 
 function removeRouteLayer(map: vietmapgl.Map) {
@@ -375,10 +406,7 @@ export const VietMapView: FC<VietMapProps> = ({
       return;
     }
 
-    // Lọc bỏ tài xế (nếu có) không cần thiết nữa theo yêu cầu
-    const displayMarkers = markers.filter(m => m.type !== "driver");
-
-    displayMarkers.forEach((markerData) => {
+    markers.forEach((markerData) => {
       const element = createMarkerElement(markerData);
 
       element.addEventListener("click", () => {
@@ -390,6 +418,7 @@ export const VietMapView: FC<VietMapProps> = ({
         <div class="tm-vietmap-popup-detail">
           ${markerData.type === "customer" ? "Điểm giao đến" : ""}
           ${markerData.type === "store" ? "Điểm lấy hàng" : ""}
+          ${markerData.type === "driver" ? "Vị trí hiện tại" : ""}
         </div>
       `);
 
@@ -403,14 +432,14 @@ export const VietMapView: FC<VietMapProps> = ({
 
     if (!initialFitDoneRef.current) {
       initialFitDoneRef.current = true;
-      if (displayMarkers.length > 1) {
+      if (markers.length > 1) {
         const bounds = new vietmapgl.LngLatBounds();
-        displayMarkers.forEach((marker) => {
+        markers.forEach((marker) => {
           bounds.extend([marker.lng, marker.lat]);
         });
         map.fitBounds(bounds, { padding: 36, maxZoom: 16, duration: 0 });
-      } else if (displayMarkers.length === 1) {
-        map.flyTo({ center: [displayMarkers[0].lng, displayMarkers[0].lat], zoom: 15, duration: 0 });
+      } else {
+        map.flyTo({ center: [markers[0].lng, markers[0].lat], zoom: 15, duration: 0 });
       }
     }
   }, [markers, loaded, onMarkerClick]);
@@ -446,7 +475,7 @@ export const VietMapView: FC<VietMapProps> = ({
           }}
         >
           <div style={{ textAlign: "center", color: "#888", fontSize: 13 }}>
-            <div style={{ fontSize: 22, marginBottom: 6 }}>🗺️</div>
+            <div style={{ fontSize: 22, marginBottom: 6 }}></div>
             <div>Dang tai ban do...</div>
           </div>
         </div>

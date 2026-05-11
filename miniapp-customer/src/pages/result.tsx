@@ -1,4 +1,4 @@
-import { MapMarker, VietMapView } from "components/vietmap";
+﻿import { MapMarker, VietMapView } from "components/vietmap";
 import React, { FC, useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 import { useRecoilValueLoadable, useResetRecoilState } from "recoil";
@@ -121,7 +121,7 @@ const TrackingStep: FC<{ index: number; text: string; status: "done" | "active" 
           flexShrink: 0,
         }}
       >
-        {status === "done" ? "✓" : index + 1}
+        {status === "done" ? "" : index + 1}
       </div>
       <Text size="small" style={{ fontWeight: status !== "pending" ? 600 : 400, color: "var(--tm-text-primary)" }}>
         {text}
@@ -322,9 +322,9 @@ const OrderTrackingMap: FC<{
         </div>
       </div>
       <div style={{ display: "flex", gap: 12, padding: "8px 4px 2px", flexWrap: "wrap" }}>
-        <LegendItem emoji="📍" color="#4285f4" label="Bạn" />
-        <LegendItem emoji="🏪" color="#00a96d" label="Quán" />
-        {hasAssignedDriver && <LegendItem emoji="🏍️" color="#ff6b35" label="Tài xế" />}
+        <LegendItem emoji="" color="#4285f4" label="Bạn" />
+        <LegendItem emoji="" color="#00a96d" label="Quán" />
+        {hasAssignedDriver && <LegendItem emoji="" color="#ff6b35" label="Tài xế" />}
       </div>
     </div>
   );
@@ -566,7 +566,7 @@ const CheckoutResultPage: FC = () => {
             localState?.localOrderMessage ||
             "Có lỗi trong quá trình xử lý, vui lòng thử lại hoặc liên hệ hỗ trợ."
           }
-          icon="❌"
+          icon=""
           color="var(--tm-danger)"
         />
       ) : (

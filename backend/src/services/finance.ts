@@ -674,6 +674,23 @@ export async function cancelOrderWithSettlementRollback(
     });
   }
 
+  // Rollback voucher usage counters when order is cancelled.
+  const usage = await tx.voucherUsage.findFirst({
+    where: { orderId: order.id },
+    select: { id: true, voucherId: true },
+  });
+  if (usage) {
+    await tx.voucherUsage.delete({ where: { id: usage.id } });
+    await tx.voucher.update({
+      where: { id: usage.voucherId },
+      data: {
+        usedCount: {
+          decrement: 1,
+        },
+      },
+    });
+  }
+
   return tx.order.update({
     where: { id: order.id },
     data: {

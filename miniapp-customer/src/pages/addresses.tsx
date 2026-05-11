@@ -1,4 +1,4 @@
-import React, { FC, useState } from "react";
+﻿import React, { FC, useState } from "react";
 import { Box, Header, Page, Text, Button, Icon, useSnackbar } from "zmp-ui";
 import { useRecoilState } from "recoil";
 import { savedAddressesState, SavedAddress } from "state";
@@ -386,7 +386,7 @@ const AddressesPage: FC = () => {
       <Box style={{ padding: "16px", paddingBottom: 80 }}>
         {addresses.length === 0 ? (
           <Box className="flex flex-col items-center justify-center" style={{ padding: "48px 0" }}>
-            <div style={{ fontSize: 48, marginBottom: 12 }}>📍</div>
+            <div style={{ fontSize: 48, marginBottom: 12 }}></div>
             <Text style={{ color: "var(--tm-text-secondary)", fontWeight: 500 }}>
               Bạn chưa có địa chỉ nào được lưu
             </Text>
@@ -465,7 +465,7 @@ const AddressesPage: FC = () => {
               </Text>
               {addr.note && (
                 <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)", fontStyle: "italic", marginBottom: 2 }}>
-                  📝 {addr.note}
+                   {addr.note}
                 </Text>
               )}
               <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)" }}>

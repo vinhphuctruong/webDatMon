@@ -10,6 +10,7 @@ import { sendOtpEmail } from "../lib/email-service";
 import { issueEmailOtp, verifyEmailOtp, peekEmailOtp } from "../lib/email-otp";
 import { HttpError } from "../lib/http-error";
 import { requireAuth } from "../middlewares/auth";
+import { ensureDriverWallets } from "../services/finance";
 import {
   hashToken,
   refreshTokenTtlMs,
@@ -464,28 +465,33 @@ authRouter.post(
 
     const passwordHash = await hashPassword(payload.password);
 
-    const user = await prisma.user.create({
-      data: {
-        name: payload.name,
-        email: payload.email,
-        phone: payload.phone,
-        passwordHash,
-        role: UserRole.DRIVER,
-        driverProfile: {
-          create: {
-            vehicleType: payload.vehicleType,
-            licensePlate: payload.licensePlate,
-            isOnline: false,
+    const user = await prisma.$transaction(async (tx) => {
+      const createdUser = await tx.user.create({
+        data: {
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          passwordHash,
+          role: UserRole.DRIVER,
+          driverProfile: {
+            create: {
+              vehicleType: payload.vehicleType,
+              licensePlate: payload.licensePlate,
+              isOnline: false,
+            },
           },
         },
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        avatarUrl: true,
-        role: true,
-      },
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          avatarUrl: true,
+          role: true,
+        },
+      });
+
+      await ensureDriverWallets(tx, createdUser.id);
+      return createdUser;
     });
 
     const tokens = await issueTokens(user);

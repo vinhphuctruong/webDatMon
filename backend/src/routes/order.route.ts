@@ -903,8 +903,10 @@ const comprehensiveReviewSchema = z.object({
   productRatings: z.array(z.object({
     productId: z.string().min(1),
     rating: z.number().int().min(1).max(5),
+    comment: z.string().max(1000).optional(),
   })).optional(),
   comment: z.string().max(1000).optional(),
+  driverComment: z.string().max(1000).optional(),
 });
 
 orderRouter.post(
@@ -953,22 +955,26 @@ orderRouter.post(
             userId: user.id,
             driverId: order.driverId,
             rating: payload.driverRating,
+            comment: payload.driverComment,
           },
         });
       }
 
       // 3. Product reviews
       const uniqueProductIds = Array.from(new Set(order.items.map(item => item.productId)));
-      const productRatingsMap = new Map(payload.productRatings?.map(p => [p.productId, p.rating]) ?? []);
+      const productRatingsMap = new Map(payload.productRatings?.map(p => [p.productId, p]) ?? []);
 
       for (const productId of uniqueProductIds) {
-        const productRating = productRatingsMap.get(productId) ?? payload.storeRating;
+        const productRatingData = productRatingsMap.get(productId);
+        const rating = productRatingData?.rating ?? payload.storeRating;
+        const comment = productRatingData?.comment;
         await tx.productReview.create({
           data: {
             orderId: order.id,
             productId: productId,
             userId: user.id,
-            rating: productRating,
+            rating: rating,
+            comment: comment,
           },
         });
       }

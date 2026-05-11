@@ -51,7 +51,7 @@ const API_BASE_URL = resolveApiBaseUrl();
 
 let cachedSession: Session | null = null;
 
-import { getStorage } from "zmp-sdk";
+import { getStorage, setStorage } from "zmp-sdk";
 
 function readSessionSync(): Session | null {
   if (cachedSession) return cachedSession;
@@ -99,9 +99,12 @@ function writeSession(session: Session | null) {
   try {
     if (!session) {
       localStorage.removeItem(SESSION_KEY);
+      setStorage({ data: { [SESSION_KEY]: "" } }).catch(() => {});
       return;
     }
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    const sessionStr = JSON.stringify(session);
+    localStorage.setItem(SESSION_KEY, sessionStr);
+    setStorage({ data: { [SESSION_KEY]: sessionStr } }).catch(() => {});
   } catch (_error) {}
 }
 
@@ -147,6 +150,17 @@ async function refreshAccessToken(current: Session): Promise<Session> {
   });
   writeSession(payload.tokens);
   return payload.tokens;
+}
+
+export async function refreshSession(): Promise<Session | null> {
+  const current = await readSession();
+  if (!current) return null;
+  try {
+    return await refreshAccessToken(current);
+  } catch (_error) {
+    writeSession(null);
+    return null;
+  }
 }
 
 async function ensureSession() {
@@ -263,4 +277,9 @@ export async function resetPasswordWithOtp(payload: { email: string; otpCode: st
 
 export function hasSession(): boolean {
   return !!readSessionSync();
+}
+
+export async function hasSessionAsync(): Promise<boolean> {
+  const session = await readSession();
+  return !!session?.accessToken;
 }

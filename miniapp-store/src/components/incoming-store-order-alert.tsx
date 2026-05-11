@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Text, useSnackbar } from "zmp-ui";
 import {
@@ -809,7 +809,7 @@ export const IncomingStoreOrderAlert: FC = () => {
 
     const isAutoAccepted = order.status === "CONFIRMED";
     showNativeNotification(
-      isAutoAccepted ? "🔔 Bạn có đơn hàng mới (đã tự nhận)" : "🔔 Bạn có đơn hàng mới",
+      isAutoAccepted ? " Bạn có đơn hàng mới (đã tự nhận)" : " Bạn có đơn hàng mới",
       {
         body: `Đơn #${orderCode} • ${order.total.toLocaleString("vi-VN")}đ`,
       },
@@ -1029,6 +1029,17 @@ export const IncomingStoreOrderAlert: FC = () => {
     navigate(`/order-detail/${orderId}`);
   };
 
+  const requestReason = (title: string, defaultReason: string) => {
+    const input = window.prompt(title, defaultReason);
+    if (input == null) return null;
+    const reason = input.trim();
+    if (reason.length < 2) {
+      snackbarRef.current.openSnackbar({ type: "warning", text: "Lý do phải từ 2 ký tự" });
+      return null;
+    }
+    return reason;
+  };
+
   const handleOrderAction = async (orderId: string, action: StoreOrderAction) => {
     if (!orderId || processingOrderId || processingAction) return;
     setProcessingOrderId(orderId);
@@ -1039,7 +1050,12 @@ export const IncomingStoreOrderAlert: FC = () => {
         await confirmStoreOrder(orderId);
         snackbarRef.current.openSnackbar({ type: "success", text: "Đã nhận đơn mới" });
       } else {
-        await cancelOrder(orderId, "Quán từ chối đơn");
+        const reason = requestReason("Nhập lý do từ chối đơn", "Quán từ chối đơn");
+        if (!reason) {
+          resetProcessing();
+          return;
+        }
+        await cancelOrder(orderId, reason);
         snackbarRef.current.openSnackbar({ type: "success", text: "Đã từ chối đơn mới" });
       }
       removeIncomingOrder(orderId);
@@ -1087,7 +1103,7 @@ export const IncomingStoreOrderAlert: FC = () => {
           >
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
               <Text style={{ fontWeight: 700, color: "var(--tm-text-primary)" }}>
-                🔔 Đơn mới #{orderCode}
+                 Đơn mới #{orderCode}
               </Text>
               <Text
                 size="xSmall"

@@ -1,4 +1,4 @@
-import "./style.css";
+﻿import "./style.css";
 import { LOGIN_HTML, APP_HTML } from "./template";
 import { api, state, saveSession, loadSession, clearSession, setOnUnauthorized } from "./api";
 import { esc, currency, fmtDate, shortId, statusTag, docPreview, flash, setFlashEl, errMsg } from "./helpers";
@@ -235,8 +235,8 @@ function renderCategories() {
     <td><span class="cat-name" data-catid="${esc(c.id)}" contenteditable="false">${esc(c.name)}</span></td>
     <td>${c.iconUrl ? `<img src="${esc(c.iconUrl)}" style="width:28px;height:28px;border-radius:6px;object-fit:cover" onerror="this.outerHTML='—'"/>` : '—'}</td>
     <td><div class="action-row">
-      <button class="btn btn-sm btn-secondary" data-cat-edit="${esc(c.id)}">✏️ Sửa tên</button>
-      <button class="btn btn-sm btn-danger-solid" data-cat-delete="${esc(c.id)}">🗑️ Xóa</button>
+      <button class="btn btn-sm btn-secondary" data-cat-edit="${esc(c.id)}"> Sửa tên</button>
+      <button class="btn btn-sm btn-danger-solid" data-cat-delete="${esc(c.id)}"> Xóa</button>
     </div></td></tr>`).join("");
 
   tb.querySelectorAll<HTMLButtonElement>("button[data-cat-edit]").forEach(btn => {
@@ -271,8 +271,8 @@ function renderBanners() {
       <div style="font-size:11px;color:var(--text-light);margin-bottom:6px">Thứ tự: ${b.sortOrder} · ${b.isActive ? '<span style="color:#22c55e">Hiển thị</span>' : '<span style="color:#ef4444">Ẩn</span>'}</div>
       <div class="action-row" style="gap:6px">
         <label class="switch" style="margin-right:auto"><input type="checkbox" data-banner-toggle="${esc(b.id)}" ${b.isActive ? "checked" : ""}><span>${b.isActive ? "Bật" : "Tắt"}</span></label>
-        <button class="btn btn-sm btn-secondary" data-banner-img="${esc(b.id)}">🖼️ Đổi ảnh</button>
-        <button class="btn btn-sm btn-danger-solid" data-banner-del="${esc(b.id)}">🗑️</button>
+        <button class="btn btn-sm btn-secondary" data-banner-img="${esc(b.id)}"> Đổi ảnh</button>
+        <button class="btn btn-sm btn-danger-solid" data-banner-del="${esc(b.id)}"></button>
       </div>
     </div>
   </div>`).join("");
@@ -327,7 +327,7 @@ function renderUsers() {
       <td><select class="filter-select" data-user-role="${esc(u.id)}" style="min-width:110px;font-size:12px">${roleOpts}</select></td>
       <td>${u._count.orders}</td>
       <td><small>${fmtDate(u.createdAt)}</small></td>
-      <td>${u.role !== "ADMIN" ? `<button class="btn btn-sm btn-danger-solid" data-user-del="${esc(u.id)}">🗑️</button>` : ''}</td>
+      <td>${u.role !== "ADMIN" ? `<button class="btn btn-sm btn-danger-solid" data-user-del="${esc(u.id)}"></button>` : ''}</td>
     </tr>`;
   }).join("");
 

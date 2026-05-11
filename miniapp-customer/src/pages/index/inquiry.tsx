@@ -1,4 +1,4 @@
-import React, { FC, useState } from "react";
+﻿import React, { FC, useState } from "react";
 import { Box, Input, useNavigate } from "zmp-ui";
 import { useSetRecoilState } from "recoil";
 import { atom } from "recoil";
@@ -11,10 +11,10 @@ export const activeFilterState = atom<FilterType>({
 });
 
 const quickFilters = [
-  { id: "near" as FilterType, label: "📍 Gần bạn" },
-  { id: "freeship" as FilterType, label: "🚚 Freeship" },
-  { id: "sale" as FilterType, label: "🔥 Giảm giá" },
-  { id: "new" as FilterType, label: "✨ Mới" },
+  { id: "near" as FilterType, label: " Gần bạn" },
+  { id: "freeship" as FilterType, label: " Freeship" },
+  { id: "sale" as FilterType, label: " Giảm giá" },
+  { id: "new" as FilterType, label: " Mới" },
   { id: "best" as FilterType, label: "⭐ Bán chạy" },
 ];
 
@@ -59,7 +59,7 @@ export const Inquiry: FC = () => {
           style={{ background: "var(--tm-primary-light)", color: "var(--tm-primary)", fontWeight: 700 }}
           onClick={() => navigate("/nearby-stores-map")}
         >
-          🗺️ Bản đồ quán
+           Bản đồ quán
         </button>
       </div>
     </Box>

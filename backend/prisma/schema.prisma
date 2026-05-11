@@ -29,6 +29,13 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum CancelRequestStatus {
+  NONE
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum DiscountType {
   PERCENT
   FIXED
@@ -425,6 +432,9 @@ model DriverProfile {
   vehicleType  String
   licensePlate String   @unique
   isOnline     Boolean  @default(false)
+  acceptanceRate Float  @default(1.0)
+  cancellationRate Float @default(0.0)
+  tier         String   @default("BASIC")
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -626,6 +636,7 @@ model ProductReview {
   productId String
   userId    String
   rating    Int
+  comment   String?
   createdAt DateTime @default(now())
 
   order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)

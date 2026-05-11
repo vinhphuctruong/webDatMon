@@ -1,4 +1,4 @@
-import { ElasticTextarea } from "components/elastic-textarea";
+﻿import { ElasticTextarea } from "components/elastic-textarea";
 import { VietMapView, MapMarker } from "components/vietmap";
 import React, { FC, Suspense, useMemo } from "react";
 import { Box, Text } from "zmp-ui";
@@ -40,7 +40,7 @@ const DeliveryMap: FC = () => {
         alignItems: 'center', justifyContent: 'center',
         gap: 8, marginBottom: 8, padding: 16, textAlign: 'center',
       }}>
-        <span style={{ fontSize: 40 }}>📍</span>
+        <span style={{ fontSize: 40 }}></span>
         <Text style={{ fontWeight: 700, fontSize: 14, color: 'var(--tm-text-primary)' }}>
           Chưa có vị trí giao hàng
         </Text>
@@ -115,8 +115,8 @@ const DeliveryMap: FC = () => {
       <div style={{
         display: 'flex', gap: 12, padding: '6px 4px', flexWrap: 'wrap',
       }}>
-        <LegendItem emoji="📍" color="#4285f4" label="Bạn" />
-        <LegendItem emoji="🏪" color="#00a96d" label="Quán" />
+        <LegendItem emoji="" color="#4285f4" label="Bạn" />
+        <LegendItem emoji="" color="#00a96d" label="Quán" />
       </div>
     </div>
   );
@@ -156,7 +156,7 @@ export const Delivery: FC = () => {
   return (
     <Box style={{ padding: '16px', background: '#fff' }}>
       <Text style={{ fontWeight: 700, fontSize: 15, color: 'var(--tm-text-primary)', marginBottom: 12 }}>
-        📍 Thông tin giao hàng
+         Thông tin giao hàng
       </Text>
 
       {SHOW_DELIVERY_MAP ? (
@@ -166,7 +166,7 @@ export const Delivery: FC = () => {
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             marginBottom: 12, border: '1px solid var(--tm-border)',
           }}>
-            <Text size="xSmall" style={{ color: 'var(--tm-text-tertiary)' }}>🗺️ Đang tải bản đồ...</Text>
+            <Text size="xSmall" style={{ color: 'var(--tm-text-tertiary)' }}> Đang tải bản đồ...</Text>
           </div>
         }>
           <DeliveryMap />
@@ -183,19 +183,19 @@ export const Delivery: FC = () => {
           }}
         >
           <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-            🗺️ Tạm ẩn bản đồ giao hàng theo yêu cầu.
+             Tạm ẩn bản đồ giao hàng theo yêu cầu.
           </Text>
         </div>
       )}
 
       <div className="tm-card" style={{ padding: '0 16px', boxShadow: 'none' }}>
-        <DeliveryRow icon="📍">
+        <DeliveryRow icon="">
           <CustomerLocationPicker />
         </DeliveryRow>
-        <DeliveryRow icon="🏪">
+        <DeliveryRow icon="">
           <StorePicker />
         </DeliveryRow>
-        <DeliveryRow icon="🕐">
+        <DeliveryRow icon="">
           <Box flex className="space-x-2">
             <Box className="flex-1 space-y-[2px]">
               <TimePicker />
@@ -205,11 +205,11 @@ export const Delivery: FC = () => {
             </Box>
           </Box>
         </DeliveryRow>
-        <DeliveryRow icon="👤">
+        <DeliveryRow icon="">
           <RequestPersonPickerPhone />
         </DeliveryRow>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '14px 0' }}>
-          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}>📝</span>
+          <span style={{ fontSize: 18, flexShrink: 0, marginTop: 1 }}></span>
           <div style={{ flex: 1 }}>
             <ElasticTextarea
               placeholder="Ghi chú cho quán/tài xế..."

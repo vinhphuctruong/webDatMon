@@ -394,9 +394,9 @@ export async function changeMyPassword(currentPassword: string, newPassword: str
   return response;
 }
 
-export async function cancelOrder(orderId: string, reason?: string) {
+export async function requestCancelOrder(orderId: string, reason?: string) {
   return apiFetch<{ data: any }>(
-    `/orders/${orderId}/cancel`,
+    `/orders/${orderId}/request-cancel`,
     {
       method: "POST",
       body: JSON.stringify({ reason }),
@@ -447,8 +447,9 @@ export async function resetPasswordWithOtp(payload: {
 export async function submitReview(orderId: string, payload: {
   storeRating: number;
   driverRating?: number;
-  productRatings?: { productId: string; rating: number }[];
+  productRatings?: { productId: string; rating: number; comment?: string }[];
   comment?: string;
+  driverComment?: string;
 }) {
   return apiFetch<{ data: any; message?: string }>(
     `/orders/${orderId}/reviews`,

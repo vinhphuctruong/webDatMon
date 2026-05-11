@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState, useCallback } from "react";
+﻿import React, { FC, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useRecoilState } from "recoil";
 import { Box, Text, useNavigate, useSnackbar } from "zmp-ui";
@@ -14,7 +14,7 @@ import { calcFinalPrice } from "utils/product";
 import { useRecoilValueLoadable } from "recoil";
 import { calculateDistance } from "utils/location";
 
-const stars = (n: number) => "★".repeat(n) + "☆".repeat(5 - n);
+const stars = (n: number) => "".repeat(n) + "".repeat(5 - n);
 
 const fmtDate = (s: string) => {
   const d = new Date(s);
@@ -117,7 +117,7 @@ const ProductDetailPage: FC = () => {
         {product.image ? (
           <img src={product.image} alt={product.name} style={{ width: "100%", height: 220, objectFit: "cover" }} />
         ) : (
-          <div style={{ width: "100%", height: 220, background: "linear-gradient(135deg, #f0fdf4, #ecfeff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56 }}>🍽️</div>
+          <div style={{ width: "100%", height: 220, background: "linear-gradient(135deg, #f0fdf4, #ecfeff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 56 }}></div>
         )}
         <button className="tm-interactive tm-glass" onClick={() => window.history.back()} style={{
           position: "absolute", top: "calc(env(safe-area-inset-top, 0px) + 44px)", left: 12,
@@ -151,13 +151,13 @@ const ProductDetailPage: FC = () => {
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, color: "var(--tm-text-secondary)", display: "flex", alignItems: "center", gap: 3 }}>
             {stats.totalReviews > 0 ? (
-              <><span style={{ color: "#ffb800" }}>★</span> {(product.rating ?? 0).toFixed(1)} ({stats.totalReviews} đánh giá)</>
+              <><span style={{ color: "#ffb800" }}></span> {(product.rating ?? 0).toFixed(1)} ({stats.totalReviews} đánh giá)</>
             ) : (
               <span style={{ color: "var(--tm-primary)", fontWeight: 600 }}>🆕 Mới</span>
             )}
           </span>
-          <span style={{ fontSize: 12, color: "var(--tm-text-secondary)" }}>🛒 Đã bán {product.sold ?? 0}</span>
-          <span style={{ fontSize: 12, color: "var(--tm-text-secondary)" }}>🕐 {product.eta ?? "20-30 phút"}</span>
+          <span style={{ fontSize: 12, color: "var(--tm-text-secondary)" }}> Đã bán {product.sold ?? 0}</span>
+          <span style={{ fontSize: 12, color: "var(--tm-text-secondary)" }}> {product.eta ?? "20-30 phút"}</span>
         </div>
         {/* Store link */}
         {product.storeId && (
@@ -165,7 +165,7 @@ const ProductDetailPage: FC = () => {
             marginTop: 10, padding: "8px 12px", background: "var(--tm-bg)", borderRadius: 8, cursor: "pointer",
             display: "flex", alignItems: "center", gap: 8,
           }}>
-            <span style={{ fontSize: 16 }}>🏪</span>
+            <span style={{ fontSize: 16 }}></span>
             <div>
               <Text style={{ fontSize: 13, fontWeight: 600, color: "var(--tm-primary)" }}>{product.storeName ?? "Quán đối tác"}</Text>
               <Text style={{ fontSize: 11, color: "var(--tm-text-secondary)" }}>Xem cửa hàng →</Text>
@@ -213,7 +213,7 @@ const ProductDetailPage: FC = () => {
             
             return (
               <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 6 }}>
-                <span style={{ fontSize: 14 }}>🚚</span>
+                <span style={{ fontSize: 14 }}></span>
                 <Text style={{ fontSize: 13, color: "var(--tm-text-secondary)" }}>Phí giao: <Text style={{ fontWeight: 600, color: "var(--tm-primary)" }}>Từ <DisplayPrice>{fee}</DisplayPrice></Text></Text>
               </div>
             );
@@ -232,7 +232,7 @@ const ProductDetailPage: FC = () => {
               <div style={{ flex: 1 }}>
                 {stats.distribution.map((d) => (
                   <div key={d.star} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                    <Text style={{ fontSize: 11, color: "var(--tm-text-secondary)", minWidth: 14 }}>{d.star}★</Text>
+                    <Text style={{ fontSize: 11, color: "var(--tm-text-secondary)", minWidth: 14 }}>{d.star}</Text>
                     <div style={{ flex: 1, height: 6, background: "#f1f5f9", borderRadius: 3, overflow: "hidden" }}>
                       <div style={{
                         height: "100%", borderRadius: 3,
@@ -251,7 +251,7 @@ const ProductDetailPage: FC = () => {
           {/* Reviews List */}
           {reviews.length === 0 ? (
             <div style={{ textAlign: "center", padding: "32px 16px", background: "#fff" }}>
-              <span style={{ fontSize: 32 }}>📝</span>
+              <span style={{ fontSize: 32 }}></span>
               <Text style={{ fontSize: 14, color: "var(--tm-text-secondary)", marginTop: 8 }}>Chưa có đánh giá nào</Text>
               <Text style={{ fontSize: 12, color: "var(--tm-text-muted)" }}>Hãy là người đầu tiên đánh giá!</Text>
             </div>

@@ -1,4 +1,4 @@
-import React, { FC, useCallback, useEffect, useRef, useState } from "react";
+﻿import React, { FC, useCallback, useEffect, useRef, useState } from "react";
 import vietmapgl from "@vietmap/vietmap-gl-js/dist/vietmap-gl";
 import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 import { getLocation } from "zmp-sdk";
@@ -298,7 +298,7 @@ export const MapAddressPicker: FC<MapAddressPickerProps> = ({
         {/* Address Search Bar Overlay */}
         <div style={{ position: "absolute", top: 12, left: 16, right: 16, zIndex: 1100 }}>
           <div style={{ position: "relative", display: "flex", alignItems: "center", background: "#fff", borderRadius: 8, padding: "0 12px", boxShadow: "0 2px 10px rgba(0,0,0,0.15)" }}>
-            <span style={{ fontSize: 18, color: "#666" }}>🔍</span>
+            <span style={{ fontSize: 18, color: "#666" }}></span>
             <input
               type="text"
               placeholder="Tìm kiếm địa chỉ, đường..."
@@ -329,7 +329,7 @@ export const MapAddressPicker: FC<MapAddressPickerProps> = ({
                   onClick={() => selectSearchResult(res)}
                   style={{ padding: "12px 16px", borderBottom: i === searchResults.length - 1 ? "none" : "1px solid #eee", cursor: "pointer", display: "flex", alignItems: "flex-start", gap: 10 }}
                 >
-                  <span style={{ fontSize: 16, color: "#00a96d", marginTop: 2 }}>📍</span>
+                  <span style={{ fontSize: 16, color: "#00a96d", marginTop: 2 }}></span>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a2e", marginBottom: 4 }}>
                       {res.name || res.display_name.split(',')[0]}
@@ -359,7 +359,7 @@ export const MapAddressPicker: FC<MapAddressPickerProps> = ({
               textAlign: "center",
             }}
           >
-            <div style={{ fontSize: 40, marginBottom: 12 }}>📍</div>
+            <div style={{ fontSize: 40, marginBottom: 12 }}></div>
             <div style={{ fontSize: 16, fontWeight: 600, color: "#1a1a2e", marginBottom: 8 }}>
               Yêu cầu bật định vị
             </div>
@@ -396,7 +396,7 @@ export const MapAddressPicker: FC<MapAddressPickerProps> = ({
             filter: "drop-shadow(0 3px 6px rgba(0,0,0,0.3))",
           }}
         >
-          📍
+          
         </div>
 
         <button
@@ -422,7 +422,7 @@ export const MapAddressPicker: FC<MapAddressPickerProps> = ({
             opacity: gpsLoading ? 0.6 : 1,
           }}
         >
-          <span style={{ fontSize: 20 }}>{gpsLoading ? "⏳" : "📡"}</span>
+          <span style={{ fontSize: 20 }}>{gpsLoading ? "⏳" : ""}</span>
           <span style={{ fontSize: 14, fontWeight: 600, color: "#333" }}>Vị trí hiện tại</span>
         </button>
 
@@ -473,7 +473,7 @@ export const MapAddressPicker: FC<MapAddressPickerProps> = ({
         )}
 
         <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 14 }}>
-          <span style={{ fontSize: 18, flexShrink: 0 }}>📍</span>
+          <span style={{ fontSize: 18, flexShrink: 0 }}></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{

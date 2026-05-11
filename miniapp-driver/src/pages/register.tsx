@@ -1,4 +1,4 @@
-import React, { FC, useState, useRef } from "react";
+﻿import React, { FC, useState, useRef } from "react";
 import { Box, Page, Text, Input, Button, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { apiFetch, requestEmailOtp } from "services/api";
@@ -61,12 +61,12 @@ const ImageUpload: FC<ImageUploadProps> = ({ label, icon, hint, value, onChange 
               background: "rgba(0,0,0,0.5)", padding: "6px 0",
               color: "#fff", fontSize: 11, fontWeight: 600, textAlign: "center",
             }}>
-              ✅ Đã tải lên · Bấm để thay đổi
+               Đã tải lên · Bấm để thay đổi
             </div>
           </div>
         ) : (
           <>
-            <div style={{ fontSize: 28, marginBottom: 4 }}>📷</div>
+            <div style={{ fontSize: 28, marginBottom: 4 }}></div>
             <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)" }}>{hint}</Text>
           </>
         )}
@@ -188,7 +188,7 @@ const RegisterPage: FC = () => {
       );
       setApplicationId(res.data.id);
       setStep("done");
-      snackbar.openSnackbar({ type: "success", text: "Nộp đơn thành công! 🎉" });
+      snackbar.openSnackbar({ type: "success", text: "Nộp đơn thành công! " });
     } catch (error: any) {
       snackbar.openSnackbar({ type: "error", text: error.message || "Nộp đơn thất bại" });
     } finally {
@@ -317,7 +317,7 @@ const RegisterPage: FC = () => {
               background: "var(--tm-primary-light)", borderRadius: 12,
               padding: 12, marginBottom: 16, display: "flex", gap: 8, alignItems: "flex-start",
             }}>
-              <span style={{ fontSize: 18 }}>ℹ️</span>
+              <span style={{ fontSize: 18 }}>ℹ</span>
               <Text size="xxSmall" style={{ color: "var(--tm-primary)", lineHeight: "18px" }}>
                 Vui lòng chụp ảnh rõ nét, đủ sáng. Admin sẽ xét duyệt hồ sơ trong 24h.
               </Text>
@@ -326,28 +326,28 @@ const RegisterPage: FC = () => {
             <div style={{ display: "grid", gap: 16 }}>
               <ImageUpload
                 label="Ảnh chân dung"
-                icon="🤳"
+                icon=""
                 hint="Chụp rõ khuôn mặt, nhìn thẳng"
                 value={images.portraitImageData}
                 onChange={(v) => updateImage("portraitImageData", v)}
               />
               <ImageUpload
                 label="CCCD / CMND (mặt trước)"
-                icon="🪪"
+                icon=""
                 hint="Chụp rõ thông tin, không bị mờ"
                 value={images.idCardImageData}
                 onChange={(v) => updateImage("idCardImageData", v)}
               />
               <ImageUpload
                 label="Bằng lái xe"
-                icon="🪪"
+                icon=""
                 hint="Chụp rõ mặt trước bằng lái"
                 value={images.driverLicenseImageData}
                 onChange={(v) => updateImage("driverLicenseImageData", v)}
               />
               <ImageUpload
                 label="Biển số xe"
-                icon="🏍️"
+                icon=""
                 hint="Chụp rõ biển số trên xe"
                 value={images.licensePlateImageData}
                 onChange={(v) => updateImage("licensePlateImageData", v)}
@@ -372,7 +372,7 @@ const RegisterPage: FC = () => {
         {step === "otp" && (
           <div className="tm-card animate-slide-up" style={{ padding: 24 }}>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div style={{ fontSize: 48, marginBottom: 8 }}>📧</div>
+              <div style={{ fontSize: 48, marginBottom: 8 }}></div>
               <Text style={{ fontWeight: 600, fontSize: 15 }}>Xác nhận email của bạn</Text>
               <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginTop: 4 }}>
                 Mã OTP đã gửi tới <strong>{form.email}</strong>
@@ -421,7 +421,7 @@ const RegisterPage: FC = () => {
         {/* Step 3: Done */}
         {step === "done" && (
           <div className="tm-card animate-slide-up" style={{ padding: 32, textAlign: "center" }}>
-            <div style={{ fontSize: 64, marginBottom: 12 }}>✅</div>
+            <div style={{ fontSize: 64, marginBottom: 12 }}></div>
             <Text.Title style={{ fontSize: 20, fontWeight: 800, marginBottom: 8 }}>
               Nộp đơn thành công!
             </Text.Title>

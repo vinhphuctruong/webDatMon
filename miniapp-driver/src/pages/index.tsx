@@ -1,7 +1,7 @@
-import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { hasSession } from "services/api";
+import { ApiError, hasSessionAsync } from "services/api";
 import { fetchDriverProfile, toggleOnline, fetchMyOrders } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
 
@@ -13,9 +13,6 @@ const HomePage: FC = () => {
   const [todayStats, setTodayStats] = useState({ earnings: 0, deliveries: 0 });
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
-
-  const [error, setError] = useState<any>(null);
-  if (error) throw error;
 
   const loadData = useCallback(async () => {
     try {
@@ -33,20 +30,33 @@ const HomePage: FC = () => {
         earnings: todayOrders.reduce((sum: number, o: any) => sum + (o.driverPayout || 0), 0),
         deliveries: todayOrders.length,
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError(err);
+      if (err instanceof ApiError && err.status === 401) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      snackbar.openSnackbar({ type: "error", text: err?.message || "Không tải được dữ liệu tài xế" });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate, snackbar]);
 
   useEffect(() => {
-    if (!hasSession()) {
-      navigate("/login", { replace: true });
-      return;
-    }
-    loadData();
+    let active = true;
+    const bootstrap = async () => {
+      const hasSession = await hasSessionAsync();
+      if (!active) return;
+      if (!hasSession) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      await loadData();
+    };
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [loadData, navigate]);
 
   const handleToggle = async () => {
@@ -67,10 +77,9 @@ const HomePage: FC = () => {
 
   const quickActions = useMemo(
     () => [
-      { icon: "📋", label: "Đơn chờ nhận", path: "/available" },
-      { icon: "🛵", label: "Đang giao", path: "/delivering" },
-      { icon: "📦", label: "Lịch sử đơn", path: "/orders" },
-      { icon: "💰", label: "Ví thu nhập", path: "/wallet" },
+      { icon: "", label: "Đang giao", path: "/delivering" },
+      { icon: "", label: "Lịch sử đơn", path: "/orders" },
+      { icon: "", label: "Ví thu nhập", path: "/wallet" },
     ],
     [],
   );

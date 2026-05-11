@@ -1,4 +1,4 @@
-import React, { FC, useMemo, useState } from "react";
+﻿import React, { FC, useMemo, useState } from "react";
 import { Page, Header, Text } from "zmp-ui";
 import { useRecoilValueLoadable } from "recoil";
 import { useNavigate } from "react-router";
@@ -87,7 +87,7 @@ const NearbyStoresMapPage: FC = () => {
                 color: viewMode === mode ? "#fff" : "var(--tm-text-secondary)",
               }}
             >
-              {mode === "map" ? "🗺️ Ban do" : "📋 Danh sach"}
+              {mode === "map" ? " Ban do" : " Danh sach"}
             </button>
           ))}
         </div>
@@ -140,7 +140,7 @@ const NearbyStoresMapPage: FC = () => {
                     flexShrink: 0,
                   }}
                 >
-                  🏪
+                  
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontWeight: 700, fontSize: 14, fontFamily: "Inter, sans-serif" }}>
@@ -176,7 +176,7 @@ const NearbyStoresMapPage: FC = () => {
           <div style={{ flex: 1, overflow: "auto", padding: "0 16px 16px" }}>
             {stores.length === 0 ? (
               <div style={{ textAlign: "center", padding: 40, color: "#888" }}>
-                <div style={{ fontSize: 40, marginBottom: 8 }}>🏪</div>
+                <div style={{ fontSize: 40, marginBottom: 8 }}></div>
                 <Text>Chua co quan nao gan ban</Text>
               </div>
             ) : (
@@ -210,7 +210,7 @@ const NearbyStoresMapPage: FC = () => {
                       flexShrink: 0,
                     }}
                   >
-                    🏪
+                    
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 600, fontSize: 14, fontFamily: "Inter, sans-serif" }}>{store.name}</div>

@@ -1,4 +1,4 @@
-import React, { FC, useState, useRef, useCallback } from "react";
+﻿import React, { FC, useState, useRef, useCallback } from "react";
 import { Box, Text, Icon } from "zmp-ui";
 import { createPortal } from "react-dom";
 
@@ -214,7 +214,7 @@ export const AddressSearchSheet: FC<AddressSearchSheetProps> = ({
                 cursor: "pointer",
               }}
             >
-              ✕
+              
             </div>
           )}
         </div>

@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router";
 import { Box, Text } from "zmp-ui";
 import { Navigation } from "./navigation";
 import { IncomingStoreOrderAlert } from "./incoming-store-order-alert";
+import { OrderCancelNoticeListener } from "./order-cancel-notice-listener";
 import HomePage from "../pages/index";
 import OrdersPage from "../pages/orders";
 import OrderDetailPage from "../pages/order-detail";
@@ -48,6 +49,7 @@ export const Layout: FC = () => {
             }
           >
             <IncomingStoreOrderAlert />
+            <OrderCancelNoticeListener />
             <Routes>
               {/* Auth routes */}
               <Route path="/login" element={<LoginPage />} />

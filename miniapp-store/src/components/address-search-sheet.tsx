@@ -1,4 +1,4 @@
-import React, { FC, useState, useRef, useCallback } from "react";
+﻿import React, { FC, useState, useRef, useCallback } from "react";
 import { Sheet, Box, Text, Icon } from "zmp-ui";
 
 export interface AddressSearchResult {
@@ -128,7 +128,7 @@ export const AddressSearchSheet: FC<AddressSearchSheetProps> = ({
                 onClick={() => { setSearchQuery(""); setSearchResults([]); }}
                 style={{ background: "#ccc", color: "#fff", width: 16, height: 16, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, cursor: "pointer" }}
               >
-                ✕
+                
               </div>
             )}
           </div>

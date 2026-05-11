@@ -1,4 +1,4 @@
-import React, { FC, useState, useCallback } from "react";
+﻿import React, { FC, useState, useCallback } from "react";
 import { Text } from "zmp-ui";
 import { useRecoilState, useSetRecoilState } from "recoil";
 import { requestLocationTriesState, manualCustomerLocationState, customerAddressTextState } from "state";
@@ -116,7 +116,7 @@ export const LocationGate: FC<LocationGateProps> = ({
         alignItems: "center",
         gap: 10,
       }}>
-        <span style={{ fontSize: 22 }}>📍</span>
+        <span style={{ fontSize: 22 }}></span>
         <div style={{ flex: 1 }}>
           <Text style={{ fontSize: 12, fontWeight: 600, color: "#92400e", lineHeight: 1.4 }}>
             Chưa có vị trí giao hàng
@@ -163,7 +163,7 @@ export const LocationGate: FC<LocationGateProps> = ({
         boxShadow: "0 8px 32px rgba(0, 169, 109, 0.15)",
         animation: "tm-marker-pulse 2s ease-in-out infinite",
       }}>
-        📍
+        
       </div>
 
       <Text style={{ fontSize: 20, fontWeight: 800, color: "var(--tm-text-primary)", marginBottom: 8 }}>
@@ -208,7 +208,7 @@ export const LocationGate: FC<LocationGateProps> = ({
         {requesting ? (
           <>⏳ Đang lấy vị trí...</>
         ) : (
-          <>🛰️ Sử dụng vị trí hiện tại</>
+          <> Sử dụng vị trí hiện tại</>
         )}
       </button>
 
@@ -229,7 +229,7 @@ export const LocationGate: FC<LocationGateProps> = ({
           display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
         }}
       >
-        🗺️ Chọn địa chỉ trên bản đồ
+         Chọn địa chỉ trên bản đồ
       </button>
 
       <Text style={{ fontSize: 11, color: "var(--tm-text-muted, #bbb)", marginTop: 16, maxWidth: 260 }}>

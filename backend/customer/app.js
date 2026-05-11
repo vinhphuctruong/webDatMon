@@ -1,4 +1,4 @@
-      /* ─── TM Food Customer App ─── */
+﻿      /* ─── TM Food Customer App ─── */
 const API_BASE    = "/api/v1";
 const SESSION_KEY = "zaui_food_customer_session";
 
@@ -157,12 +157,12 @@ async function loadOrders() {
 
 function renderOrders() {
   if (!state.orders.length) {
-    els.ordersList.innerHTML = `<div class="empty-state"><div class="emoji">📭</div><p>Bạn chưa có đơn nào<br><small>Hãy đặt món ngay!</small></p></div>`;
+    els.ordersList.innerHTML = `<div class="empty-state"><div class="emoji"></div><p>Bạn chưa có đơn nào<br><small>Hãy đặt món ngay!</small></p></div>`;
     return;
   }
   els.ordersList.innerHTML = state.orders.map((o) => `
     <div class="order-card" data-order-id="${o.id}">
-      <div class="order-card-icon">📦</div>
+      <div class="order-card-icon"></div>
       <div class="order-card-body">
         <div class="order-card-header">
           <div>
@@ -172,11 +172,11 @@ function renderOrders() {
           <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
         </div>
         <div class="order-meta">
-          💰 <strong>${fmtVND(o.total)}</strong> &nbsp;
-          <span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? "💵 COD" : "📱 QR"}</span>
-          &nbsp; 🕒 ${fmtDate(o.createdAt)}
+           <strong>${fmtVND(o.total)}</strong> &nbsp;
+          <span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? " COD" : " QR"}</span>
+          &nbsp;  ${fmtDate(o.createdAt)}
           ${o.status === "PENDING" && o.paymentMethod === "SEPAY_QR" && o.paymentStatus === "PENDING"
-            ? ` &nbsp; <span style="color:#e05500;font-weight:700;font-size:12px;">⚠️ Chờ thanh toán</span>` : ""}
+            ? ` &nbsp; <span style="color:#e05500;font-weight:700;font-size:12px;"> Chờ thanh toán</span>` : ""}
         </div>
       </div>
     </div>
@@ -198,7 +198,7 @@ async function openOrderDetail(orderId) {
   if (order.paymentMethod === "SEPAY_QR" && order.paymentStatus === "PENDING" && order.payment?.sepayQrContent) {
     qrHtml = `
       <div class="order-detail-section">
-        <h5>📱 Quét QR để thanh toán</h5>
+        <h5> Quét QR để thanh toán</h5>
         <div class="qr-box">
           <div id="modal-qr-code"></div>
           <p class="qr-amount">${fmtVND(order.total)}</p>
@@ -276,7 +276,7 @@ async function loadStores() {
 
 function renderStores(stores) {
   if (!stores.length) {
-    els.storesGrid.innerHTML = `<div class="empty-state"><div class="emoji">🏪</div><p>Không tìm thấy cửa hàng</p></div>`;
+    els.storesGrid.innerHTML = `<div class="empty-state"><div class="emoji"></div><p>Không tìm thấy cửa hàng</p></div>`;
     return;
   }
   els.storesGrid.innerHTML = stores.map((s) => `
@@ -285,12 +285,12 @@ function renderStores(stores) {
         <div class="store-name">${s.name}</div>
         <span class="store-open-badge ${s.isOpen ? "open" : "closed"}">${s.isOpen ? "Đang mở" : "Đóng cửa"}</span>
       </div>
-      <div class="store-address">📍 ${s.address}</div>
+      <div class="store-address"> ${s.address}</div>
       <div class="store-meta">
         <span class="store-rating">⭐ ${s.rating.toFixed(1)}</span>
-        <span class="store-eta">🕒 ${s.etaMinutesMin}–${s.etaMinutesMax} phút</span>
+        <span class="store-eta"> ${s.etaMinutesMin}–${s.etaMinutesMax} phút</span>
       </div>
-      ${s.isOpen ? `<button class="store-select-btn" data-store-id="${s.id}" data-store-name="${s.name}">🛒 Đặt món từ đây</button>` : ""}
+      ${s.isOpen ? `<button class="store-select-btn" data-store-id="${s.id}" data-store-name="${s.name}"> Đặt món từ đây</button>` : ""}
     </div>
   `).join("");
 
@@ -343,7 +343,7 @@ function renderPlaceProducts() {
         ? `<img class="product-card-img" src="${p.imageUrl}" alt="${p.name}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
         : ""
       }
-      <div class="product-card-img-placeholder" style="${p.imageUrl ? "display:none" : ""}">🍽️</div>
+      <div class="product-card-img-placeholder" style="${p.imageUrl ? "display:none" : ""}"></div>
       <div class="product-card-body">
         <div class="product-card-name">${p.name}</div>
         <div class="product-card-price">${fmtVND(p.price)}</div>
@@ -491,7 +491,7 @@ els.checkoutForm.addEventListener("submit", async (e) => {
     if (paymentMethod === "SEPAY_QR") {
       /* Need to fetch payment info */
       const paymentData = order.payment;
-      els.step3Title.textContent      = "📱 Quét QR để thanh toán";
+      els.step3Title.textContent      = " Quét QR để thanh toán";
       els.paymentQrSection.classList.remove("hidden");
       els.paymentCodSection.classList.add("hidden");
       els.orderAmountDisplay.textContent = fmtVND(order.total);
@@ -507,7 +507,7 @@ els.checkoutForm.addEventListener("submit", async (e) => {
         });
       }
     } else {
-      els.step3Title.textContent = "✅ Đặt hàng COD thành công!";
+      els.step3Title.textContent = " Đặt hàng COD thành công!";
       els.paymentQrSection.classList.add("hidden");
       els.paymentCodSection.classList.remove("hidden");
       els.codAmount.textContent = fmtVND(order.total);
@@ -531,9 +531,9 @@ els.checkPaymentBtn.addEventListener("click", async () => {
     const r = await api(`/orders/${state.currentOrderId}`);
     const o = r.data;
     if (o.paymentStatus === "SUCCEEDED") {
-      showToast("✅ Thanh toán thành công!");
+      showToast(" Thanh toán thành công!");
       els.paymentQrSection.classList.add("hidden");
-      els.step3Title.textContent = "✅ Thanh toán thành công!";
+      els.step3Title.textContent = " Thanh toán thành công!";
       await loadOrders();
     } else {
       showToast("⏳ Chưa nhận được thanh toán. Vui lòng thử lại.");
@@ -577,7 +577,7 @@ async function loadProfile() {
 
 els.refreshBtn.addEventListener("click", async () => {
   await Promise.all([loadOrders(), loadStores()]);
-  showToast("🔄 Đã làm mới!");
+  showToast(" Đã làm mới!");
 });
 
 /* Login */

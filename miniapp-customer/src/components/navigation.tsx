@@ -34,7 +34,6 @@ export const NO_BOTTOM_NAVIGATION_PAGES = [
   "/account",
   "/login",
   "/orders",
-  "/active-orders",
   "/addresses",
 ];
 

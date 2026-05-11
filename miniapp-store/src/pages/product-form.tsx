@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { createManagedStoreProduct, fetchCategories } from "services/api";
@@ -158,7 +158,7 @@ const ProductFormPage = () => {
               
               <div style={{ position: "relative", width: "100%", padding: 12, borderRadius: 8, border: "1px dashed var(--tm-primary)", textAlign: "center", background: "#f1fdf7" }}>
                 <Text style={{ color: "var(--tm-primary)", fontWeight: 600 }}>
-                  {formData.imageUrl ? "Chọn ảnh khác" : "📸 Tải ảnh từ máy"}
+                  {formData.imageUrl ? "Chọn ảnh khác" : " Tải ảnh từ máy"}
                 </Text>
                 <input
                   type="file"

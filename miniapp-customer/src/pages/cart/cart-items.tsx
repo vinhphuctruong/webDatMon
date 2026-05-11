@@ -1,4 +1,4 @@
-import { FinalPrice } from "components/display/final-price";
+﻿import { FinalPrice } from "components/display/final-price";
 import { DisplaySelectedOptions } from "components/display/selected-options";
 import { ProductPicker } from "components/product/picker";
 import React, { FC, useState } from "react";
@@ -125,7 +125,7 @@ export const CartItems: FC = () => {
         </ProductPicker>
       ) : (
         <div className="tm-empty-state" style={{ background: '#fff', borderRadius: 16 }}>
-          <span className="tm-empty-icon">🛒</span>
+          <span className="tm-empty-icon"></span>
           <Text style={{ fontWeight: 600, color: 'var(--tm-text-primary)', marginBottom: 4 }}>
             Giỏ hàng trống
           </Text>

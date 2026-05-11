@@ -1,4 +1,4 @@
-/* ─── TM Food Driver App ─── */
+﻿/* ─── TM Food Driver App ─── */
 const API_BASE    = "/api/v1";
 const SESSION_KEY = "zaui_food_driver_session";
 
@@ -160,10 +160,10 @@ function renderProfile() {
   els.driverPhone.textContent       = p.user.phone || "–";
 
   if (p.isOnline) {
-    els.toggleOnlineBtn.textContent = "🟢 Online";
+    els.toggleOnlineBtn.textContent = " Online";
     els.toggleOnlineBtn.className   = "online-toggle online";
   } else {
-    els.toggleOnlineBtn.textContent = "⚫ Offline";
+    els.toggleOnlineBtn.textContent = " Offline";
     els.toggleOnlineBtn.className   = "online-toggle offline";
   }
 }
@@ -189,12 +189,12 @@ async function loadOrders() {
 
 function renderAvailableOrders() {
   if (!state.available.length) {
-    els.availableOrdersList.innerHTML = `<div class="empty-state"><div class="emoji">📭</div><p>Chưa có đơn nào<br><small>Bật Online để nhận đơn</small></p></div>`;
+    els.availableOrdersList.innerHTML = `<div class="empty-state"><div class="emoji"></div><p>Chưa có đơn nào<br><small>Bật Online để nhận đơn</small></p></div>`;
     return;
   }
   els.availableOrdersList.innerHTML = state.available.map((o) => `
     <div class="order-card">
-      <div class="order-card-icon available">🛵</div>
+      <div class="order-card-icon available"></div>
       <div class="order-card-body">
         <div class="order-card-header">
           <div>
@@ -204,13 +204,13 @@ function renderAvailableOrders() {
           <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
         </div>
         <div class="order-meta">
-          💰 <strong>${fmtVND(o.total)}</strong> &nbsp;
-          <span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? "💵 COD" : "📱 QR"}</span>
-          &nbsp; 📍 ${o.store?.address || ""}
+           <strong>${fmtVND(o.total)}</strong> &nbsp;
+          <span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? " COD" : " QR"}</span>
+          &nbsp;  ${o.store?.address || ""}
         </div>
         <div class="order-items">${(o.items||[]).slice(0,3).map((i) => `${i.productName} x${i.quantity}`).join(" · ")}</div>
         <div class="order-card-actions">
-          <button class="btn-primary btn-sm" data-claim="${o.id}">✅ Nhận đơn</button>
+          <button class="btn-primary btn-sm" data-claim="${o.id}"> Nhận đơn</button>
         </div>
       </div>
     </div>
@@ -228,18 +228,18 @@ function renderAvailableOrders() {
 
 function renderMyOrders() {
   if (!state.mine.length) {
-    els.myOrdersList.innerHTML = `<div class="empty-state"><div class="emoji">📦</div><p>Bạn chưa có đơn nào</p></div>`;
+    els.myOrdersList.innerHTML = `<div class="empty-state"><div class="emoji"></div><p>Bạn chưa có đơn nào</p></div>`;
     return;
   }
   els.myOrdersList.innerHTML = state.mine.map((o) => {
     const actions = [];
     /* Backend: claim → PICKED_UP directly, complete → DELIVERED */
     if (o.status === "PICKED_UP") {
-      actions.push(`<button class="btn-primary btn-sm" data-complete="${o.id}">✅ Xác nhận đã giao</button>`);
+      actions.push(`<button class="btn-primary btn-sm" data-complete="${o.id}"> Xác nhận đã giao</button>`);
     }
     return `
       <div class="order-card">
-        <div class="order-card-icon mine">📦</div>
+        <div class="order-card-icon mine"></div>
         <div class="order-card-body">
           <div class="order-card-header">
             <div>
@@ -249,9 +249,9 @@ function renderMyOrders() {
             <span class="status-badge status-${o.status}">${statusLabel(o.status)}</span>
           </div>
           <div class="order-meta">
-            💰 <strong>${fmtVND(o.total)}</strong> &nbsp;
-            <span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? "💵 COD" : "📱 QR"}</span>
-            ${o.driverPayout ? ` &nbsp; 🏆 Thu về: <strong>${fmtVND(o.driverPayout)}</strong>` : ""}
+             <strong>${fmtVND(o.total)}</strong> &nbsp;
+            <span class="pm-badge pm-${o.paymentMethod}">${o.paymentMethod === "COD" ? " COD" : " QR"}</span>
+            ${o.driverPayout ? ` &nbsp;  Thu về: <strong>${fmtVND(o.driverPayout)}</strong>` : ""}
           </div>
           <div class="order-items">${(o.items||[]).slice(0,3).map((i) => `${i.productName} x${i.quantity}`).join(" · ")}</div>
           ${actions.length ? `<div class="order-card-actions">${actions.join("")}</div>` : ""}
@@ -393,7 +393,7 @@ els.confirmTopupDemo.addEventListener("click", async () => {
     els.topupPanel.style.display = "none";
     els.topupQrSection.classList.add("hidden");
     els.topupForm.reset();
-    showToast("✅ Nạp tiền thành công!");
+    showToast(" Nạp tiền thành công!");
   } catch (err) { alert(`Xác nhận thất bại: ${err.message}`); }
 });
 
@@ -421,7 +421,7 @@ els.withdrawForm.addEventListener("submit", async (e) => {
     els.withdrawForm.reset();
     els.withdrawPanel.style.display = "none";
     await loadWallet();
-    showToast("✅ Yêu cầu rút tiền đã được ghi nhận!");
+    showToast(" Yêu cầu rút tiền đã được ghi nhận!");
   } catch (err) { alert(`Rút tiền thất bại: ${err.message}`); }
 });
 

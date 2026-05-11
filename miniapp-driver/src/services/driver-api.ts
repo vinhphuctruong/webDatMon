@@ -20,24 +20,8 @@ export async function syncDriverLocation(latitude: number, longitude: number) {
 }
 
 // ── Orders ──────────────────────────────────────────
-export async function fetchAvailableOrders(params?: { latitude?: number; longitude?: number }) {
-  const query = new URLSearchParams();
-  if (params?.latitude != null) query.set("latitude", String(params.latitude));
-  if (params?.longitude != null) query.set("longitude", String(params.longitude));
-  const qs = query.toString();
-  return apiFetch<{ data: any[] }>(`/drivers/orders/available${qs ? `?${qs}` : ""}`, undefined, {
-    auth: true,
-  });
-}
-
 export async function fetchMyOrders() {
   return apiFetch<{ data: any[] }>("/drivers/orders/mine", undefined, { auth: true });
-}
-
-export async function claimOrder(orderId: string) {
-  return apiFetch<{ data: any }>(`/drivers/orders/${orderId}/claim`, {
-    method: "POST",
-  }, { auth: true });
 }
 
 export async function acceptDispatchOrder(orderId: string) {
@@ -66,6 +50,13 @@ export async function completeOrder(orderId: string) {
 
 export async function reportFailedDelivery(orderId: string, reason?: string) {
   return apiFetch<{ data: any }>(`/orders/${orderId}/driver-failed`, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  }, { auth: true });
+}
+
+export async function rejectAssignedOrder(orderId: string, reason?: string) {
+  return apiFetch<{ data: any }>(`/orders/${orderId}/driver-reject`, {
     method: "POST",
     body: JSON.stringify({ reason }),
   }, { auth: true });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+﻿import React, { useEffect, useState } from "react";
 import { Page, Box, Text, Icon, Modal, Input, Button, useSnackbar } from "zmp-ui";
 import { fetchMyWallets, fetchWalletTransactions, requestPayout } from "services/api";
 import { DisplayPrice } from "components/display/price";
@@ -75,7 +75,7 @@ const WalletPage = () => {
            </Box>
         ) : !wallet ? (
            <div className="tm-empty-state tm-card" style={{ padding: "42px 20px" }}>
-             <span className="tm-empty-icon">💰</span>
+             <span className="tm-empty-icon"></span>
              <Text style={{ fontWeight: 700 }}>Chưa có thông tin ví</Text>
            </div>
         ) : (

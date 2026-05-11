@@ -1,4 +1,4 @@
-import React, { FC, useState } from "react";
+﻿import React, { FC, useState } from "react";
 import { Box, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { loginWithCredentials } from "services/api";
@@ -59,7 +59,7 @@ const LoginPage: FC = () => {
               boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
             }}
           >
-            <span style={{ fontSize: 38 }}>🛵</span>
+            <span style={{ fontSize: 38 }}></span>
           </div>
           <Text.Title style={{ color: "#fff", fontSize: 24, fontWeight: 800 }}>TM Food Driver</Text.Title>
           <Text size="small" style={{ color: "rgba(255,255,255,0.84)" }}>

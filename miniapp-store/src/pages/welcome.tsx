@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+﻿import React, { useEffect } from "react";
 import { Page, Box, Text } from "zmp-ui";
 import { useNavigate } from "react-router";
 
@@ -33,7 +33,7 @@ const WelcomePage = () => {
               boxShadow: "0 12px 40px rgba(0,0,0,0.15)",
             }}
           >
-            <span style={{ fontSize: 50 }}>🏪</span>
+            <span style={{ fontSize: 50 }}></span>
           </div>
           <Text.Title style={{ color: "#fff", fontSize: 28, fontWeight: 800, textAlign: "center", marginBottom: 8 }}>
             TM Food Quán

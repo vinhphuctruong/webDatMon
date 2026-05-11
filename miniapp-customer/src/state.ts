@@ -1,4 +1,4 @@
-import { atom, selector, selectorFamily } from "recoil";
+﻿import { atom, selector, selectorFamily } from "recoil";
 import { getLocation, getPhoneNumber, getUserInfo } from "zmp-sdk";
 import logo from "static/logo.png";
 import mockCategories from "./mock/categories.json";
@@ -630,7 +630,7 @@ export const customerAddressDisplayState = selector<string>({
     }
     const location = get(locationState);
     if (!location) {
-      return "📍 Vui lòng chọn địa chỉ giao hàng";
+      return " Vui lòng chọn địa chỉ giao hàng";
     }
     const lat = Number(location.latitude).toFixed(5);
     const lng = Number(location.longitude).toFixed(5);

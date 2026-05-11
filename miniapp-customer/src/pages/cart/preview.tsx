@@ -1,4 +1,4 @@
-import { DisplayPrice } from "components/display/price";
+﻿import { DisplayPrice } from "components/display/price";
 import React, { FC, useState } from "react";
 import {
   useRecoilValue,
@@ -79,6 +79,7 @@ export const CartPreview: FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [voucherInput, setVoucherInput] = useState("");
   const [showVoucher, setShowVoucher] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"COD" | "SEPAY_QR">("COD");
 
   const applyVoucher = async () => {
     const code = voucherInput.trim().toUpperCase();
@@ -93,7 +94,7 @@ export const CartPreview: FC = () => {
       setShowVoucher(false);
       snackbar.openSnackbar({
         type: "success",
-        text: `Áp dụng mã ${code} — Giảm ${(result.discount / 1000).toFixed(0)}K 🎉`,
+        text: `Áp dụng mã ${code} — Giảm ${(result.discount / 1000).toFixed(0)}K `,
       });
     } catch (err: any) {
       const msg = err?.message || "Mã voucher không hợp lệ";
@@ -151,6 +152,8 @@ export const CartPreview: FC = () => {
       const orderPayload = {
         ...(note.trim() ? { note: note.trim() } : {}),
         ...(appliedVoucherCode ? { voucherCode: appliedVoucherCode } : {}),
+        paymentMethod,
+        autoConfirmPayment: paymentMethod === "SEPAY_QR",
         deliveryAddress: {
           receiverName: customerName,
           phone: customerPhone,
@@ -290,7 +293,7 @@ export const CartPreview: FC = () => {
             border: '1px dashed var(--tm-primary)',
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <span style={{ fontSize: 12 }}>🎫</span>
+              <span style={{ fontSize: 12 }}></span>
               <Text size="xxxSmall" style={{ color: 'var(--tm-primary)', fontWeight: 600 }}>
                 {appliedVoucherCode} · Giảm <DisplayPrice>{voucherDiscount}</DisplayPrice>
               </Text>
@@ -345,7 +348,7 @@ export const CartPreview: FC = () => {
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                 }}
               >
-                🎫 Nhập mã voucher giảm giá
+                 Nhập mã voucher giảm giá
               </button>
             )}
           </div>
@@ -353,6 +356,49 @@ export const CartPreview: FC = () => {
       </div>
 
       {/* Fee breakdown — compact */}
+      <div style={{ marginBottom: 10 }}>
+        <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 6 }}>
+          Phương thức thanh toán
+        </Text>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <button
+            onClick={() => setPaymentMethod("COD")}
+            style={{
+              padding: "9px 10px",
+              borderRadius: 10,
+              border: paymentMethod === "COD" ? "1.5px solid var(--tm-primary)" : "1px solid var(--tm-border)",
+              background: paymentMethod === "COD" ? "var(--tm-primary-light)" : "#fff",
+              color: "var(--tm-text-primary)",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+             COD
+          </button>
+          <button
+            onClick={() => setPaymentMethod("SEPAY_QR")}
+            style={{
+              padding: "9px 10px",
+              borderRadius: 10,
+              border:
+                paymentMethod === "SEPAY_QR"
+                  ? "1.5px solid var(--tm-primary)"
+                  : "1px solid var(--tm-border)",
+              background: paymentMethod === "SEPAY_QR" ? "var(--tm-primary-light)" : "#fff",
+              color: "var(--tm-text-primary)",
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: "pointer",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+             Thanh toán online
+          </button>
+        </div>
+      </div>
+
       <div style={{ marginBottom: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
           <Text size="xxxSmall" style={{ color: 'var(--tm-text-secondary)' }}>Tạm tính ({quantity} món)</Text>
@@ -392,7 +438,7 @@ export const CartPreview: FC = () => {
           padding: '8px 12px', marginBottom: 8, borderRadius: 10,
           background: '#fff7ed', border: '1px solid #fed7aa',
         }}>
-          <span style={{ fontSize: 16 }}>📍</span>
+          <span style={{ fontSize: 16 }}></span>
           <Text size="xxxSmall" style={{ color: '#92400e', flex: 1, lineHeight: 1.3 }}>
             Vui lòng chọn địa chỉ giao hàng để tính phí ship chính xác
           </Text>
@@ -423,7 +469,7 @@ export const CartPreview: FC = () => {
           boxShadow: (quantity && hasLocation) ? 'var(--tm-shadow-floating)' : 'none',
         }}
       >
-        {submitting ? "Đang tạo đơn..." : !hasLocation ? "📍 Chọn địa chỉ giao hàng" : "Đặt giao ngay"}
+        {submitting ? "Đang tạo đơn..." : !hasLocation ? " Chọn địa chỉ giao hàng" : "Đặt giao ngay"}
       </button>
     </div>
   );

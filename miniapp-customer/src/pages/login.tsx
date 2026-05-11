@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from "react";
+﻿import React, { FC, useEffect, useState } from "react";
 import { Page, Text, useNavigate, useSnackbar } from "zmp-ui";
 import { useLocation } from "react-router";
 import { getUserInfo } from "zmp-sdk";
@@ -499,7 +499,7 @@ const LoginPage: FC = () => {
                   padding: "10px 12px", borderRadius: 10,
                   background: "var(--tm-primary-light)", border: "1px solid var(--tm-primary)",
                 }}>
-                  <span style={{ fontSize: 16 }}>✅</span>
+                  <span style={{ fontSize: 16 }}></span>
                   <Text size="xSmall" style={{ color: "var(--tm-primary)", fontWeight: 600 }}>
                     OTP đã xác nhận thành công
                   </Text>

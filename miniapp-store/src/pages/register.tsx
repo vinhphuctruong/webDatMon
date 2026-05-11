@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+﻿import React, { useState } from "react";
 import { Page, Box, Text, useSnackbar, Header } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { submitStoreApplication } from "services/api";
@@ -133,7 +133,7 @@ const RegisterPage = () => {
               )}
               <div style={{ position: "relative", width: "100%", padding: 12, borderRadius: 8, border: "1px dashed var(--tm-primary)", textAlign: "center", background: "#f1fdf7" }}>
                 <Text style={{ color: "var(--tm-primary)", fontWeight: 600 }}>
-                  {formData.frontStoreImageData ? "Chọn ảnh khác" : "📸 Tải ảnh lên"}
+                  {formData.frontStoreImageData ? "Chọn ảnh khác" : " Tải ảnh lên"}
                 </Text>
                 <input
                   type="file"
@@ -153,7 +153,7 @@ const RegisterPage = () => {
               )}
               <div style={{ position: "relative", width: "100%", padding: 12, borderRadius: 8, border: "1px dashed var(--tm-primary)", textAlign: "center", background: "#f1fdf7" }}>
                 <Text style={{ color: "var(--tm-primary)", fontWeight: 600 }}>
-                  {formData.businessLicenseImageData ? "Chọn ảnh khác" : "📸 Tải ảnh lên"}
+                  {formData.businessLicenseImageData ? "Chọn ảnh khác" : " Tải ảnh lên"}
                 </Text>
                 <input
                   type="file"

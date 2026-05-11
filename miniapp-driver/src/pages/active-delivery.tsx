@@ -1,6 +1,14 @@
-import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
+﻿import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Modal, Page, Text, useSnackbar } from "zmp-ui";
-import { fetchMyOrders, completeOrder, pickupOrder, reportFailedDelivery } from "services/driver-api";
+import { useNavigate } from "react-router";
+import { ApiError, hasSessionAsync } from "services/api";
+import {
+  fetchMyOrders,
+  completeOrder,
+  pickupOrder,
+  rejectAssignedOrder,
+  reportFailedDelivery,
+} from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
 import { VietMapView, MapMarker } from "components/vietmap";
 import {
@@ -183,30 +191,54 @@ const ActiveDeliveryPage: FC = () => {
   const [completing, setCompleting] = useState<string | null>(null);
   const [pickingUp, setPickingUp] = useState<string | null>(null);
   const [failModal, setFailModal] = useState<{ orderId: string; visible: boolean }>({ orderId: "", visible: false });
+  const [rejectModal, setRejectModal] = useState<{ orderId: string; visible: boolean }>({
+    orderId: "",
+    visible: false,
+  });
   const [failReason, setFailReason] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
   const [failing, setFailing] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
   const snackbar = useSnackbar();
-
-  const [error, setError] = useState<any>(null);
-  if (error) throw error;
+  const navigate = useNavigate();
 
   const loadOrders = useCallback(async () => {
     try {
       const res = await fetchMyOrders();
       const active = (res.data || []).filter((o: any) => ["PICKED_UP", "CONFIRMED", "PREPARING"].includes(o.status));
       setActiveOrders(active);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      setError(err);
+      if (err instanceof ApiError && err.status === 401) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      snackbar.openSnackbar({ type: "error", text: err?.message || "Không tải được đơn đang giao" });
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [navigate, snackbar]);
 
   useEffect(() => {
-    loadOrders();
-    const interval = setInterval(loadOrders, 15000);
-    return () => clearInterval(interval);
+    let active = true;
+    let interval: ReturnType<typeof setInterval> | null = null;
+
+    const bootstrap = async () => {
+      const hasSession = await hasSessionAsync();
+      if (!active) return;
+      if (!hasSession) {
+        navigate("/login", { replace: true });
+        return;
+      }
+      await loadOrders();
+      interval = setInterval(loadOrders, 15000);
+    };
+
+    void bootstrap();
+    return () => {
+      active = false;
+      if (interval) clearInterval(interval);
+    };
   }, [loadOrders]);
 
   const handleComplete = async (orderId: string) => {
@@ -236,9 +268,14 @@ const ActiveDeliveryPage: FC = () => {
   };
 
   const handleFailed = async () => {
+    const reason = failReason.trim();
+    if (reason.length < 2) {
+      snackbar.openSnackbar({ type: "warning", text: "Vui lòng nhập lý do giao thất bại (tối thiểu 2 ký tự)" });
+      return;
+    }
     setFailing(true);
     try {
-      await reportFailedDelivery(failModal.orderId, failReason);
+      await reportFailedDelivery(failModal.orderId, reason);
       snackbar.openSnackbar({ type: "success", text: "Đã báo giao thất bại" });
       setFailModal({ orderId: "", visible: false });
       setFailReason("");
@@ -247,6 +284,26 @@ const ActiveDeliveryPage: FC = () => {
       snackbar.openSnackbar({ type: "error", text: error.message || "Không thể gửi báo cáo" });
     } finally {
       setFailing(false);
+    }
+  };
+
+  const handleRejectAssigned = async () => {
+    const reason = rejectReason.trim();
+    if (reason.length < 2) {
+      snackbar.openSnackbar({ type: "warning", text: "Vui lòng nhập lý do nhả đơn (tối thiểu 2 ký tự)" });
+      return;
+    }
+    setRejecting(true);
+    try {
+      await rejectAssignedOrder(rejectModal.orderId, reason);
+      snackbar.openSnackbar({ type: "success", text: "Đã nhả đơn về hệ thống dispatch" });
+      setRejectModal({ orderId: "", visible: false });
+      setRejectReason("");
+      loadOrders();
+    } catch (error: any) {
+      snackbar.openSnackbar({ type: "error", text: error.message || "Không thể nhả đơn" });
+    } finally {
+      setRejecting(false);
     }
   };
 
@@ -273,10 +330,10 @@ const ActiveDeliveryPage: FC = () => {
           </Box>
         ) : activeOrders.length === 0 ? (
           <div className="tm-empty-state tm-card" style={{ padding: "42px 20px" }}>
-            <span className="tm-empty-icon">🛵</span>
+            <span className="tm-empty-icon"></span>
             <Text style={{ fontWeight: 700, marginBottom: 4 }}>Không có đơn đang giao</Text>
             <Text size="xSmall" style={{ color: "var(--tm-text-secondary)" }}>
-              Vào mục "Đơn chờ" để nhận thêm cuốc mới
+              Bật trạng thái online để nhận đơn phân công tự động
             </Text>
           </div>
         ) : (
@@ -301,12 +358,12 @@ const ActiveDeliveryPage: FC = () => {
               </div>
 
               <div style={{ background: "var(--tm-bg)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
-                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>🏪 {order.store?.name}</Text>
+                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}> {order.store?.name}</Text>
                 <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>{order.store?.address}</Text>
               </div>
 
               <div style={{ background: "#f8faf8", borderRadius: 12, padding: 12, marginBottom: 10 }}>
-                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}>📍 Giao tới khách</Text>
+                <Text style={{ fontWeight: 700, fontSize: 14, marginBottom: 3 }}> Giao tới khách</Text>
                 <Text size="xxxSmall" style={{ color: "var(--tm-text-secondary)" }}>
                   {order.deliveryAddress?.receiverName} · {order.deliveryAddress?.phone}
                 </Text>
@@ -343,18 +400,23 @@ const ActiveDeliveryPage: FC = () => {
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1.5fr", gap: 8 }}>
                   <button
                     className="tm-interactive"
-                    onClick={() => setFailModal({ orderId: order.id, visible: true })}
+                    onClick={() =>
+                      setRejectModal({
+                        orderId: order.id,
+                        visible: true,
+                      })
+                    }
                     style={{
-                      background: "#fff1f2",
-                      color: "var(--tm-danger)",
-                      border: "2px solid #fecdd3",
+                      background: "#eff6ff",
+                      color: "#1d4ed8",
+                      border: "2px solid #bfdbfe",
                       borderRadius: 14,
                       padding: "12px",
-                      fontSize: 14,
-                      fontWeight: 800,
+                      fontSize: 12,
+                      fontWeight: 700,
                     }}
                   >
-                    Thất bại
+                    Nhả đơn
                   </button>
                   {order.status === "PICKED_UP" ? (
                     <button
@@ -441,6 +503,47 @@ const ActiveDeliveryPage: FC = () => {
             }}
           >
             {failing ? "Đang xử lý..." : "Xác nhận"}
+          </button>
+        </Box>
+      </Modal>
+
+      <Modal
+        visible={rejectModal.visible}
+        title="Nhả đơn về hệ thống"
+        onClose={() => setRejectModal({ orderId: "", visible: false })}
+      >
+        <Box p={4}>
+          <Text style={{ marginBottom: 12 }}>
+            Đơn sẽ được dispatch lại cho tài xế khác và ảnh hưởng chỉ số nhận chuyến của bạn.
+          </Text>
+          <textarea
+            value={rejectReason}
+            onChange={(event) => setRejectReason(event.target.value)}
+            placeholder="Lý do nhả đơn (tuỳ chọn)"
+            rows={3}
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 8,
+              border: "1px solid var(--tm-border)",
+              marginBottom: 16,
+            }}
+          />
+          <button
+            onClick={handleRejectAssigned}
+            disabled={rejecting}
+            style={{
+              width: "100%",
+              padding: 12,
+              borderRadius: 12,
+              background: "#1d4ed8",
+              color: "#fff",
+              fontWeight: 700,
+              border: "none",
+              opacity: rejecting ? 0.7 : 1,
+            }}
+          >
+            {rejecting ? "Đang xử lý..." : "Xác nhận nhả đơn"}
           </button>
         </Box>
       </Modal>

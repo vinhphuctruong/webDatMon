@@ -1,4 +1,4 @@
-import React, { FC, Suspense } from "react";
+﻿import React, { FC, Suspense } from "react";
 import { useRecoilValue } from "recoil";
 import { productsState } from "state";
 import { Box, Text, useNavigate } from "zmp-ui";
@@ -60,7 +60,7 @@ const FavoriteButton: FC<{ productId: number }> = ({ productId }) => {
         transition: 'transform 0.2s',
       }}
     >
-      {isFav ? "❤️" : "🤍"}
+      {isFav ? "" : ""}
     </button>
   );
 };
@@ -79,7 +79,7 @@ export const ProductListContent: FC = () => {
     <Box className="bg-white" style={{ padding: '16px 0' }}>
       <div className="tm-section-header" style={{ paddingTop: 0, paddingBottom: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ fontSize: 16 }}>🏪</span>
+          <span style={{ fontSize: 16 }}></span>
           <span className="tm-section-title">
             {filterLabel ? `Quán ${filterLabel.toLowerCase()}` : "Quán gần bạn"}
           </span>
@@ -121,7 +121,7 @@ export const ProductListContent: FC = () => {
                       borderRadius: 12, padding: '2px 6px',
                       display: 'flex', alignItems: 'center', gap: 2,
                     }}>
-                      <span style={{ color: '#ffb800', fontSize: 10 }}>★</span>
+                      <span style={{ color: '#ffb800', fontSize: 10 }}></span>
                       <span style={{ color: 'var(--tm-text-primary)', fontSize: 10, fontWeight: 700 }}>
                         {product.rating}
                       </span>
@@ -189,7 +189,7 @@ export const ProductListContent: FC = () => {
       </div>
       {filtered.length === 0 && (
         <div className="tm-empty-state">
-          <span className="tm-empty-icon">🔍</span>
+          <span className="tm-empty-icon"></span>
           <Text style={{ fontWeight: 600, marginBottom: 4 }}>Không có quán phù hợp</Text>
           <Text size="xSmall" style={{ color: 'var(--tm-text-secondary)' }}>Thử bộ lọc khác nhé!</Text>
         </div>
@@ -201,7 +201,7 @@ export const ProductListContent: FC = () => {
 export const ProductListFallback: FC = () => (
   <Box className="bg-white" style={{ padding: '16px' }}>
     <div className="tm-section-header" style={{ paddingTop: 0 }}>
-      <span className="tm-section-title">🏪 Quán gần bạn</span>
+      <span className="tm-section-title"> Quán gần bạn</span>
     </div>
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
       {[...new Array(4)].map((_, i) => (<ProductSlideSkeleton key={i} />))}

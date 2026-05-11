@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+﻿import React, { useCallback } from "react";
 import { FC } from "react";
 import { useRecoilState } from "recoil";
 import { keywordState } from "state";
@@ -66,7 +66,7 @@ export const Inquiry: FC = () => {
                   handleChange(term);
                 }}
               >
-                🔍 {term}
+                 {term}
               </button>
             ))}
           </div>

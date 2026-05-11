@@ -1,4 +1,4 @@
-# ZaUI Coffee
+﻿# ZaUI Coffee
 
 <p style="display: flex; flex-wrap: wrap; gap: 4px">
   <img alt="react" src="https://img.shields.io/github/package-json/dependency-version/Zalo-MiniApp/zaui-coffee/react" />
@@ -27,14 +27,14 @@ Public template for building a coffee shop on Zalo Mini App. Main features:
 
 1. Install [Visual Studio Code](https://code.visualstudio.com/download) and [Zalo Mini App Extension](https://mini.zalo.me/docs/dev-tools).
 1. Click on **Create Project** > Choose **ZaUI Coffee** template > Wait until the generated project is ready.
-1. **Configure App ID** and **Install Dependencies**, then navigate to the **Run** panel > **Start** to develop your Mini App 🚀
+1. **Configure App ID** and **Install Dependencies**, then navigate to the **Run** panel > **Start** to develop your Mini App 
 
 
 ### Using Zalo Mini App Studio
 
 1. [Install Zalo Mini App Studio](https://mini.zalo.me/docs/dev-tools)
 1. Click on New project > Enter your Mini App ID > Choose ZaUI Coffee template
-1. Wait until the generated project is ready and click the Start button to run the mini app 🚀
+1. Wait until the generated project is ready and click the Start button to run the mini app 
 
 ### Using Zalo Mini App CLI
 
@@ -53,7 +53,7 @@ Public template for building a coffee shop on Zalo Mini App. Main features:
    zmp start
    ```
 
-1. Open `localhost:3000` on your browser and start coding 🔥
+1. Open `localhost:3000` on your browser and start coding 
 
 ## Deployment
 

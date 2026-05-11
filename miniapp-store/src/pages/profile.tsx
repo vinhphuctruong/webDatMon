@@ -1,4 +1,4 @@
-import React, { FC, Suspense, useEffect, useState } from "react";
+﻿import React, { FC, Suspense, useEffect, useState } from "react";
 import { Box, Page, Text, useNavigate, useSnackbar } from "zmp-ui";
 import { useToBeImplemented } from "hooks";
 import { useSetRecoilState, useRecoilValue, useRecoilValueLoadable } from "recoil";
@@ -58,7 +58,7 @@ const ProfileHeader: FC = () => {
         {userName}
       </Text.Title>
       <Text size="xxSmall" style={{ color: "rgba(255,255,255,0.8)", marginTop: 4 }}>
-        Thành viên FoodPass 🏅
+        Thành viên FoodPass 
       </Text>
     </div>
   );
@@ -70,9 +70,9 @@ const StatsRow: FC = () => {
   const vouchers = useRecoilValue(vouchersState);
 
   const stats = [
-    { label: "Đơn hàng", value: String(orders.length), icon: "📦" },
-    { label: "Yêu thích", value: String(favorites.length), icon: "❤️" },
-    { label: "Voucher", value: String(vouchers.filter((v) => !v.used).length), icon: "🎫" },
+    { label: "Đơn hàng", value: String(orders.length), icon: "" },
+    { label: "Yêu thích", value: String(favorites.length), icon: "" },
+    { label: "Voucher", value: String(vouchers.filter((v) => !v.used).length), icon: "" },
   ];
 
   return (
@@ -113,7 +113,7 @@ const MembershipCard: FC = () => {
       <div className="tm-membership">
         <div style={{ position: "relative", zIndex: 1 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-            <span style={{ fontSize: 24 }}>👑</span>
+            <span style={{ fontSize: 24 }}></span>
             <div>
               <Text.Title style={{ color: "#fff", fontWeight: 700 }}>
                 FoodPass Thành viên
@@ -331,20 +331,20 @@ const MenuSections: FC = () => {
   };
 
   const personalItems: MenuItemData[] = [
-    { icon: "👤", label: "Thông tin tài khoản", action: "account" },
-    { icon: "📦", label: "Đơn hàng gần đây" },
-    { icon: "📍", label: "Địa chỉ cửa hàng" },
-    { icon: "💳", label: "Phương thức thanh toán" },
+    { icon: "", label: "Thông tin tài khoản", action: "account" },
+    { icon: "", label: "Đơn hàng gần đây" },
+    { icon: "", label: "Địa chỉ cửa hàng" },
+    { icon: "", label: "Phương thức thanh toán" },
   ];
 
   const otherItems: MenuItemData[] = [
     { icon: "⭐", label: "Đánh giá quán & tài xế" },
-    { icon: "📞", label: "Hỗ trợ & góp ý" },
-    { icon: "📄", label: "Điều khoản sử dụng" },
-    { icon: "ℹ️", label: "Về TM Food" },
+    { icon: "", label: "Hỗ trợ & góp ý" },
+    { icon: "", label: "Điều khoản sử dụng" },
+    { icon: "ℹ", label: "Về TM Food" },
     autoLoginDisabled
-      ? { icon: "🔐", label: "Đăng nhập lại demo", action: "login_demo" as const }
-      : { icon: "🚪", label: "Đăng xuất", tone: "danger", action: "logout" as const },
+      ? { icon: "", label: "Đăng nhập lại demo", action: "login_demo" as const }
+      : { icon: "", label: "Đăng xuất", tone: "danger", action: "logout" as const },
   ];
 
   const resolveMenuClick = (item: MenuItemData) => {

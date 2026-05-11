@@ -1,12 +1,13 @@
-import React, { FC, useEffect, useState } from "react";
+﻿import React, { FC, useEffect, useState } from "react";
 import { Box, Button, Input, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import {
+  ApiError,
   fetchMyProfile,
   updateMyProfile,
   changeMyPassword,
   clearApiSession,
-  hasSession,
+  hasSessionAsync,
 } from "services/api";
 import { fetchDriverProfile } from "services/driver-api";
 
@@ -24,19 +25,38 @@ const ProfilePage: FC = () => {
   const [savingPassword, setSavingPassword] = useState(false);
 
   useEffect(() => {
-    if (!hasSession()) {
-      navigate("/login", { replace: true });
-      return;
-    }
+    let active = true;
+    const bootstrap = async () => {
+      const hasSession = await hasSessionAsync();
+      if (!active) return;
+      if (!hasSession) {
+        navigate("/login", { replace: true });
+        return;
+      }
 
-    Promise.all([fetchMyProfile(), fetchDriverProfile()])
-      .then(([userRes, driverRes]) => {
-        setUser(userRes);
-        setDriver(driverRes.data);
-        setEditForm({ name: userRes.name, phone: userRes.phone || "" });
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
+      Promise.all([fetchMyProfile(), fetchDriverProfile()])
+        .then(([userRes, driverRes]) => {
+          if (!active) return;
+          setUser(userRes);
+          setDriver(driverRes.data);
+          setEditForm({ name: userRes.name, phone: userRes.phone || "" });
+        })
+        .catch((error: any) => {
+          if (error instanceof ApiError && error.status === 401) {
+            navigate("/login", { replace: true });
+            return;
+          }
+          console.error(error);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+
+    void bootstrap();
+    return () => {
+      active = false;
+    };
   }, [navigate]);
 
   const handleSaveProfile = async () => {
@@ -119,7 +139,7 @@ const ProfilePage: FC = () => {
                 color: "#fff",
               }}
             >
-              🛵
+              
             </div>
             <div>
               <Text style={{ fontWeight: 700, fontSize: 17 }}>{user?.name}</Text>

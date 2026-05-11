@@ -1,4 +1,4 @@
-import { FinalPrice } from "components/display/final-price";
+﻿import { FinalPrice } from "components/display/final-price";
 import { Sheet } from "components/fullscreen-sheet";
 import React, { FC, ReactNode, startTransition, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -152,7 +152,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
 
       setVisible(false);
       snackbar.openSnackbar({
-        text: `Đã thêm ${product.name} vào giỏ hàng! 🛒`,
+        text: `Đã thêm ${product.name} vào giỏ hàng! `,
         type: "success",
       });
     } catch (error) {
@@ -216,7 +216,7 @@ export const ProductPicker: FC<ProductPickerProps> = ({
                       <FinalPrice options={options}>{product}</FinalPrice>
                     </Text>
                     <div className="tm-stats-row">
-                      <span style={{ color: '#ffb800' }}>★</span>
+                      <span style={{ color: '#ffb800' }}></span>
                       <span style={{ fontWeight: 600 }}>{product.rating ?? 4.7}</span>
                       <span className="tm-dot" />
                       <span>{product.sold ? `${product.sold} đã bán` : "Mới"}</span>

@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Script: Boost a specific driver to become "top 1" in the dispatch ranking.
  *
  * The dispatch engine scores drivers by:
@@ -28,7 +28,7 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 // ──────────────────────────────────────────────────────────────
-// ⚠️  CHANGE THIS to match the driver you want to boost
+//   CHANGE THIS to match the driver you want to boost
 // ──────────────────────────────────────────────────────────────
 const TARGET_DRIVER_EMAIL = "truongvinhphuc99@gmail.com";
 
@@ -40,15 +40,15 @@ async function main() {
   });
 
   if (!driver) {
-    console.error(`❌ Không tìm thấy tài xế với email: ${TARGET_DRIVER_EMAIL}`);
+    console.error(` Không tìm thấy tài xế với email: ${TARGET_DRIVER_EMAIL}`);
     process.exit(1);
   }
 
-  console.log(`✅ Tìm thấy tài xế: ${driver.name} (${driver.id})`);
+  console.log(` Tìm thấy tài xế: ${driver.name} (${driver.id})`);
 
   // 2. Ensure driver profile exists & is ONLINE
   if (!driver.driverProfile) {
-    console.error("❌ Tài xế chưa có DriverProfile. Hãy duyệt đơn đăng ký trước.");
+    console.error(" Tài xế chưa có DriverProfile. Hãy duyệt đơn đăng ký trước.");
     process.exit(1);
   }
 
@@ -56,7 +56,7 @@ async function main() {
     where: { userId: driver.id },
     data: { isOnline: true },
   });
-  console.log("✅ Đã set tài xế isOnline = true");
+  console.log(" Đã set tài xế isOnline = true");
 
   // 3. Find a store to attach the fake orders to
   const store = await prisma.store.findFirst({
@@ -64,7 +64,7 @@ async function main() {
   });
 
   if (!store || store.products.length === 0) {
-    console.error("❌ Không tìm thấy store/product nào trong DB.");
+    console.error(" Không tìm thấy store/product nào trong DB.");
     process.exit(1);
   }
 
@@ -76,7 +76,7 @@ async function main() {
   });
 
   if (!customer) {
-    console.error("❌ Không tìm thấy customer nào.");
+    console.error(" Không tìm thấy customer nào.");
     process.exit(1);
   }
 
@@ -84,7 +84,7 @@ async function main() {
   const ORDER_COUNT = 20;
   const now = Date.now();
 
-  console.log(`📦 Tạo ${ORDER_COUNT} đơn DELIVERED cho tài xế...`);
+  console.log(` Tạo ${ORDER_COUNT} đơn DELIVERED cho tài xế...`);
 
   for (let i = 0; i < ORDER_COUNT; i++) {
     // Spread completedAt over the last 7 days, most recent = 35 min ago (idle ≥ 30 → score 1.0)
@@ -180,17 +180,17 @@ async function main() {
     : 0;
 
   console.log("\n" + "═".repeat(50));
-  console.log("📊 KẾT QUẢ BOOST TÀI XẾ");
+  console.log(" KẾT QUẢ BOOST TÀI XẾ");
   console.log("═".repeat(50));
   console.log(`   Tài xế    : ${driver.name}`);
   console.log(`   ID        : ${driver.id}`);
-  console.log(`   Online    : ✅`);
+  console.log(`   Online    : `);
   console.log(`   Delivered : ${deliveredCount}`);
   console.log(`   Cancelled : ${cancelledCount}`);
   console.log(`   Rate      : ${(completionRate * 100).toFixed(1)}%  →  perf score = ${completionRate.toFixed(3)}`);
   console.log(`   Idle      : ${idleMinutes.toFixed(0)} phút  →  idle score = ${Math.min(1, idleMinutes / 30).toFixed(3)}`);
   console.log("═".repeat(50));
-  console.log("\n🎯 Tài xế này sẽ được ưu tiên top 1 khi:");
+  console.log("\n Tài xế này sẽ được ưu tiên top 1 khi:");
   console.log("   1. App tài xế đang mở & gửi GPS (distance score tốt)");
   console.log("   2. Ở gần quán (≤ 2km = distance score cao nhất)");
   console.log("   3. Có đơn mới được dispatch\n");

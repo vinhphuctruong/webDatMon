@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from "react";
+﻿import React, { FC, useEffect, useState } from "react";
 import { Autoplay, Pagination } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Box, Text } from "zmp-ui";
@@ -14,9 +14,9 @@ interface BannerItem {
 }
 
 const FALLBACK_BANNERS: BannerItem[] = [
-  { id: "f1", title: "Giảm 50% cho đơn đầu tiên 🎉", imageUrl: "", link: null, sortOrder: 0, isActive: true },
-  { id: "f2", title: "Freeship đơn từ 49K 🚚", imageUrl: "", link: null, sortOrder: 1, isActive: true },
-  { id: "f3", title: "Combo trưa chỉ từ 39K 🍱", imageUrl: "", link: null, sortOrder: 2, isActive: true },
+  { id: "f1", title: "Giảm 50% cho đơn đầu tiên ", imageUrl: "", link: null, sortOrder: 0, isActive: true },
+  { id: "f2", title: "Freeship đơn từ 49K ", imageUrl: "", link: null, sortOrder: 1, isActive: true },
+  { id: "f3", title: "Combo trưa chỉ từ 39K ", imageUrl: "", link: null, sortOrder: 2, isActive: true },
 ];
 
 const GRADIENT_COLORS = [
@@ -49,7 +49,7 @@ const FlashDealTimer: FC = () => {
   return (
     <div className="tm-flash-deal">
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <span>⚡</span>
+        <span></span>
         <span style={{ fontWeight: 700 }}>Flash Deal</span>
         <span style={{ fontSize: 11, opacity: 0.9 }}>Kết thúc sau</span>
       </div>

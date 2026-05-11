@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+﻿import React, { useState, useEffect } from "react";
 import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useNavigate, useLocation } from "react-router";
 import { loginWithCredentials, fetchMyStoreApplication } from "services/api";
@@ -87,7 +87,7 @@ const LoginPage = () => {
               boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
             }}
           >
-            <span style={{ fontSize: 40 }}>🏪</span>
+            <span style={{ fontSize: 40 }}></span>
           </div>
           <Text.Title style={{ color: "#fff", fontSize: 24, fontWeight: 800 }}>
             TM Food Quán

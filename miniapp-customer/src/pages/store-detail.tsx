@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState, useCallback } from "react";
+﻿import React, { FC, useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useRecoilState } from "recoil";
 import { Box, Text, useNavigate, useSnackbar } from "zmp-ui";
@@ -77,16 +77,16 @@ const StoreDetailPage: FC = () => {
           ← Quay lại
         </button>
         <Text style={{ fontSize: 20, fontWeight: 800, color: "#fff", marginBottom: 4 }}>{store.name}</Text>
-        <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}>📍 {store.address}</Text>
+        <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", marginBottom: 8 }}> {store.address}</Text>
         <div style={{ display: "flex", gap: 16, flexWrap: "wrap" }}>
           <span style={{ fontSize: 12, background: "rgba(255,255,255,0.2)", padding: "4px 10px", borderRadius: 20 }}>
             {store.rating > 0 ? `⭐ ${store.rating.toFixed(1)}` : "🆕 Mới"}
           </span>
           <span style={{ fontSize: 12, background: "rgba(255,255,255,0.2)", padding: "4px 10px", borderRadius: 20 }}>
-            🕐 {store.etaMinutesMin}-{store.etaMinutesMax} phút
+             {store.etaMinutesMin}-{store.etaMinutesMax} phút
           </span>
           <span style={{ fontSize: 12, background: store.isOpen ? "rgba(255,255,255,0.2)" : "rgba(239,68,68,0.8)", padding: "4px 10px", borderRadius: 20 }}>
-            {store.isOpen ? "🟢 Đang mở" : "🔴 Đã đóng"}
+            {store.isOpen ? " Đang mở" : " Đã đóng"}
           </span>
         </div>
       </div>
@@ -117,7 +117,7 @@ const StoreDetailPage: FC = () => {
                 {product.image ? (
                   <img src={product.image} alt={product.name} style={{ width: "100%", height: 120, objectFit: "cover" }} />
                 ) : (
-                  <div style={{ width: "100%", height: 120, background: "linear-gradient(135deg, #f0fdf4, #ecfeff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>🍽️</div>
+                  <div style={{ width: "100%", height: 120, background: "linear-gradient(135deg, #f0fdf4, #ecfeff)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}></div>
                 )}
                 </div>
                 {product.sale && (
@@ -189,7 +189,7 @@ const StoreDetailPage: FC = () => {
           zIndex: 100,
         }}>
           <Text style={{ fontSize: 14, fontWeight: 600, color: "var(--tm-text-primary)" }}>
-            🛒 {cartQty} món trong giỏ
+             {cartQty} món trong giỏ
           </Text>
           <button
             onClick={() => navigate("/cart")}

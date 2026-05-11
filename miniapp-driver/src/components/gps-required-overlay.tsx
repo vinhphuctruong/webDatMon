@@ -1,4 +1,4 @@
-import React, { FC, useState, useCallback, useEffect } from "react";
+﻿import React, { FC, useState, useCallback, useEffect } from "react";
 import { Text } from "zmp-ui";
 import { getLocation } from "zmp-sdk";
 
@@ -115,7 +115,7 @@ export const GpsRequiredOverlay: FC<GpsRequiredOverlayProps> = ({ children }) =>
         boxShadow: "0 8px 40px rgba(0, 0, 0, 0.2)",
         animation: "tm-marker-pulse 2s ease-in-out infinite",
       }}>
-        🛰️
+        
       </div>
 
       <Text style={{
@@ -163,7 +163,7 @@ export const GpsRequiredOverlay: FC<GpsRequiredOverlayProps> = ({ children }) =>
           transition: "all 0.2s",
         }}
       >
-        {checking ? "⏳ Đang kiểm tra..." : "🛰️ Cho phép truy cập GPS"}
+        {checking ? "⏳ Đang kiểm tra..." : " Cho phép truy cập GPS"}
       </button>
 
       <Text style={{
