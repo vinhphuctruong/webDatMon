@@ -176,6 +176,13 @@ interface WalletMutationInput {
   referenceCode?: string;
   note?: string;
   metadata?: Prisma.InputJsonValue;
+  /**
+   * ShopeeFood model: Allow wallet balance to go negative (debt).
+   * Used for driver credit wallets during COD hold operations.
+   * Drivers keep the physical cash they collect; the platform tracks
+   * the debt and deducts from future earnings.
+   */
+  allowNegativeAvailable?: boolean;
 }
 
 async function mutateWallet(tx: PrismaTx, input: WalletMutationInput): Promise<Wallet> {
@@ -193,7 +200,12 @@ async function mutateWallet(tx: PrismaTx, input: WalletMutationInput): Promise<W
     throw new HttpError(StatusCodes.BAD_REQUEST, "Amount must be greater than zero");
   }
 
-  if (availableAfter < 0 || holdAfter < 0) {
+  // ShopeeFood model: driver credit wallets can go negative (debt tracking).
+  // Other wallets (platform, merchant) still enforce non-negative balance.
+  if (holdAfter < 0) {
+    throw new HttpError(StatusCodes.BAD_REQUEST, "Insufficient wallet balance");
+  }
+  if (availableAfter < 0 && !input.allowNegativeAvailable) {
     throw new HttpError(StatusCodes.BAD_REQUEST, "Insufficient wallet balance");
   }
 
@@ -451,6 +463,7 @@ export async function settleDeliveredOrder(tx: PrismaTx, options: SettleOrderOpt
         orderId: order.id,
         paymentId: order.payment?.id,
         note: "COD platform fee charged from driver credit wallet",
+        allowNegativeAvailable: true,
       });
 
       await creditWalletAvailable(tx, {

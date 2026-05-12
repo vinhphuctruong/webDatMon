@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import { env } from "./config/env";
 import { prisma } from "./db/prisma";
 import { startDispatchTimer } from "./services/dispatch-engine";
+import { updateDriverPresence } from "./services/driver-presence";
 
 let io: Server;
 
@@ -79,6 +80,13 @@ export const initSocket = (httpServer: HttpServer) => {
       if (user.role !== "DRIVER") return;
       
       try {
+        // Update in-memory presence so dispatch engine can find this driver
+        updateDriverPresence(user.id, {
+          latitude: data.latitude,
+          longitude: data.longitude,
+          isOnline: true,
+        });
+
         const activeOrders = await prisma.order.findMany({
           where: {
             driverId: user.id,

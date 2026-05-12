@@ -1,4 +1,4 @@
-﻿import React, { FC, useEffect, useRef, useState } from "react";
+import React, { FC, useEffect, useRef, useState } from "react";
 import vietmapgl from "@vietmap/vietmap-gl-js/dist/vietmap-gl";
 import "@vietmap/vietmap-gl-js/dist/vietmap-gl.css";
 
@@ -10,6 +10,22 @@ export interface MapMarker {
   color?: string;
   type?: "customer" | "store" | "driver";
   icon?: string;
+  heading?: number;
+}
+
+export interface RouteInstruction {
+  sign: number;
+  text: string;
+  distanceMeters: number;
+  timeMs: number;
+  streetName?: string;
+}
+
+export interface RouteSummary {
+  coordinates: [number, number][];
+  distanceMeters: number;
+  timeMs: number;
+  instructions: RouteInstruction[];
 }
 
 export interface VietMapProps {
@@ -21,11 +37,43 @@ export interface VietMapProps {
   className?: string;
   style?: React.CSSProperties;
   showRoute?: boolean;
+  routeVehicle?: "car" | "bike" | "foot" | "motorcycle";
+  onRouteResolved?: (route: RouteSummary | null) => void;
+  followCenter?: boolean;
+  followCenterDurationMs?: number;
+  mapStylePreset?: "osm-detail" | "vietmap-street" | "vietmap-light" | "vietmap-dark" | "vietmap-hybrid";
+  onUserMapMoveStart?: () => void;
 }
 
 const DEFAULT_CENTER: [number, number] = [106.6519, 10.9804];
 const ROUTE_SOURCE_ID = "tm-route-source";
 const ROUTE_LAYER_ID = "tm-route-layer";
+const TRANSPARENT_STYLE_IMAGE = {
+  width: 1,
+  height: 1,
+  data: new Uint8Array([0, 0, 0, 0]),
+};
+const OSM_DETAIL_STYLE = {
+  version: 8 as const,
+  sources: {
+    osm: {
+      type: "raster",
+      tiles: ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+      tileSize: 256,
+      attribution: "© OpenStreetMap contributors",
+      maxzoom: 19,
+    },
+  },
+  layers: [
+    {
+      id: "osm-raster",
+      type: "raster",
+      source: "osm",
+      minzoom: 0,
+      maxzoom: 22,
+    },
+  ],
+};
 
 const MARKER_CONFIG: Record<string, { glyph: "pin" | "store" | "driver"; color: string; size: number; pulse?: boolean }> = {
   customer: { glyph: "pin", color: "#4285f4", size: 38, pulse: true },
@@ -38,6 +86,80 @@ const POPUP_LABELS: Record<string, string> = {
   store: "Cua hang",
   driver: "Tai xe",
 };
+
+let abortGuardRefCount = 0;
+let abortGuardCleanup: (() => void) | null = null;
+
+function isIgnorableAbortError(input: unknown): boolean {
+  if (!input) {
+    return false;
+  }
+
+  if (typeof input === "string") {
+    return input.includes("signal is aborted without reason");
+  }
+
+  const row = input as { name?: unknown; message?: unknown; reason?: unknown };
+  const name = typeof row.name === "string" ? row.name : "";
+  const message = typeof row.message === "string" ? row.message : "";
+  const reason = typeof row.reason === "string" ? row.reason : "";
+
+  return (
+    name.includes("AbortError") &&
+    (message.includes("signal is aborted without reason") || reason.includes("signal is aborted without reason"))
+  );
+}
+
+function installAbortErrorGuard() {
+  if (typeof window === "undefined") {
+    return () => {};
+  }
+
+  abortGuardRefCount += 1;
+  if (!abortGuardCleanup) {
+    const onUnhandledRejection = (event: PromiseRejectionEvent) => {
+      if (isIgnorableAbortError(event.reason)) {
+        event.preventDefault();
+      }
+    };
+
+    const onWindowError = (event: ErrorEvent) => {
+      if (
+        isIgnorableAbortError(event.error) ||
+        isIgnorableAbortError(event.message)
+      ) {
+        event.preventDefault();
+      }
+    };
+
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    window.addEventListener("error", onWindowError);
+
+    abortGuardCleanup = () => {
+      window.removeEventListener("unhandledrejection", onUnhandledRejection);
+      window.removeEventListener("error", onWindowError);
+      abortGuardCleanup = null;
+    };
+  }
+
+  return () => {
+    abortGuardRefCount = Math.max(0, abortGuardRefCount - 1);
+    if (abortGuardRefCount === 0 && abortGuardCleanup) {
+      abortGuardCleanup();
+    }
+  };
+}
+
+function haversineMeters(aLat: number, aLng: number, bLat: number, bLng: number) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(bLat - aLat);
+  const dLng = toRad(bLng - aLng);
+  const x =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(aLat)) * Math.cos(toRad(bLat)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 6371000 * (2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)));
+}
 
 function toFiniteNumber(value: unknown): number | null {
   const numeric = typeof value === "number" ? value : Number(value);
@@ -101,15 +223,71 @@ function buildRouteCoordinates(path: unknown): [number, number][] | null {
   return null;
 }
 
-async function fetchRoadRoute(apiKey: string, from: MapMarker, to: MapMarker): Promise<[number, number][] | null> {
+function buildRouteInstructions(path: unknown): RouteInstruction[] {
+  if (!path || typeof path !== "object") {
+    return [];
+  }
+
+  const row = path as Record<string, unknown>;
+  if (!Array.isArray(row.instructions)) {
+    return [];
+  }
+
+  return row.instructions
+    .map((instruction): RouteInstruction | null => {
+      if (!instruction || typeof instruction !== "object") {
+        return null;
+      }
+      const value = instruction as Record<string, unknown>;
+      const text = typeof value.text === "string" ? value.text.trim() : "";
+      if (!text) {
+        return null;
+      }
+
+      return {
+        sign: toFiniteNumber(value.sign) ?? 0,
+        text,
+        distanceMeters: toFiniteNumber(value.distance) ?? 0,
+        timeMs: toFiniteNumber(value.time) ?? 0,
+        streetName: typeof value.street_name === "string" && value.street_name.trim() ? value.street_name.trim() : undefined,
+      };
+    })
+    .filter((item): item is RouteInstruction => item !== null);
+}
+
+function buildRouteSummary(path: unknown): RouteSummary | null {
+  const coordinates = buildRouteCoordinates(path);
+  if (!coordinates) {
+    return null;
+  }
+
+  const row = (path && typeof path === "object" ? path : {}) as Record<string, unknown>;
+  const distanceMeters = toFiniteNumber(row.distance) ?? 0;
+  const timeMs = toFiniteNumber(row.time) ?? 0;
+  const instructions = buildRouteInstructions(path);
+
+  return {
+    coordinates,
+    distanceMeters,
+    timeMs,
+    instructions,
+  };
+}
+
+async function fetchRoadRoute(
+  apiKey: string,
+  from: MapMarker,
+  to: MapMarker,
+  vehicle: "car" | "bike" | "foot" | "motorcycle",
+): Promise<RouteSummary | null> {
   const url = new URL("https://maps.vietmap.vn/api/route");
   url.searchParams.set("api-version", "1.1");
   url.searchParams.set("apikey", apiKey);
   url.searchParams.append("point", `${from.lat},${from.lng}`);
   url.searchParams.append("point", `${to.lat},${to.lng}`);
-  url.searchParams.set("vehicle", "car");
+  url.searchParams.set("vehicle", vehicle);
   url.searchParams.set("points_encoded", "false");
-  url.searchParams.set("instructions", "false");
+  url.searchParams.set("instructions", "true");
   url.searchParams.set("calc_points", "true");
 
   try {
@@ -121,16 +299,16 @@ async function fetchRoadRoute(apiKey: string, from: MapMarker, to: MapMarker): P
     const payload = await response.json();
 
     if (Array.isArray(payload?.paths) && payload.paths.length > 0) {
-      const coords = buildRouteCoordinates(payload.paths[0]);
-      if (coords) {
-        return coords;
+      const route = buildRouteSummary(payload.paths[0]);
+      if (route) {
+        return route;
       }
     }
 
     if (Array.isArray(payload?.routes) && payload.routes.length > 0) {
-      const coords = buildRouteCoordinates(payload.routes[0]);
-      if (coords) {
-        return coords;
+      const route = buildRouteSummary(payload.routes[0]);
+      if (route) {
+        return route;
       }
     }
 
@@ -232,6 +410,10 @@ function createMarkerElement(marker: MapMarker) {
   } else {
     icon.innerHTML = markerGlyphSvg(config.glyph, Math.round(size * 0.56));
   }
+  if (marker.type === "driver" && Number.isFinite(marker.heading)) {
+    icon.style.transform = `rotate(${marker.heading}deg)`;
+    icon.style.transition = "transform 220ms linear";
+  }
 
   wrapper.appendChild(icon);
 
@@ -259,9 +441,7 @@ function markerGlyphSvg(glyph: "pin" | "store" | "driver", iconSize: number) {
   if (glyph === "driver") {
     return `
       <svg class="tm-vietmap-marker-svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 24 24" aria-hidden="true">
-        <circle ${common} cx="8" cy="17" r="2" />
-        <circle ${common} cx="18" cy="17" r="2" />
-        <path ${common} d="M3 16v-4h3l2-3h6l3 3h2a2 2 0 0 1 2 2v2" />
+        <path d="M12 3l6 15-6.2-4.1L6 18 12 3z" fill="white" />
       </svg>
     `;
   }
@@ -280,6 +460,25 @@ function removeRouteLayer(map: vietmapgl.Map) {
   if (map.getSource(ROUTE_SOURCE_ID)) {
     map.removeSource(ROUTE_SOURCE_ID);
   }
+}
+
+function resolveMapStyle(
+  apiKey: string,
+  mapStylePreset: NonNullable<VietMapProps["mapStylePreset"]>,
+): string | typeof OSM_DETAIL_STYLE {
+  if (mapStylePreset === "osm-detail") {
+    return OSM_DETAIL_STYLE;
+  }
+  if (mapStylePreset === "vietmap-light") {
+    return `https://maps.vietmap.vn/maps/styles/lm/style.json?apikey=${apiKey}`;
+  }
+  if (mapStylePreset === "vietmap-dark") {
+    return `https://maps.vietmap.vn/maps/styles/dm/style.json?apikey=${apiKey}`;
+  }
+  if (mapStylePreset === "vietmap-hybrid") {
+    return `https://maps.vietmap.vn/maps/styles/hm/style.json?apikey=${apiKey}`;
+  }
+  return `https://maps.vietmap.vn/maps/styles/tm/style.json?apikey=${apiKey}`;
 }
 
 function addRouteLayer(map: vietmapgl.Map, coordinates: [number, number][]) {
@@ -323,16 +522,31 @@ export const VietMapView: FC<VietMapProps> = ({
   className,
   style: wrapperStyle,
   showRoute = false,
+  routeVehicle = "motorcycle",
+  onRouteResolved,
+  followCenter = false,
+  followCenterDurationMs = 800,
+  mapStylePreset = "osm-detail",
+  onUserMapMoveStart,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<vietmapgl.Map | null>(null);
   const markerInstancesRef = useRef<vietmapgl.Marker[]>([]);
   const initialFitDoneRef = useRef(false);
   const mapLoadedRef = useRef(false);
+  const routeRequestIdRef = useRef(0);
+  const lastRouteQueryRef = useRef<{ from: [number, number]; to: [number, number] } | null>(null);
+  const lastFollowCenterRef = useRef<[number, number] | null>(null);
+  const prevFollowCenterModeRef = useRef<boolean>(false);
+  const onUserMapMoveStartRef = useRef<(() => void) | undefined>(onUserMapMoveStart);
   const [loaded, setLoaded] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const apiKey = (import.meta.env.VITE_VIETMAP_API_KEY || "").trim();
+
+  useEffect(() => {
+    onUserMapMoveStartRef.current = onUserMapMoveStart;
+  }, [onUserMapMoveStart]);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -340,9 +554,11 @@ export const VietMapView: FC<VietMapProps> = ({
     }
 
     injectCSS();
+    const uninstallAbortGuard = installAbortErrorGuard();
 
     if (!apiKey) {
       setErrorMessage("Thieu VITE_VIETMAP_API_KEY");
+      uninstallAbortGuard();
       return;
     }
 
@@ -350,9 +566,10 @@ export const VietMapView: FC<VietMapProps> = ({
 
     const map = new vietmapgl.Map({
       container: containerRef.current,
-      style: `https://maps.vietmap.vn/api/maps/light/styles.json?apikey=${apiKey}`,
+      style: resolveMapStyle(apiKey, mapStylePreset),
       center,
       zoom,
+      maxZoom: 20,
     });
 
     map.addControl(new vietmapgl.NavigationControl(), "top-right");
@@ -369,6 +586,22 @@ export const VietMapView: FC<VietMapProps> = ({
     map.on("error", (event) => {
       console.warn("Mapbox GL Error:", event?.error?.message);
     });
+    map.on("movestart", (event: { originalEvent?: unknown }) => {
+      if (event?.originalEvent && onUserMapMoveStartRef.current) {
+        onUserMapMoveStartRef.current();
+      }
+    });
+    map.on("styleimagemissing", (event: { id?: string }) => {
+      const imageId = event?.id;
+      if (!imageId || map.hasImage(imageId)) {
+        return;
+      }
+      try {
+        map.addImage(imageId, TRANSPARENT_STYLE_IMAGE);
+      } catch {
+        // Ignore if style cannot accept placeholder image
+      }
+    });
 
     timeoutId = setTimeout(() => {
       if (!mapLoadedRef.current) {
@@ -384,12 +617,19 @@ export const VietMapView: FC<VietMapProps> = ({
       }
       markerInstancesRef.current.forEach((marker) => marker.remove());
       markerInstancesRef.current = [];
+      routeRequestIdRef.current += 1;
+      try {
+        map.stop();
+      } catch {
+        // ignore
+      }
       map.remove();
       mapRef.current = null;
       mapLoadedRef.current = false;
       setLoaded(false);
+      uninstallAbortGuard();
     };
-  }, [apiKey, center, zoom]);
+  }, [apiKey, mapStylePreset]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -398,6 +638,45 @@ export const VietMapView: FC<VietMapProps> = ({
     }
 
     map.resize();
+  }, [loaded, height]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded || !followCenter) {
+      prevFollowCenterModeRef.current = followCenter;
+      return;
+    }
+
+    const [nextLng, nextLat] = center;
+    const previousCenter = lastFollowCenterRef.current;
+    const followJustEnabled = !prevFollowCenterModeRef.current && followCenter;
+    prevFollowCenterModeRef.current = followCenter;
+    lastFollowCenterRef.current = center;
+
+    if (!previousCenter || followJustEnabled) {
+      map.jumpTo({ center, zoom });
+      return;
+    }
+
+    const movedMeters = haversineMeters(previousCenter[1], previousCenter[0], nextLat, nextLng);
+    if (movedMeters < 3) {
+      return;
+    }
+
+    map.easeTo({
+      center,
+      zoom,
+      duration: followCenterDurationMs,
+      essential: true,
+      easing: (t) => 1 - Math.pow(1 - t, 2),
+    });
+  }, [center, zoom, loaded, followCenter, followCenterDurationMs]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) {
+      return;
+    }
 
     markerInstancesRef.current.forEach((marker) => marker.remove());
     markerInstancesRef.current = [];
@@ -432,7 +711,9 @@ export const VietMapView: FC<VietMapProps> = ({
 
     if (!initialFitDoneRef.current) {
       initialFitDoneRef.current = true;
-      if (markers.length > 1) {
+      if (followCenter) {
+        map.jumpTo({ center, zoom });
+      } else if (markers.length > 1) {
         const bounds = new vietmapgl.LngLatBounds();
         markers.forEach((marker) => {
           bounds.extend([marker.lng, marker.lat]);
@@ -442,7 +723,55 @@ export const VietMapView: FC<VietMapProps> = ({
         map.flyTo({ center: [markers[0].lng, markers[0].lat], zoom: 15, duration: 0 });
       }
     }
-  }, [markers, loaded, onMarkerClick]);
+  }, [markers, loaded, onMarkerClick, followCenter, center, zoom]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !loaded) {
+      return;
+    }
+
+    if (!showRoute || markers.length < 2) {
+      routeRequestIdRef.current += 1;
+      lastRouteQueryRef.current = null;
+      removeRouteLayer(map);
+      onRouteResolved?.(null);
+      return;
+    }
+
+    const driver = markers.find((marker) => marker.type === "driver") || markers[0];
+    const destination = markers.find((marker) => marker.type !== "driver") || markers[markers.length - 1];
+
+    const lastQuery = lastRouteQueryRef.current;
+    if (lastQuery) {
+      const movedFromMeters = haversineMeters(lastQuery.from[1], lastQuery.from[0], driver.lat, driver.lng);
+      const movedToMeters = haversineMeters(lastQuery.to[1], lastQuery.to[0], destination.lat, destination.lng);
+      if (movedFromMeters < 20 && movedToMeters < 3) {
+        return;
+      }
+    }
+
+    const currentRequestId = routeRequestIdRef.current + 1;
+    routeRequestIdRef.current = currentRequestId;
+    lastRouteQueryRef.current = {
+      from: [driver.lng, driver.lat],
+      to: [destination.lng, destination.lat],
+    };
+
+    fetchRoadRoute(apiKey, driver, destination, routeVehicle).then((route) => {
+      if (routeRequestIdRef.current !== currentRequestId) {
+        return;
+      }
+
+      if (!route || !mapRef.current) {
+        onRouteResolved?.(null);
+        return;
+      }
+
+      addRouteLayer(mapRef.current, route.coordinates);
+      onRouteResolved?.(route);
+    });
+  }, [markers, loaded, showRoute, apiKey, routeVehicle, onRouteResolved]);
 
   return (
     <div

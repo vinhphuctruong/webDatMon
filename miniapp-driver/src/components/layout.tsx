@@ -1,5 +1,5 @@
 import React, { FC, Suspense } from "react";
-import { Route, Routes } from "react-router";
+import { Route, Routes, useNavigate, useLocation } from "react-router";
 import { Box, Text } from "zmp-ui";
 import { Navigation } from "./navigation";
 import { ScrollRestoration } from "./scroll-restoration";
@@ -15,6 +15,41 @@ import ProfilePage from "../pages/profile";
 import LoginPage from "../pages/login";
 import RegisterPage from "../pages/register";
 import ForgotPasswordPage from "../pages/forgot-password";
+import NavigationPage from "../pages/navigation";
+import { hasSessionAsync } from "../services/api";
+
+const AuthGuard: FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [hasSession, setHasSession] = React.useState<boolean | null>(null);
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  React.useEffect(() => {
+    let active = true;
+    hasSessionAsync().then((has) => {
+      if (!active) return;
+      setHasSession(has);
+      if (!has) {
+        const publicPaths = ["/login", "/register", "/forgot-password"];
+        if (!publicPaths.includes(location.pathname)) {
+          navigate("/login", { replace: true });
+        }
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [location.pathname, navigate]);
+
+  if (hasSession === null) {
+    return (
+      <Box className="flex-1 flex items-center justify-center" style={{ background: "var(--tm-bg)", height: "100vh" }}>
+        <Text style={{ color: "var(--tm-text-secondary)" }}>Đang xác thực...</Text>
+      </Box>
+    );
+  }
+
+  return <>{children}</>;
+};
 
 const statusBarHeight = window.ZaloJavaScriptInterface?.getStatusBarHeight?.() ?? 0;
 const safeAreaTopFromSdk = Math.max(
@@ -51,17 +86,20 @@ export const Layout: FC = () => {
 
               {/* Protected routes — GPS required */}
               <Route path="/*" element={
-                <GpsRequiredOverlay>
-                  <IncomingOrderAlert />
-                  <OrderCancelNoticeListener />
-                  <Routes>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/delivering" element={<ActiveDeliveryPage />} />
-                    <Route path="/orders" element={<OrdersPage />} />
-                    <Route path="/wallet" element={<WalletPage />} />
-                    <Route path="/profile" element={<ProfilePage />} />
-                  </Routes>
-                </GpsRequiredOverlay>
+                <AuthGuard>
+                  <GpsRequiredOverlay>
+                    <IncomingOrderAlert />
+                    <OrderCancelNoticeListener />
+                    <Routes>
+                      <Route path="/" element={<HomePage />} />
+                      <Route path="/delivering" element={<ActiveDeliveryPage />} />
+                      <Route path="/orders" element={<OrdersPage />} />
+                      <Route path="/wallet" element={<WalletPage />} />
+                      <Route path="/profile" element={<ProfilePage />} />
+                      <Route path="/navigation" element={<NavigationPage />} />
+                    </Routes>
+                  </GpsRequiredOverlay>
+                </AuthGuard>
               } />
             </Routes>
           </Suspense>

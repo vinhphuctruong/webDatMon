@@ -9,7 +9,13 @@ const OFFER_TIMEOUT_SECONDS = 15;
 const EXPIRE_CHECK_INTERVAL_MS = 3000;
 const DISPATCH_SCAN_INTERVAL_MS = 5000;
 const MAX_DISPATCH_ATTEMPTS = 5;
-const MIN_DRIVER_CREDIT_BALANCE = 10_000;
+/**
+ * ShopeeFood model: Drivers do NOT need a positive wallet balance to receive orders.
+ * Instead, they can accumulate debt (negative balance) up to MAX_DRIVER_DEBT.
+ * Once debt exceeds this limit, they are blocked from receiving new COD orders.
+ * This ensures drivers can always work without pre-funding their wallet.
+ */
+const MAX_DRIVER_DEBT = 500_000;
 const MAX_ACTIVE_ORDERS_PER_DRIVER = 2;
 const CANDIDATE_RADIUS_KM = [2, 5, 10, 20];
 const ACTIVE_DRIVER_ORDER_STATUSES: OrderStatus[] = [
@@ -45,7 +51,7 @@ interface DispatchDebugDriver {
   reasons: string[];
 }
 
-function classifyDispatchOfferKind(input: {
+export function classifyDispatchOfferKind(input: {
   autoAcceptOrders?: boolean | null;
   isStackedOffer?: boolean;
 }): DispatchOfferKind {
@@ -165,8 +171,9 @@ async function buildCandidatePool(
   const hardFiltered = freshPresences.filter((presence) => {
     const activeOrders = activeMap.get(presence.driverId) ?? 0;
     const walletBalance = walletMap.get(presence.driverId) ?? 0;
-    const hasEnoughCredit = !requireCreditBalance || walletBalance >= MIN_DRIVER_CREDIT_BALANCE;
-    return activeOrders < MAX_ACTIVE_ORDERS_PER_DRIVER && hasEnoughCredit;
+    // ShopeeFood model: allow negative balance, only block if debt exceeds limit
+    const debtExceedsLimit = requireCreditBalance && walletBalance < -MAX_DRIVER_DEBT;
+    return activeOrders < MAX_ACTIVE_ORDERS_PER_DRIVER && !debtExceedsLimit;
   });
   if (!hardFiltered.length) return [];
 
@@ -557,8 +564,8 @@ export async function getDispatchDebugReport(orderId: string) {
 
     if (!presence) reasons.push("DRIVER_LOCATION_STALE_OR_MISSING");
     if (activeOrders >= MAX_ACTIVE_ORDERS_PER_DRIVER) reasons.push("DRIVER_AT_CAPACITY");
-    if (requireCreditBalance && walletBalance < MIN_DRIVER_CREDIT_BALANCE) {
-      reasons.push("DRIVER_WALLET_BELOW_THRESHOLD");
+    if (requireCreditBalance && walletBalance < -MAX_DRIVER_DEBT) {
+      reasons.push("DRIVER_DEBT_EXCEEDS_LIMIT");
     }
 
     let distanceKm: number | null = null;
@@ -618,7 +625,7 @@ export async function getDispatchDebugReport(orderId: string) {
         }
       : null,
     thresholds: {
-      minDriverCreditBalance: MIN_DRIVER_CREDIT_BALANCE,
+      maxDriverDebt: MAX_DRIVER_DEBT,
       maxActiveOrdersPerDriver: MAX_ACTIVE_ORDERS_PER_DRIVER,
       candidateRadiusKm: CANDIDATE_RADIUS_KM,
     },

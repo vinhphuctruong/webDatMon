@@ -1,4 +1,4 @@
-﻿import React, { FC, useEffect, useMemo, useState } from "react";
+import React, { FC, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text, Icon, Modal, Input, Button, useSnackbar } from "zmp-ui";
 import { 
   fetchMyWallets, 
@@ -162,31 +162,7 @@ const WalletPage: FC = () => {
               </button>
             </div>
 
-            {/* Cash Wallet */}
-            <div className="tm-card tm-interactive animate-slide-up" style={{ padding: 20, background: "linear-gradient(135deg, #064e3b, #022c22)", color: "#fff", border: "none", boxShadow: "var(--tm-shadow-floating)" }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 24 }}></span>
-                  <div>
-                    <Text style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>Ví tiền mặt</Text>
-                    <Text size="xxxSmall" style={{ color: "#a7f3d0" }}>Thu nhập giao hàng</Text>
-                  </div>
-                </div>
-              </div>
-              <div style={{ background: "rgba(255,255,255,0.05)", borderRadius: 12, padding: 16, border: "1px solid rgba(255,255,255,0.1)" }}>
-                <Text size="xSmall" style={{ color: "#a7f3d0" }}>Khả dụng</Text>
-                <Text style={{ fontSize: 28, fontWeight: 800, color: "#34d399", marginTop: 4 }}>
-                  <DisplayPrice>{wallets.cash?.availableBalance || 0}</DisplayPrice>
-                </Text>
-              </div>
-              <button 
-                className="tm-interactive"
-                onClick={() => setPayoutVisible(true)}
-                style={{ width: "100%", padding: "12px", background: "transparent", color: "#34d399", border: "1px solid #34d399", borderRadius: 12, marginTop: 12, fontWeight: 700, fontSize: 14 }}
-              >
-                Rút tiền
-              </button>
-            </div>
+
 
             {/* Transactions History */}
             <div style={{ marginTop: 20 }}>
@@ -265,46 +241,7 @@ const WalletPage: FC = () => {
         </Box>
       </Modal>
 
-      {/* Modal Rút tiền */}
-      <Modal
-        visible={payoutVisible}
-        title="Rút tiền"
-        onClose={() => {
-          setPayoutVisible(false);
-          setPayoutAmount("");
-        }}
-      >
-        <Box p={4} style={{ display: "grid", gap: 12 }}>
-          <Input
-            type="number"
-            label="Số tiền cần rút"
-            placeholder="VD: 100000"
-            value={payoutAmount}
-            onChange={(e) => setPayoutAmount(e.target.value)}
-          />
-          <Input
-            label="Ngân hàng"
-            placeholder="VD: VCB, TCB, VMB..."
-            value={bankCode}
-            onChange={(e) => setBankCode(e.target.value)}
-          />
-          <Input
-            label="Số tài khoản"
-            placeholder="Nhập số tài khoản"
-            value={bankAccount}
-            onChange={(e) => setBankAccount(e.target.value)}
-          />
-          <Input
-            label="Tên chủ tài khoản"
-            placeholder="NGUYEN VAN A"
-            value={bankAccountName}
-            onChange={(e) => setBankAccountName(e.target.value)}
-          />
-          <Button fullWidth onClick={handlePayout} loading={isProcessing} style={{ marginTop: 12 }}>
-            Yêu cầu rút tiền
-          </Button>
-        </Box>
-      </Modal>
+
     </Page>
   );
 };

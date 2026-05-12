@@ -49,6 +49,24 @@ function resolveApiBaseUrl() {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+function getApiBaseCandidates() {
+  if (API_BASE_URL === DEFAULT_API_BASE_URL) {
+    return [API_BASE_URL];
+  }
+  return [API_BASE_URL, DEFAULT_API_BASE_URL];
+}
+
+function normalizeTextErrorMessage(raw: string) {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return "";
+  }
+  if (/^<!doctype html>/i.test(trimmed) || /^<html/i.test(trimmed)) {
+    return "";
+  }
+  return trimmed.length > 240 ? `${trimmed.slice(0, 240)}...` : trimmed;
+}
+
 let cachedSession: Session | null = null;
 
 import { getStorage, setStorage } from "zmp-sdk";
@@ -125,18 +143,45 @@ async function request<T>(
 
   headers.set("ngrok-skip-browser-warning", "true");
 
-  const url = `${API_BASE_URL}${path}`;
-  const response = await fetch(url, { ...init, headers });
+  let response: Response | undefined;
+  let lastNetworkError: unknown;
+  let attemptedUrl = `${API_BASE_URL}${path}`;
+
+  for (const baseUrl of getApiBaseCandidates()) {
+    attemptedUrl = `${baseUrl}${path}`;
+    try {
+      response = await fetch(attemptedUrl, {
+        ...init,
+        headers,
+      });
+      break;
+    } catch (error) {
+      lastNetworkError = error;
+    }
+  }
+
+  if (!response) {
+    throw new ApiError(`Network error while calling ${attemptedUrl}`, 0, {
+      cause: lastNetworkError,
+    });
+  }
 
   let payload: any = null;
+  let rawTextPayload = "";
   try {
     payload = await response.clone().json();
   } catch (_error) {
     payload = null;
+    try {
+      rawTextPayload = await response.text();
+    } catch (_textError) {
+      rawTextPayload = "";
+    }
   }
 
   if (!response.ok) {
-    const message = payload?.message || `API request failed (${response.status})`;
+    const textMessage = normalizeTextErrorMessage(rawTextPayload);
+    const message = payload?.message || textMessage || `API request failed (${response.status})`;
     throw new ApiError(message, response.status, payload?.details);
   }
 

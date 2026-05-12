@@ -1,6 +1,6 @@
 ﻿import React, { FC, useState, useCallback, useEffect } from "react";
 import { Text } from "zmp-ui";
-import { getLocation } from "zmp-sdk";
+import { getDriverLocationSafe } from "utils/location";
 
 interface GpsRequiredOverlayProps {
   children: React.ReactNode;
@@ -28,49 +28,20 @@ export const GpsRequiredOverlay: FC<GpsRequiredOverlayProps> = ({ children }) =>
     setChecking(true);
     setError("");
 
-    // Helper: try HTML5 Geolocation API
-    const tryHTML5Geo = (): Promise<boolean> => {
-      return new Promise((resolve) => {
-        if (!navigator.geolocation) {
-          resolve(false);
-          return;
-        }
-        navigator.geolocation.getCurrentPosition(
-          () => resolve(true),  // success = GPS works
-          () => resolve(false), // error = denied or unavailable
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-        );
-      });
-    };
-
     try {
-      // 1. Try Zalo SDK first (works inside Zalo Mini App)
-      let resolved = false;
-      try {
-        const zaloPromise = getLocation({ fail: console.warn });
-        const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Zalo SDK timeout")), 4000)
-        );
-        const result = await Promise.race([zaloPromise, timeoutPromise]) as any;
-        if (result?.latitude && result?.longitude) {
-          setGpsGranted(true);
-          sessionStorage.setItem("tm_driver_gps_granted", "true");
-          resolved = true;
-        }
-      } catch {
-        // Zalo SDK failed — will try HTML5 fallback
-      }
+      const result = await getDriverLocationSafe({
+        maxAgeMs: 0,
+        allowStale: false,
+        forceRefresh: true,
+        quiet: false,
+      });
 
-      // 2. Fallback: HTML5 Geolocation API (works in browser & webview)
-      if (!resolved) {
-        const html5Ok = await tryHTML5Geo();
-        if (html5Ok) {
-          setGpsGranted(true);
-          sessionStorage.setItem("tm_driver_gps_granted", "true");
-        } else {
-          setGpsGranted(false);
-          setError("Không thể truy cập GPS. Hãy kiểm tra:\n• Đã bật Định vị (GPS) trên thiết bị\n• Đã cấp quyền vị trí cho Zalo\n• Thử tắt/bật lại GPS rồi bấm nút bên dưới");
-        }
+      if (result?.latitude && result?.longitude) {
+        setGpsGranted(true);
+        sessionStorage.setItem("tm_driver_gps_granted", "true");
+      } else {
+        setGpsGranted(false);
+        setError("Không thể truy cập GPS. Hãy kiểm tra:\n• Đã bật Định vị (GPS) trên thiết bị\n• Đã cấp quyền vị trí cho Zalo\n• Thử tắt/bật lại GPS rồi bấm nút bên dưới");
       }
     } catch (err) {
       console.warn("GPS check failed:", err);

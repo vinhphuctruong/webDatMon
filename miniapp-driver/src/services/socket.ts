@@ -51,13 +51,6 @@ export async function initSocket() {
   let session = await readSession();
   let token = session?.accessToken || "";
 
-  // Refresh once proactively before connecting socket.
-  const refreshedSession = await refreshSession();
-  if (refreshedSession?.accessToken) {
-    session = refreshedSession;
-    token = refreshedSession.accessToken;
-  }
-
   if (!token) {
     console.error("[Socket] Missing access token, skip socket connection");
     return null;

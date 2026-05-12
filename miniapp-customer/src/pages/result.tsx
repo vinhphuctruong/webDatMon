@@ -25,7 +25,7 @@ interface LocalResultState {
   trackingSnapshot?: TrackingSnapshot;
 }
 
-const SHOW_TRACKING_MAP = true;
+const SHOW_TRACKING_MAP = false;
 
 const getStepStatus = (status: "done" | "active" | "pending") => {
   if (status === "done") {
@@ -523,28 +523,13 @@ const CheckoutResultPage: FC = () => {
             )}
           </div>
 
-          {SHOW_TRACKING_MAP ? (
+          {SHOW_TRACKING_MAP && (
             <OrderTrackingMap
               snapshot={trackingSnapshot}
               hasAssignedDriver={hasAssignedDriver}
               driverName={liveOrder?.driver?.name || undefined}
               orderStatus={status}
             />
-          ) : (
-            <div
-              className="tm-card"
-              style={{
-                marginTop: 12,
-                padding: 12,
-                border: "1px dashed var(--tm-border)",
-                background: "var(--tm-bg)",
-                boxShadow: "none",
-              }}
-            >
-              <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-                Tạm ẩn bản đồ theo dõi đơn hàng.
-              </Text>
-            </div>
           )}
 
           <DriverAssignmentCard order={liveOrder} />

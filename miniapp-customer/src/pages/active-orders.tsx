@@ -9,6 +9,8 @@ import { THU_DAU_MOT_CENTER, normalizeStoredCoordinates } from "utils/location";
 import { formatStoreOrderCode } from "utils/order-code";
 import { calculateDistance } from "utils/location";
 
+const SHOW_ACTIVE_ORDER_MAP = false;
+
 /* ── Star Rating Component ────────────────── */
 const StarRating: FC<{
   value: number;
@@ -233,8 +235,8 @@ const OrderCard: FC<{ order: any; onRefresh: () => void }> = ({ order, onRefresh
         {order.items?.map((item: any) => `${item.productName || item.name} x${item.quantity}`).join(", ")}
       </Text>
 
-      {/* Map for picked up orders */}
-      {order.status === "PICKED_UP" && <OrderLocationMap order={order} />}
+      {/* Map preview hidden to reduce VietMap API usage */}
+      {SHOW_ACTIVE_ORDER_MAP && order.status === "PICKED_UP" && <OrderLocationMap order={order} />}
 
       {/* Delivered banner - confirm received prompt */}
       {isDelivered && !hasConfirmed && (

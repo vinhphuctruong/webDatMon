@@ -5,6 +5,7 @@ import {
   PaymentStatus,
   UserRole,
   WalletTransactionType,
+  DispatchStatus,
 } from "@prisma/client";
 import { Router } from "express";
 import { z } from "zod";
@@ -18,9 +19,89 @@ import {
   setDriverOnlineStatus,
   updateDriverPresence,
 } from "../services/driver-presence";
-import { acceptDispatch, rejectDispatch } from "../services/dispatch-engine";
+import { acceptDispatch, rejectDispatch, classifyDispatchOfferKind } from "../services/dispatch-engine";
 
 const driverRouter = Router();
+
+driverRouter.use(requireAuth, requireRole(UserRole.DRIVER));
+
+driverRouter.get(
+  "/orders/dispatch/pending",
+  asyncHandler(async (req, res) => {
+    const driverId = req.user!.id;
+    const now = new Date();
+
+    const dispatches = await prisma.orderDispatch.findMany({
+      where: {
+        currentDriverId: driverId,
+        status: DispatchStatus.OFFERED,
+        offerExpiresAt: { gt: now },
+        order: {
+          status: { in: [OrderStatus.CONFIRMED, OrderStatus.PREPARING] },
+        },
+      },
+      include: {
+        order: {
+          include: { store: true, items: true },
+        },
+        attempts: {
+          where: { driverId, offered: true },
+          take: 1,
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    });
+
+    if (dispatches.length === 0) {
+      res.json({ data: [] });
+      return;
+    }
+
+    const activeOrderCountForDriver = await prisma.order.count({
+      where: {
+        driverId,
+        status: { in: [OrderStatus.CONFIRMED, OrderStatus.PREPARING, OrderStatus.PICKED_UP] },
+      },
+    });
+
+    const payload = dispatches.map((dispatch) => {
+      const attempt = dispatch.attempts[0];
+      const isStackedOffer = activeOrderCountForDriver > 0;
+      const bundleCount = isStackedOffer ? activeOrderCountForDriver + 1 : 1;
+      const offerKind = classifyDispatchOfferKind({
+        autoAcceptOrders: dispatch.order.store.autoAcceptOrders,
+        isStackedOffer,
+      });
+
+      return {
+        dispatchId: dispatch.id,
+        orderId: dispatch.order.id,
+        timeoutSeconds: 15,
+        expiresAt: dispatch.offerExpiresAt?.toISOString(),
+        store: {
+          id: dispatch.order.store.id,
+          name: dispatch.order.store.name,
+          address: dispatch.order.store.address,
+          latitude: dispatch.order.store.latitude,
+          longitude: dispatch.order.store.longitude,
+        },
+        deliveryAddress: dispatch.order.deliveryAddress,
+        total: dispatch.order.total,
+        driverPayout: dispatch.order.driverPayout,
+        deliveryFee: dispatch.order.deliveryFee,
+        paymentMethod: dispatch.order.paymentMethod,
+        itemCount: dispatch.order.items.length,
+        distanceKm: attempt?.distanceKm,
+        timeMinutes: attempt?.timeMinutes,
+        isStacked: isStackedOffer,
+        bundleCount,
+        offerKind,
+      };
+    });
+
+    res.json({ data: payload });
+  }),
+);
 const claimableStatuses: OrderStatus[] = [
   OrderStatus.CONFIRMED,
   OrderStatus.PREPARING,
@@ -29,7 +110,6 @@ const completableStatuses: OrderStatus[] = [
   OrderStatus.PICKED_UP,
 ];
 
-driverRouter.use(requireAuth, requireRole(UserRole.DRIVER));
 
 const updateAvailabilitySchema = z.object({
   isOnline: z.boolean(),
@@ -200,13 +280,10 @@ driverRouter.post(
 
       if (order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.NONE) {
         const { creditWallet } = await ensureDriverWallets(tx, driverId);
-        const requiredCredit = order.merchantPayout + order.platformRevenue;
-        if (creditWallet.availableBalance < requiredCredit) {
-          throw new HttpError(
-            StatusCodes.BAD_REQUEST,
-            `Số dư ví tín dụng không đủ. Cần ít nhất ${requiredCredit} VND`,
-          );
-        }
+
+        // ShopeeFood model: No minimum balance check.
+        // Driver's wallet can go negative (debt). They keep the physical
+        // cash collected from the customer to offset the debt.
 
         if (order.merchantPayout > 0) {
           await holdWalletAmount(tx, {
@@ -215,6 +292,7 @@ driverRouter.post(
             amount: order.merchantPayout,
             orderId: order.id,
             note: "Hold driver credit wallet for COD merchant settlement",
+            allowNegativeAvailable: true,
           });
         }
       }

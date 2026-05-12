@@ -1,3 +1,35 @@
+import { getLocation } from "zmp-sdk";
+
+export const LOCATION_TIMEOUT_MS = 6000;
+const LOCATION_MIN_CALL_INTERVAL_MS = 5000;
+const LOCATION_RATE_LIMIT_BASE_COOLDOWN_MS = 20000;
+const LOCATION_RATE_LIMIT_MAX_COOLDOWN_MS = 120000;
+
+type CachedDriverLocation = {
+  latitude: number;
+  longitude: number;
+  timestamp: number;
+  source: "zalo" | "html5";
+};
+
+type DriverLocationResult = {
+  latitude: number;
+  longitude: number;
+  source: "zalo" | "html5" | "cache";
+};
+
+const driverLocationCache: {
+  lastGood: CachedDriverLocation | null;
+  lastAttemptAt: number;
+  rateLimitedUntil: number;
+  rateLimitHits: number;
+} = {
+  lastGood: null,
+  lastAttemptAt: 0,
+  rateLimitedUntil: 0,
+  rateLimitHits: 0,
+};
+
 export function calculateDistance(lat1, lon1, lat2, lon2) {
   const R = 6371; // Radius of the earth in km
   const dLat = deg2rad(lat2 - lat1);
@@ -11,6 +43,131 @@ export function calculateDistance(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   const d = R * c; // Distance in km
   return d;
+}
+
+function parseCoordinate(value: unknown): number | null {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+function parseLocationErrorCode(error: unknown): number | null {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "number" ? code : Number.isFinite(Number(code)) ? Number(code) : null;
+}
+
+function updateLocationCache(latitude: number, longitude: number, source: "zalo" | "html5") {
+  driverLocationCache.lastGood = {
+    latitude,
+    longitude,
+    timestamp: Date.now(),
+    source,
+  };
+  driverLocationCache.rateLimitHits = 0;
+}
+
+function readFromCache(maxAgeMs: number): DriverLocationResult | null {
+  const last = driverLocationCache.lastGood;
+  if (!last) {
+    return null;
+  }
+  if (Date.now() - last.timestamp > maxAgeMs) {
+    return null;
+  }
+  return {
+    latitude: last.latitude,
+    longitude: last.longitude,
+    source: "cache",
+  };
+}
+
+function readHtml5Location() {
+  return new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+        });
+      },
+      () => resolve(null),
+      {
+        enableHighAccuracy: true,
+        timeout: LOCATION_TIMEOUT_MS,
+        maximumAge: 0,
+      },
+    );
+  });
+}
+
+export async function getDriverLocationSafe(options?: {
+  maxAgeMs?: number;
+  allowStale?: boolean;
+  forceRefresh?: boolean;
+  quiet?: boolean;
+}): Promise<DriverLocationResult | null> {
+  const maxAgeMs = options?.maxAgeMs ?? 15000;
+  const allowStale = options?.allowStale ?? true;
+  const forceRefresh = options?.forceRefresh ?? false;
+  const quiet = options?.quiet ?? true;
+  const now = Date.now();
+
+  if (!forceRefresh) {
+    const fromCache = readFromCache(maxAgeMs);
+    if (fromCache) {
+      return fromCache;
+    }
+  }
+
+  if (!forceRefresh && now < driverLocationCache.rateLimitedUntil) {
+    return allowStale ? readFromCache(Number.MAX_SAFE_INTEGER) : null;
+  }
+
+  if (!forceRefresh && now - driverLocationCache.lastAttemptAt < LOCATION_MIN_CALL_INTERVAL_MS) {
+    return allowStale ? readFromCache(Number.MAX_SAFE_INTEGER) : null;
+  }
+  driverLocationCache.lastAttemptAt = now;
+
+  try {
+    const result = (await Promise.race([
+      getLocation({}),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("GPS timeout")), LOCATION_TIMEOUT_MS)),
+    ])) as { latitude?: unknown; longitude?: unknown };
+
+    const latitude = parseCoordinate(result?.latitude);
+    const longitude = parseCoordinate(result?.longitude);
+    if (latitude != null && longitude != null) {
+      updateLocationCache(latitude, longitude, "zalo");
+      return { latitude, longitude, source: "zalo" };
+    }
+  } catch (error) {
+    const code = parseLocationErrorCode(error);
+    if (code === -1409) {
+      driverLocationCache.rateLimitHits += 1;
+      const cooldown = Math.min(
+        LOCATION_RATE_LIMIT_MAX_COOLDOWN_MS,
+        LOCATION_RATE_LIMIT_BASE_COOLDOWN_MS * Math.max(1, driverLocationCache.rateLimitHits),
+      );
+      driverLocationCache.rateLimitedUntil = Date.now() + cooldown;
+    } else if (!quiet) {
+      console.warn("getLocation failed", error);
+    }
+  }
+
+  const html5 = await readHtml5Location();
+  if (html5) {
+    updateLocationCache(html5.latitude, html5.longitude, "html5");
+    return { ...html5, source: "html5" };
+  }
+
+  return allowStale ? readFromCache(Number.MAX_SAFE_INTEGER) : null;
 }
 
 export function deg2rad(deg) {

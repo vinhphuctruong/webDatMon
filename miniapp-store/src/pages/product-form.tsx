@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { createManagedStoreProduct, fetchCategories } from "services/api";
@@ -31,8 +31,8 @@ const ProductFormPage = () => {
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) {
-        openSnackbar({ text: "Ảnh quá lớn, vui lòng chọn ảnh < 1MB", type: "error" });
+      if (file.size > 5 * 1024 * 1024) {
+        openSnackbar({ text: "Ảnh quá lớn, vui lòng chọn ảnh < 5MB", type: "error" });
         e.target.value = '';
         return;
       }

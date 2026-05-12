@@ -1,14 +1,13 @@
-﻿import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { FC, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { Text, useSnackbar } from "zmp-ui";
-import { getLocation } from "zmp-sdk";
-import { syncDriverLocation, acceptDispatchOrder } from "services/driver-api";
+import { syncDriverLocation, acceptDispatchOrder, fetchPendingDispatchOffers } from "services/driver-api";
 import { initSocket } from "services/socket";
 import { DisplayPrice } from "./display/price";
 import { requestNotificationPermission, showNativeNotification } from "utils/notification";
+import { getDriverLocationSafe } from "utils/location";
 
 const POLL_INTERVAL_MS = 5000;
-const LOCATION_TIMEOUT_MS = 4000;
 const SLIDE_ACCEPT_THRESHOLD = 0.86;
 const SLIDE_KNOB_SIZE = 42;
 const SLIDE_TRACK_PADDING = 4;
@@ -67,52 +66,12 @@ function extractAreaName(address: any) {
   return "Khu vực giao hàng";
 }
 
-const parseLocation = (raw: unknown) => {
-  const numeric = typeof raw === "number" ? raw : Number(raw);
-  return Number.isFinite(numeric) ? numeric : null;
-};
-
-function readHtml5Location() {
-  return new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) {
-      resolve(null);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        resolve({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      () => resolve(null),
-      {
-        enableHighAccuracy: true,
-        timeout: LOCATION_TIMEOUT_MS,
-        maximumAge: 0,
-      },
-    );
-  });
-}
-
 async function readDriverLocation() {
-  try {
-    const result = (await Promise.race([
-      getLocation({}),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("GPS timeout")), LOCATION_TIMEOUT_MS)),
-    ])) as { latitude?: number | string; longitude?: number | string };
-
-    const latitude = parseLocation(result?.latitude);
-    const longitude = parseLocation(result?.longitude);
-    if (latitude == null || longitude == null) {
-      return await readHtml5Location();
-    }
-
-    return { latitude, longitude };
-  } catch (_error) {
-    return await readHtml5Location();
-  }
+  return getDriverLocationSafe({
+    maxAgeMs: 8000,
+    allowStale: true,
+    quiet: true,
+  });
 }
 
 /* ── Countdown Timer Hook ─────────────────────────────── */
@@ -341,6 +300,8 @@ export const IncomingOrderAlert: FC = () => {
       // Push one immediate location update after socket connected
       // so dispatcher can consider this driver quickly.
       const firstLocation = await readDriverLocation();
+
+
       if (firstLocation) {
         socket.emit("driver_location_update", {
           latitude: firstLocation.latitude,
@@ -349,6 +310,16 @@ export const IncomingOrderAlert: FC = () => {
         try {
           await syncDriverLocation(firstLocation.latitude, firstLocation.longitude);
         } catch (_) {}
+      }
+
+      // ── Fetch pending dispatch offers upon reconnect ──
+      try {
+        const pendingRes = await fetchPendingDispatchOffers();
+        if (pendingRes.data && pendingRes.data.length > 0) {
+          pendingRes.data.forEach((offer: any) => enqueueOffer(offer));
+        }
+      } catch (err) {
+        console.error("Failed to fetch pending offers", err);
       }
 
       // ── Exclusive Dispatch Offer ──

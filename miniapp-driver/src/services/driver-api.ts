@@ -24,6 +24,10 @@ export async function fetchMyOrders() {
   return apiFetch<{ data: any[] }>("/drivers/orders/mine", undefined, { auth: true });
 }
 
+export async function fetchPendingDispatchOffers() {
+  return apiFetch<{ data: any[] }>("/drivers/orders/dispatch/pending", undefined, { auth: true });
+}
+
 export async function acceptDispatchOrder(orderId: string) {
   return apiFetch<{ data: any }>(`/drivers/orders/${orderId}/accept-dispatch`, {
     method: "POST",

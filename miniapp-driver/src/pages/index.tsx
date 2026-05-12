@@ -1,13 +1,13 @@
-﻿import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
+import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { ApiError, hasSessionAsync } from "services/api";
+import { ApiError } from "services/api";
 import { fetchDriverProfile, toggleOnline, fetchMyOrders } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
 
 const HomePage: FC = () => {
   const navigate = useNavigate();
-  const snackbar = useSnackbar();
+  const { openSnackbar } = useSnackbar();
   const [profile, setProfile] = useState<any>(null);
   const [isOnline, setIsOnline] = useState(false);
   const [todayStats, setTodayStats] = useState({ earnings: 0, deliveries: 0 });
@@ -36,21 +36,16 @@ const HomePage: FC = () => {
         navigate("/login", { replace: true });
         return;
       }
-      snackbar.openSnackbar({ type: "error", text: err?.message || "Không tải được dữ liệu tài xế" });
+      openSnackbar({ type: "error", text: err?.message || "Không tải được dữ liệu tài xế" });
     } finally {
       setLoading(false);
     }
-  }, [navigate, snackbar]);
+  }, [navigate]);
 
   useEffect(() => {
     let active = true;
     const bootstrap = async () => {
-      const hasSession = await hasSessionAsync();
       if (!active) return;
-      if (!hasSession) {
-        navigate("/login", { replace: true });
-        return;
-      }
       await loadData();
     };
     void bootstrap();
@@ -64,12 +59,12 @@ const HomePage: FC = () => {
     try {
       const res = await toggleOnline(!isOnline);
       setIsOnline(res.data.isOnline);
-      snackbar.openSnackbar({
+      openSnackbar({
         type: "success",
         text: res.data.isOnline ? "Bạn đã bật nhận đơn" : "Bạn đã tắt nhận đơn",
       });
     } catch (error: any) {
-      snackbar.openSnackbar({ type: "error", text: error.message || "Lỗi cập nhật trạng thái" });
+      openSnackbar({ type: "error", text: error.message || "Lỗi cập nhật trạng thái" });
     } finally {
       setToggling(false);
     }

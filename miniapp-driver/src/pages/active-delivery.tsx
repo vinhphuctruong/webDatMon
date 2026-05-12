@@ -1,4 +1,4 @@
-﻿import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
+import React, { FC, useCallback, useEffect, useState } from "react";
 import { Box, Modal, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { ApiError, hasSessionAsync } from "services/api";
@@ -10,18 +10,18 @@ import {
   reportFailedDelivery,
 } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
-import { VietMapView, MapMarker } from "components/vietmap";
 import {
   THU_DAU_MOT_CENTER,
   calculateDistance,
   calculateETA,
   displayDistance,
+  getDriverLocationSafe,
   normalizeStoredCoordinates,
 } from "utils/location";
-import { getLocation } from "zmp-sdk";
 import { formatStoreOrderCode } from "utils/order-code";
 
 const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
+  const navigate = useNavigate();
   const normalizedStoreCoordinates = normalizeStoredCoordinates(
     order.store?.latitude,
     order.store?.longitude,
@@ -40,14 +40,14 @@ const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
 
   useEffect(() => {
     const fetchLocation = async () => {
-      try {
-        const pos = await getLocation({});
-        if (pos && pos.latitude && pos.longitude) {
-          setDriverLat(parseFloat(pos.latitude as string));
-          setDriverLng(parseFloat(pos.longitude as string));
-        }
-      } catch (error) {
-        console.error("Failed to get driver location", error);
+      const pos = await getDriverLocationSafe({
+        maxAgeMs: 12000,
+        allowStale: true,
+        quiet: true,
+      });
+      if (pos) {
+        setDriverLat(pos.latitude);
+        setDriverLng(pos.longitude);
       }
     };
 
@@ -55,29 +55,6 @@ const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
     const interval = setInterval(fetchLocation, 10000);
     return () => clearInterval(interval);
   }, []);
-
-  const markers = useMemo<MapMarker[]>(() => {
-    const list: MapMarker[] = [
-      { lat: storeLat, lng: storeLng, label: order.store?.name || "Quán", type: "store" },
-      {
-        lat: customerLat,
-        lng: customerLng,
-        label: order.deliveryAddress?.receiverName || "Khách",
-        type: "customer",
-      },
-    ];
-
-    if (driverLat && driverLng) {
-      list.push({ lat: driverLat, lng: driverLng, label: "Bạn", type: "driver" });
-    }
-
-    return list;
-  }, [storeLat, storeLng, customerLat, customerLng, order.store?.name, order.deliveryAddress?.receiverName, driverLat, driverLng]);
-
-  const center = useMemo<[number, number]>(() => {
-    if (driverLat && driverLng) return [driverLng, driverLat];
-    return [(storeLng + customerLng) / 2, (storeLat + customerLat) / 2];
-  }, [storeLng, customerLng, storeLat, customerLat, driverLat, driverLng]);
 
   // Only navigate to customer when driver has actually picked up food
   const isPickedUp = order.status === "PICKED_UP";
@@ -91,86 +68,65 @@ const DeliveryRouteMap: FC<{ order: any }> = ({ order }) => {
 
   const eta = calculateETA(distance);
 
-  const googleMapsUrl = driverLat && driverLng
-    ? `https://www.google.com/maps/dir/?api=1&origin=${driverLat},${driverLng}&destination=${targetLat},${targetLng}&travelmode=driving`
-    : `https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`;
 
   return (
-    <div style={{ marginBottom: 10, position: "relative" }}>
-      <VietMapView
-        center={center}
-        zoom={14}
-        markers={markers}
-        height={190}
-        showRoute={false}
-        style={{ borderRadius: 12, border: "1px solid var(--tm-border)" }}
-      />
-
+    <div style={{ marginBottom: 10 }}>
       <div
         style={{
-          position: "absolute",
-          top: 8,
-          left: 8,
-          zIndex: 1000,
-          background: "rgba(255,255,255,0.95)",
-          backdropFilter: "blur(8px)",
-          padding: "6px 10px",
-          borderRadius: 10,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+          borderRadius: 12,
+          border: "1px solid var(--tm-border)",
+          background: "linear-gradient(135deg, #f8fbff 0%, #eef6ff 100%)",
+          padding: "10px 12px",
+          marginBottom: 10,
         }}
       >
         <div style={{ fontSize: 10, color: "var(--tm-text-secondary)", fontWeight: 600 }}>
           ETA tới {isPickedUp ? "khách" : "quán"}
         </div>
-        <div style={{ fontSize: 13, fontWeight: 800, color: "var(--tm-primary)" }}>{eta}</div>
-        <div style={{ fontSize: 10, color: "var(--tm-text-tertiary)" }}>{displayDistance(distance)}</div>
+        <div style={{ fontSize: 16, fontWeight: 800, color: "var(--tm-primary)", marginTop: 2 }}>{eta}</div>
+        <div style={{ fontSize: 12, color: "var(--tm-text-tertiary)" }}>
+          {displayDistance(distance)} {driverLat && driverLng ? "• Cập nhật theo GPS" : "• Ước tính"}
+        </div>
       </div>
 
       <button
-        onClick={async () => {
-          const url = `https://www.google.com/maps/dir/?api=1&destination=${targetLat},${targetLng}&travelmode=driving`;
-
-          // Try openOutApp first (may open in browser or native app)
-          try {
-            const { openOutApp } = await import("zmp-sdk/apis");
-            await openOutApp({ url });
-            return;
-          } catch (e1) {
-            console.warn("openOutApp failed:", e1);
+        onClick={() => {
+          const params = new URLSearchParams({
+            destLat: String(targetLat),
+            destLng: String(targetLng),
+            destName: isPickedUp
+              ? (order.deliveryAddress?.receiverName || "Khách hàng")
+              : (order.store?.name || "Quán"),
+            destType: isPickedUp ? "customer" : "store",
+          });
+          if (driverLat && driverLng) {
+            params.set("originLat", String(driverLat));
+            params.set("originLng", String(driverLng));
           }
-
-          // Fallback: openWebview
-          try {
-            const { openWebview } = await import("zmp-sdk/apis");
-            await openWebview({ url, config: { style: "normal" } });
-            return;
-          } catch (e2) {
-            console.warn("openWebview failed:", e2);
-          }
-
-          // Last resort
-          window.location.href = url;
+          navigate(`/navigation?${params.toString()}`);
         }}
         style={{
           width: "100%",
           marginTop: 10,
-          background: "#4285F4",
+          background: "linear-gradient(135deg, #1a73e8 0%, #4285f4 100%)",
           color: "#fff",
           border: "none",
           borderRadius: 12,
-          padding: "10px",
+          padding: "12px",
           fontWeight: 700,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
           gap: 8,
-          fontSize: 14
+          fontSize: 14,
+          cursor: "pointer",
+          boxShadow: "0 2px 8px rgba(26,115,232,0.35)",
         }}
       >
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="3 11 22 2 13 21 11 13 3 11" />
         </svg>
-        Dẫn đường bằng Google Maps
+        Mở bản đồ dẫn đường
       </button>
 
     </div>
@@ -224,12 +180,7 @@ const ActiveDeliveryPage: FC = () => {
     let interval: ReturnType<typeof setInterval> | null = null;
 
     const bootstrap = async () => {
-      const hasSession = await hasSessionAsync();
       if (!active) return;
-      if (!hasSession) {
-        navigate("/login", { replace: true });
-        return;
-      }
       await loadOrders();
       interval = setInterval(loadOrders, 15000);
     };

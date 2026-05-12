@@ -29,6 +29,7 @@ export const NO_BOTTOM_NAVIGATION_PAGES = [
   "/login",
   "/register",
   "/forgot-password",
+  "/navigation",
 ];
 
 export const Navigation: FC = () => {

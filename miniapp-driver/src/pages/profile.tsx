@@ -1,4 +1,4 @@
-﻿import React, { FC, useEffect, useState } from "react";
+import React, { FC, useEffect, useState } from "react";
 import { Box, Button, Input, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import {
@@ -7,7 +7,6 @@ import {
   updateMyProfile,
   changeMyPassword,
   clearApiSession,
-  hasSessionAsync,
 } from "services/api";
 import { fetchDriverProfile } from "services/driver-api";
 
@@ -27,12 +26,7 @@ const ProfilePage: FC = () => {
   useEffect(() => {
     let active = true;
     const bootstrap = async () => {
-      const hasSession = await hasSessionAsync();
       if (!active) return;
-      if (!hasSession) {
-        navigate("/login", { replace: true });
-        return;
-      }
 
       Promise.all([fetchMyProfile(), fetchDriverProfile()])
         .then(([userRes, driverRes]) => {

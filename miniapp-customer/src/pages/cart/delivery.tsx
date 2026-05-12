@@ -138,7 +138,7 @@ const LegendItem: FC<{ emoji: string; color: string; label: string }> = ({ emoji
   </div>
 );
 
-const SHOW_DELIVERY_MAP = true;
+const SHOW_DELIVERY_MAP = false;
 
 export const Delivery: FC = () => {
   const [note, setNote] = useRecoilState(orderNoteState);
@@ -159,7 +159,7 @@ export const Delivery: FC = () => {
          Thông tin giao hàng
       </Text>
 
-      {SHOW_DELIVERY_MAP ? (
+      {SHOW_DELIVERY_MAP && (
         <Suspense fallback={
           <div style={{
             height: 220, borderRadius: 12, background: 'var(--tm-bg)',
@@ -171,21 +171,6 @@ export const Delivery: FC = () => {
         }>
           <DeliveryMap />
         </Suspense>
-      ) : (
-        <div
-          className="tm-card"
-          style={{
-            marginBottom: 12,
-            border: "1px dashed var(--tm-border)",
-            background: "var(--tm-bg)",
-            boxShadow: "none",
-            padding: "10px 12px",
-          }}
-        >
-          <Text size="xSmall" style={{ color: "var(--tm-text-tertiary)" }}>
-             Tạm ẩn bản đồ giao hàng theo yêu cầu.
-          </Text>
-        </div>
       )}
 
       <div className="tm-card" style={{ padding: '0 16px', boxShadow: 'none' }}>
