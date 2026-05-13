@@ -87,6 +87,8 @@ interface ApiCartSummary {
 interface ApiOrder {
   id: string;
   status: string;
+  cancelRequestStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED" | string;
+  cancelReason?: string | null;
   total: number;
   estimatedDeliveryAt?: string;
   store: {

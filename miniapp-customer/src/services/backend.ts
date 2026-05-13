@@ -95,6 +95,8 @@ export interface ApiOrderDriver {
 export interface ApiOrder {
   id: string;
   status: string;
+  cancelRequestStatus?: "NONE" | "PENDING" | "APPROVED" | "REJECTED" | string;
+  cancelReason?: string | null;
   driverId?: string | null;
   driver?: ApiOrderDriver | null;
   total: number;

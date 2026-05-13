@@ -262,6 +262,20 @@ async function refreshAccessToken(current: Session): Promise<Session> {
   return payload.tokens;
 }
 
+export async function refreshSession(): Promise<Session | null> {
+  const current = await readSession();
+  if (!current) return null;
+  try {
+    return await refreshAccessToken(current);
+  } catch (_error: any) {
+    if (_error instanceof ApiError && _error.status === 0) {
+      return current;
+    }
+    writeSession(null);
+    return null;
+  }
+}
+
 async function ensureSession() {
   const existing = await readSession();
   if (existing) {
@@ -293,7 +307,10 @@ export async function apiFetch<T>(
     try {
       session = await refreshAccessToken(session);
       return await request<T>(path, init, session.accessToken);
-    } catch (_refreshError) {
+    } catch (_refreshError: any) {
+      if (_refreshError instanceof ApiError && _refreshError.status === 0) {
+        throw _refreshError;
+      }
       writeSession(null);
       throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại", 401);
     }

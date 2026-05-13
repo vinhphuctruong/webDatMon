@@ -36,9 +36,15 @@ const ProfilePage: FC = () => {
           setEditForm({ name: userRes.name, phone: userRes.phone || "" });
         })
         .catch((error: any) => {
-          if (error instanceof ApiError && error.status === 401) {
-            navigate("/login", { replace: true });
-            return;
+          if (error instanceof ApiError) {
+            if (error.status === 401) {
+              navigate("/login", { replace: true });
+              return;
+            }
+            if (error.status === 403) {
+              navigate("/register", { replace: true });
+              return;
+            }
           }
           console.error(error);
         })

@@ -1,6 +1,7 @@
-import { DispatchStatus, OrderStatus } from "@prisma/client";
+import { DispatchStatus, OrderStatus, UserRole } from "@prisma/client";
 import { prisma } from "../db/prisma";
 import { cancelOrderWithSettlementRollback } from "./finance";
+import { getIO } from "../socket";
 
 const MAINTENANCE_INTERVAL_MS = 60_000;
 const PENDING_AUTO_CANCEL_MS = 15 * 60_000;
@@ -24,12 +25,25 @@ async function autoCancelPendingOrders() {
   });
 
   for (const order of staleOrders) {
-    await prisma.$transaction(async (tx) => {
+    const reason = "Tự động huỷ: đơn PENDING quá 15 phút";
+    const updated = await prisma.$transaction(async (tx) => {
       await cancelOrderWithSettlementRollback(tx, {
         orderId: order.id,
-        reason: "Tự động huỷ: đơn PENDING quá 15 phút",
+        reason,
       });
+      return tx.order.findUniqueOrThrow({ where: { id: order.id } });
     });
+
+    try {
+      getIO().to(`user_${updated.userId}`).emit("order_cancellation_notice", {
+        orderId: updated.id,
+        action: "ORDER_CANCELLED",
+        actorRole: UserRole.ADMIN,
+        cancelReason: reason,
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancellation_notice", err);
+    }
   }
 }
 
@@ -46,12 +60,25 @@ async function autoCancelReadyWithoutDriverOrders() {
   });
 
   for (const order of staleOrders) {
-    await prisma.$transaction(async (tx) => {
+    const reason = "Tự động huỷ: đơn READY/PREPARING không có tài xế quá 30 phút";
+    const updated = await prisma.$transaction(async (tx) => {
       await cancelOrderWithSettlementRollback(tx, {
         orderId: order.id,
-        reason: "Tự động huỷ: đơn READY/PREPARING không có tài xế quá 30 phút",
+        reason,
       });
+      return tx.order.findUniqueOrThrow({ where: { id: order.id } });
     });
+
+    try {
+      getIO().to(`user_${updated.userId}`).emit("order_cancellation_notice", {
+        orderId: updated.id,
+        action: "ORDER_CANCELLED",
+        actorRole: UserRole.ADMIN,
+        cancelReason: reason,
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancellation_notice", err);
+    }
   }
 }
 

@@ -4,8 +4,6 @@ import { useNavigate } from "react-router";
 import { fetchManagedStoreDashboard, toggleManagedStoreStatus, fetchMyStoreApplication } from "services/api";
 import { DashboardData } from "types/store";
 import { formatCurrency } from "utils/formatter";
-import { THU_DAU_MOT_CENTER, isWithinServiceArea, normalizeStoredCoordinates } from "utils/location";
-import { VietMapView } from "components/vietmap";
 import { useSetRecoilState, useRecoilValueLoadable } from "recoil";
 import { cartState, remoteStoresState, storesState } from "state";
 import { fetchCart } from "services/backend";
@@ -93,20 +91,6 @@ const HomePage = () => {
     );
   }
 
-  const normalizedStoreCoordinates = normalizeStoredCoordinates(
-    data.store.latitude,
-    data.store.longitude,
-  );
-  const hasValidStoreCoordinates =
-    normalizedStoreCoordinates !== null &&
-    isWithinServiceArea(normalizedStoreCoordinates.lat, normalizedStoreCoordinates.lng);
-
-  const safeStoreLat = hasValidStoreCoordinates
-    ? normalizedStoreCoordinates.lat
-    : THU_DAU_MOT_CENTER.lat;
-  const safeStoreLng = hasValidStoreCoordinates
-    ? normalizedStoreCoordinates.lng
-    : THU_DAU_MOT_CENTER.lng;
 
   return (
     <Page className="page-with-bg pb-20">
@@ -155,23 +139,6 @@ const HomePage = () => {
         </div>
       </Box>
 
-      <Box p={4} pt={0} className="tm-content-pad">
-        <div className="tm-card" style={{ padding: 16 }}>
-          <Text.Title style={{ fontSize: 16, marginBottom: 12 }}>Vị trí cửa hàng</Text.Title>
-          {!hasValidStoreCoordinates && (
-            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 8 }}>
-              Chưa xác định được vị trí chính xác của cửa hàng, bản đồ đang hiển thị vị trí mặc định.
-            </Text>
-          )}
-          <VietMapView
-            center={[safeStoreLng, safeStoreLat]}
-            zoom={15}
-            height={160}
-            markers={[{ lat: safeStoreLat, lng: safeStoreLng, type: "store", label: "Cửa hàng của bạn" }]}
-            style={{ borderRadius: 12, border: "1px solid var(--tm-border)" }}
-          />
-        </div>
-      </Box>
 
       <Box p={4} pt={0} className="tm-content-pad">
         <div className="tm-card" style={{ padding: 16 }}>

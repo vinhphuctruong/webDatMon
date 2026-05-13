@@ -279,7 +279,10 @@ export async function apiFetch<T>(
     try {
       session = await refreshAccessToken(session);
       return await request<T>(path, init, session.accessToken);
-    } catch (_refreshError) {
+    } catch (_refreshError: any) {
+      if (_refreshError instanceof ApiError && _refreshError.status === 0) {
+        throw _refreshError;
+      }
       writeSession(null);
       throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại", 401);
     }

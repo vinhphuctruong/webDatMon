@@ -165,9 +165,15 @@ const ActiveDeliveryPage: FC = () => {
       setActiveOrders(active);
     } catch (err: any) {
       console.error(err);
-      if (err instanceof ApiError && err.status === 401) {
-        navigate("/login", { replace: true });
-        return;
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          navigate("/login", { replace: true });
+          return;
+        }
+        if (err.status === 403) {
+          navigate("/register", { replace: true });
+          return;
+        }
       }
       snackbar.openSnackbar({ type: "error", text: err?.message || "Không tải được đơn đang giao" });
     } finally {

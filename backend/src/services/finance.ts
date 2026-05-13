@@ -650,34 +650,39 @@ export async function cancelOrderWithSettlementRollback(
 
   if (order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.HELD) {
     if (!order.driverId) {
-      throw new HttpError(StatusCodes.BAD_REQUEST, "Driver not assigned for COD hold rollback");
+      throw new HttpError(StatusCodes.BAD_REQUEST, "Tài xế chưa được gán để hoàn tiền giữ chỗ COD");
     }
 
-    const { creditWallet } = await ensureDriverWallets(tx, order.driverId);
-    await releaseHeldToAvailable(tx, {
-      walletId: creditWallet.id,
-      type: WalletTransactionType.COD_HOLD_REFUND,
-      amount: order.codHoldAmount,
-      orderId: order.id,
-      paymentId: order.payment?.id,
-      note: input.reason ?? "Refund COD hold on order cancellation",
-    });
+    if (order.codHoldAmount > 0) {
+      const { creditWallet } = await ensureDriverWallets(tx, order.driverId);
+      await releaseHeldToAvailable(tx, {
+        walletId: creditWallet.id,
+        type: WalletTransactionType.COD_HOLD_REFUND,
+        amount: order.codHoldAmount,
+        orderId: order.id,
+        paymentId: order.payment?.id,
+        note: input.reason ?? "Refund COD hold on order cancellation",
+      });
+    }
   }
 
   if (
     order.paymentMethod === PaymentMethod.SEPAY_QR &&
     order.paymentStatus === PaymentStatus.SUCCEEDED
   ) {
-    const escrowWallet = await ensurePlatformWallet(tx, WalletType.PLATFORM_ESCROW);
+    if (order.total > 0) {
+      const escrowWallet = await ensurePlatformWallet(tx, WalletType.PLATFORM_ESCROW);
 
-    await debitWalletAvailable(tx, {
-      walletId: escrowWallet.id,
-      type: WalletTransactionType.ORDER_REFUND_OUT,
-      amount: order.total,
-      orderId: order.id,
-      paymentId: order.payment?.id,
-      note: input.reason ?? "Refund cashless payment to customer",
-    });
+      await debitWalletAvailable(tx, {
+        walletId: escrowWallet.id,
+        type: WalletTransactionType.ORDER_REFUND_OUT,
+        amount: order.total,
+        orderId: order.id,
+        paymentId: order.payment?.id,
+        note: input.reason ?? "Refund cashless payment to customer",
+        allowNegativeAvailable: true,
+      });
+    }
 
     await tx.orderPayment.updateMany({
       where: { orderId: order.id },

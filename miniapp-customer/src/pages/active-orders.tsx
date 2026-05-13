@@ -231,6 +231,21 @@ const OrderCard: FC<{ order: any; onRefresh: () => void }> = ({ order, onRefresh
           {order.cancelReason ? `: ${order.cancelReason}` : ""}
         </Text>
       )}
+      {["CANCELLED", "FAILED"].includes(order.status) && !!order.cancelReason && (
+        <Text
+          size="xxSmall"
+          style={{
+            color: "#7f1d1d",
+            background: "#fef2f2",
+            borderRadius: 8,
+            padding: "4px 8px",
+            display: "inline-block",
+            marginBottom: 6,
+          }}
+        >
+          Lý do: {order.cancelReason}
+        </Text>
+      )}
       <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {order.items?.map((item: any) => `${item.productName || item.name} x${item.quantity}`).join(", ")}
       </Text>

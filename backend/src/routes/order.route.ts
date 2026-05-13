@@ -3,6 +3,8 @@ import {
   PaymentMethod,
   PaymentStatus,
   UserRole,
+  CodHoldStatus,
+  WalletTransactionType,
 } from "@prisma/client";
 import { Router } from "express";
 import { StatusCodes } from "http-status-codes";
@@ -19,6 +21,8 @@ import {
   createSePayQrContent,
   createSePayReference,
   settleDeliveredOrder,
+  ensureDriverWallets,
+  releaseHeldToAvailable,
 } from "../services/finance";
 import { calculateUnitPrice } from "../utils/pricing";
 import { estimateDeliveryFee } from "../services/delivery-fee";
@@ -642,6 +646,19 @@ orderRouter.patch(
       });
     });
 
+    if (payload.status === OrderStatus.CANCELLED) {
+      try {
+        getIO().to(`user_${updated.userId}`).emit("order_cancellation_notice", {
+          orderId: updated.id,
+          action: "ORDER_CANCELLED",
+          actorRole: UserRole.ADMIN,
+          cancelReason: payload.cancelReason || "Admin huỷ đơn",
+        });
+      } catch (err) {
+        console.warn("[Socket] Unable to emit order_cancellation_notice", err);
+      }
+    }
+
     res.json({ data: toOrderResponse(updated) });
   }),
 );
@@ -739,6 +756,16 @@ orderRouter.post(
     const { reason } = req.body;
     const user = req.user!;
 
+    let fallbackReason = "Đơn hàng đã bị huỷ";
+
+    if (user.role === UserRole.CUSTOMER) {
+      fallbackReason = "Khách hàng đổi ý, xin huỷ đơn";
+    } else if (user.role === UserRole.STORE_MANAGER) {
+      fallbackReason = "Quán tạm quá tải, xin lỗi quý khách và mong bạn đặt lại sau ít phút";
+    }
+
+    const usedReason = (typeof reason === "string" && reason.trim()) ? reason.trim() : fallbackReason;
+
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
@@ -768,7 +795,7 @@ orderRouter.post(
 
       await cancelOrderWithSettlementRollback(tx, {
         orderId,
-        reason: reason || "User cancelled",
+        reason: usedReason,
       });
 
       return tx.order.findUniqueOrThrow({
@@ -776,6 +803,17 @@ orderRouter.post(
         include: { store: true, items: true, payment: true },
       });
     });
+
+    try {
+      getIO().to(`user_${updated.userId}`).emit("order_cancellation_notice", {
+        orderId: updated.id,
+        action: "ORDER_CANCELLED",
+        actorRole: user.role,
+        cancelReason: usedReason,
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancellation_notice", err);
+    }
 
     res.json({ data: toOrderResponse(updated) });
   }),
@@ -805,11 +843,27 @@ orderRouter.post(
         throw new HttpError(StatusCodes.FORBIDDEN, "Không thể nhả đơn ở trạng thái này.");
       }
 
+      // Hoàn tiền tạm giữ COD nếu có
+      if (order.paymentMethod === PaymentMethod.COD && order.codHoldStatus === CodHoldStatus.HELD) {
+        if (order.codHoldAmount > 0) {
+          const { creditWallet } = await ensureDriverWallets(tx, order.driverId);
+          await releaseHeldToAvailable(tx, {
+            walletId: creditWallet.id,
+            type: WalletTransactionType.COD_HOLD_REFUND,
+            amount: order.codHoldAmount,
+            orderId: order.id,
+            paymentId: order.payment?.id,
+            note: "Hoàn tiền COD do tài xế nhả đơn",
+          });
+        }
+      }
+
       // Nhả đơn: Bỏ driverId, cho phép tài xế khác nhận
       await tx.order.update({
         where: { id: orderId },
         data: { 
           driverId: null,
+          codHoldStatus: order.paymentMethod === PaymentMethod.COD ? CodHoldStatus.NONE : undefined,
           note: order.note ? `${order.note} | Tài xế huỷ nhận chuyến: ${reason}` : `Tài xế huỷ nhận chuyến: ${reason}`
         },
       });
@@ -819,6 +873,17 @@ orderRouter.post(
         include: { store: true, items: true, payment: true },
       });
     });
+
+    try {
+      getIO().to(`user_${updated.userId}`).emit("order_cancellation_notice", {
+        orderId: updated.id,
+        action: "DRIVER_RELEASED",
+        actorRole: UserRole.DRIVER,
+        cancelReason: reason || "Tài xế huỷ nhận chuyến",
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancellation_notice", err);
+    }
 
     res.json({ data: toOrderResponse(updated) });
   }),
@@ -835,6 +900,8 @@ orderRouter.post(
     const { reason } = req.body;
     const user = req.user!;
 
+    const failReason = reason ? `Giao thất bại: ${reason}` : "Giao thất bại (Khách bom hàng)";
+    
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
@@ -850,7 +917,7 @@ orderRouter.post(
 
       await cancelOrderWithSettlementRollback(tx, {
         orderId,
-        reason: reason ? `Giao thất bại: ${reason}` : "Giao thất bại (Khách bom hàng)",
+        reason: failReason,
       });
 
       return tx.order.findUniqueOrThrow({
@@ -858,6 +925,17 @@ orderRouter.post(
         include: { store: true, items: true, payment: true },
       });
     });
+
+    try {
+      getIO().to(`user_${updated.userId}`).emit("order_cancellation_notice", {
+        orderId: updated.id,
+        action: "DELIVERY_FAILED",
+        actorRole: UserRole.DRIVER,
+        cancelReason: failReason,
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancellation_notice", err);
+    }
 
     res.json({ data: toOrderResponse(updated) });
   }),

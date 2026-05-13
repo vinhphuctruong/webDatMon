@@ -138,6 +138,8 @@ const ALERT_REPEAT_DURATION_MS = 60_000;
 const ALERT_REPEAT_INTERVAL_MS = 5_000;
 const VOICE_SEGMENT_GAP_MS = 20;
 const VOICE_SEGMENT_RATE = 1.2;
+const DEFAULT_STORE_REJECT_REASON =
+  "Quán tạm quá tải nên chưa thể nhận đơn lúc này. Mong bạn thông cảm.";
 
 const buildIncomingOrderVoiceMessage = (orderCode: string) => {
   const last4Digits = getPickupOrderCodeLast4Digits(orderCode);
@@ -168,6 +170,8 @@ export const IncomingStoreOrderAlert: FC = () => {
   const [incomingOrders, setIncomingOrders] = useState<StoreIncomingOrder[]>([]);
   const [processingOrderId, setProcessingOrderId] = useState<string | null>(null);
   const [processingAction, setProcessingAction] = useState<StoreOrderAction | null>(null);
+  const [rejectModalOrderId, setRejectModalOrderId] = useState<string | null>(null);
+  const [rejectReasonInput, setRejectReasonInput] = useState("");
   const [openingPermission, setOpeningPermission] = useState(false);
   const [lastDiagnostics, setLastDiagnostics] = useState("");
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -1024,40 +1028,59 @@ export const IncomingStoreOrderAlert: FC = () => {
     setProcessingAction(null);
   };
 
+  const closeRejectModal = () => {
+    setRejectModalOrderId(null);
+    setRejectReasonInput("");
+  };
+
   const handleViewOrder = (orderId: string) => {
     removeIncomingOrder(orderId);
     navigate(`/order-detail/${orderId}`);
   };
 
-  const requestReason = (title: string, defaultReason: string) => {
-    const input = window.prompt(title, defaultReason);
-    if (input == null) return null;
-    const reason = input.trim();
-    if (reason.length < 2) {
-      snackbarRef.current.openSnackbar({ type: "warning", text: "Lý do phải từ 2 ký tự" });
-      return null;
-    }
-    return reason;
-  };
-
   const handleOrderAction = async (orderId: string, action: StoreOrderAction) => {
     if (!orderId || processingOrderId || processingAction) return;
+
+    if (action === "reject") {
+      setRejectModalOrderId(orderId);
+      setRejectReasonInput("");
+      return;
+    }
+
     setProcessingOrderId(orderId);
     setProcessingAction(action);
 
     try {
-      if (action === "accept") {
-        await confirmStoreOrder(orderId);
-        snackbarRef.current.openSnackbar({ type: "success", text: "Đã nhận đơn mới" });
-      } else {
-        const reason = requestReason("Nhập lý do từ chối đơn", "Quán từ chối đơn");
-        if (!reason) {
-          resetProcessing();
-          return;
-        }
-        await cancelOrder(orderId, reason);
-        snackbarRef.current.openSnackbar({ type: "success", text: "Đã từ chối đơn mới" });
-      }
+      await confirmStoreOrder(orderId);
+      snackbarRef.current.openSnackbar({ type: "success", text: "Đã nhận đơn mới" });
+      removeIncomingOrder(orderId);
+      resetProcessing();
+    } catch (error: any) {
+      snackbarRef.current.openSnackbar({
+        type: "error",
+        text: error?.message || "Không xử lý được đơn hàng",
+      });
+      resetProcessing();
+    }
+  };
+
+  const submitRejectOrder = async () => {
+    const orderId = rejectModalOrderId;
+    if (!orderId || processingOrderId || processingAction) return;
+
+    const trimmedInput = rejectReasonInput.trim();
+    if (trimmedInput.length > 0 && trimmedInput.length < 2) {
+      snackbarRef.current.openSnackbar({ type: "warning", text: "Lý do phải từ 2 ký tự" });
+      return;
+    }
+    const finalReason = trimmedInput || DEFAULT_STORE_REJECT_REASON;
+
+    closeRejectModal();
+    setProcessingOrderId(orderId);
+    setProcessingAction("reject");
+    try {
+      await cancelOrder(orderId, finalReason);
+      snackbarRef.current.openSnackbar({ type: "success", text: "Đã từ chối đơn mới" });
       removeIncomingOrder(orderId);
       resetProcessing();
     } catch (error: any) {
@@ -1074,7 +1097,8 @@ export const IncomingStoreOrderAlert: FC = () => {
   }
 
   return (
-    <div
+    <>
+      <div
       style={{
         position: "fixed",
         left: 12,
@@ -1087,7 +1111,7 @@ export const IncomingStoreOrderAlert: FC = () => {
         overflowY: "auto",
         pointerEvents: "none",
       }}
-    >
+      >
       {incomingOrders.map((incomingOrder) => {
         const isPending = incomingOrder.status === "PENDING";
         const isProcessingThisOrder = processingOrderId === incomingOrder.id;
@@ -1129,7 +1153,7 @@ export const IncomingStoreOrderAlert: FC = () => {
                 <button
                   className="tm-interactive"
                   onClick={() => handleOrderAction(incomingOrder.id, "reject")}
-                  disabled={isProcessingThisOrder}
+                  disabled={isProcessingThisOrder || !!rejectModalOrderId}
                   style={{
                     flex: 1,
                     border: "1px solid #fecdd3",
@@ -1146,7 +1170,7 @@ export const IncomingStoreOrderAlert: FC = () => {
                 <button
                   className="tm-interactive"
                   onClick={() => handleOrderAction(incomingOrder.id, "accept")}
-                  disabled={isProcessingThisOrder}
+                  disabled={isProcessingThisOrder || !!rejectModalOrderId}
                   style={{
                     flex: 1,
                     border: "none",
@@ -1197,71 +1221,90 @@ export const IncomingStoreOrderAlert: FC = () => {
           </div>
         );
       })}
-      {hasPendingOrder && (
-        <div style={{ display: "grid", gap: 8, pointerEvents: "auto" }}>
-          <button
-            className="tm-interactive"
-            onClick={handleTestSound}
+      {/* Debug UI removed */}
+      </div>
+      {rejectModalOrderId && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 14000,
+            background: "rgba(0, 0, 0, 0.36)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+          onClick={closeRejectModal}
+        >
+          <div
+            className="tm-card"
             style={{
-              border: "1px solid var(--tm-border)",
-              borderRadius: 12,
-              background: "#fff",
-              color: "var(--tm-text-primary)",
-              padding: "10px 12px",
-              fontWeight: 700,
+              width: "100%",
+              maxWidth: 420,
+              padding: 14,
+              pointerEvents: "auto",
             }}
+            onClick={(event) => event.stopPropagation()}
           >
-            Kiểm tra chuông
-          </button>
-          <button
-            className="tm-interactive"
-            onClick={handleTestHaptic}
-            style={{
-              border: "1px solid var(--tm-border)",
-              borderRadius: 12,
-              background: "#fff",
-              color: "var(--tm-text-primary)",
-              padding: "10px 12px",
-              fontWeight: 700,
-            }}
-          >
-            Kiểm tra rung
-          </button>
-          <button
-            className="tm-interactive"
-            onClick={handleOpenPermissionSettings}
-            style={{
-              border: "1px solid #bfdbfe",
-              borderRadius: 12,
-              background: "#eff6ff",
-              color: "#1d4ed8",
-              padding: "10px 12px",
-              fontWeight: 700,
-            }}
-          >
-            {openingPermission ? "Đang mở quyền..." : "Bật quyền chuông/rung"}
-          </button>
-          <button
-            className="tm-interactive"
-            onClick={() => navigate("/orders")}
-            style={{
-              border: "none",
-              borderRadius: 12,
-              background: "var(--tm-primary)",
-              color: "#fff",
-              padding: "10px 12px",
-              fontWeight: 700,
-            }}
-          >
-            Mở danh sách đơn hàng
-          </button>
-          {!!lastDiagnostics && (
-            <Text size="xxSmall" style={{ color: "var(--tm-text-secondary)" }}>
-              {lastDiagnostics}
+            <Text style={{ fontWeight: 700, color: "var(--tm-text-primary)", marginBottom: 6 }}>
+              Lý do từ chối đơn
             </Text>
-          )}
+            <Text size="xSmall" style={{ color: "var(--tm-text-secondary)", marginBottom: 8 }}>
+              Bỏ trống để dùng lý do mặc định hợp lý cho khách.
+            </Text>
+            <textarea
+              value={rejectReasonInput}
+              onChange={(event) => setRejectReasonInput(event.target.value)}
+              placeholder={DEFAULT_STORE_REJECT_REASON}
+              rows={3}
+              style={{
+                width: "100%",
+                borderRadius: 10,
+                border: "1px solid var(--tm-border)",
+                padding: "10px 12px",
+                outline: "none",
+                resize: "none",
+                fontSize: 14,
+                color: "var(--tm-text-primary)",
+                background: "#fff",
+                boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button
+                className="tm-interactive"
+                onClick={closeRejectModal}
+                style={{
+                  flex: 1,
+                  border: "1px solid var(--tm-border)",
+                  borderRadius: 10,
+                  background: "#fff",
+                  padding: "10px 12px",
+                  fontWeight: 600,
+                }}
+              >
+                Đóng
+              </button>
+              <button
+                className="tm-interactive"
+                onClick={submitRejectOrder}
+                style={{
+                  flex: 1,
+                  border: "none",
+                  borderRadius: 10,
+                  background: "#ef4444",
+                  color: "#fff",
+                  padding: "10px 12px",
+                  fontWeight: 700,
+                }}
+              >
+                Xác nhận từ chối
+              </button>
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };

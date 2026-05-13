@@ -1,4 +1,7 @@
-import { atom, selector, selectorFamily } from "recoil";
+import { atom, selector, selectorFamily, RecoilEnv } from "recoil";
+
+// Suppress duplicate atom key warning during Vite HMR development
+RecoilEnv.RECOIL_DUPLICATE_ATOM_KEY_CHECKING_ENABLED = false;
 import { getLocation, getPhoneNumber, getUserInfo } from "zmp-sdk";
 import logo from "static/logo.png";
 import mockCategories from "./mock/categories.json";

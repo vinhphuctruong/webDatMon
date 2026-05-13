@@ -1,7 +1,7 @@
 import React, { FC, useCallback, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { ApiError } from "services/api";
+import { ApiError, clearApiSession } from "services/api";
 import { fetchDriverProfile, toggleOnline, fetchMyOrders } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
 
@@ -32,9 +32,17 @@ const HomePage: FC = () => {
       });
     } catch (err: any) {
       console.error(err);
-      if (err instanceof ApiError && err.status === 401) {
-        navigate("/login", { replace: true });
-        return;
+      if (err instanceof ApiError) {
+        if (err.status === 401) {
+          clearApiSession();
+          navigate("/login", { replace: true });
+          return;
+        }
+        if (err.status === 403) {
+          clearApiSession();
+          navigate("/register", { replace: true });
+          return;
+        }
       }
       openSnackbar({ type: "error", text: err?.message || "Không tải được dữ liệu tài xế" });
     } finally {

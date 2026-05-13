@@ -1,5 +1,6 @@
-﻿import React, { FC, useEffect, useMemo, useState } from "react";
+import React, { FC, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text } from "zmp-ui";
+import { useNavigate } from "react-router";
 import { fetchMyOrders } from "services/driver-api";
 import { DisplayPrice } from "components/display/price";
 import { formatStoreOrderCode } from "utils/order-code";
@@ -7,6 +8,7 @@ import { formatStoreOrderCode } from "utils/order-code";
 const OrdersPage: FC = () => {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchMyOrders()
@@ -14,7 +16,14 @@ const OrdersPage: FC = () => {
         const history = (res.data || []).filter((o: any) => ["DELIVERED", "CANCELLED", "FAILED"].includes(o.status));
         setOrders(history);
       })
-      .catch(console.error)
+      .catch((err: any) => {
+        console.error(err);
+        if (err.status === 401) {
+          navigate("/login", { replace: true });
+        } else if (err.status === 403) {
+          navigate("/register", { replace: true });
+        }
+      })
       .finally(() => setLoading(false));
   }, []);
 

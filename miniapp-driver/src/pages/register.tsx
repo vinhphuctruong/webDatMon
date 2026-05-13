@@ -1,7 +1,7 @@
-﻿import React, { FC, useState, useRef } from "react";
+import React, { FC, useState, useRef, useEffect } from "react";
 import { Box, Page, Text, Input, Button, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { apiFetch, requestEmailOtp } from "services/api";
+import { apiFetch, requestEmailOtp, clearApiSession } from "services/api";
 
 // ── Image Upload Component ──────────────────────────
 interface ImageUploadProps {
@@ -107,6 +107,11 @@ const RegisterPage: FC = () => {
   const [debugOtp, setDebugOtp] = useState("");
   const snackbar = useSnackbar();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Clear any ghost sessions to prevent redirection loops
+    clearApiSession();
+  }, []);
 
   const update = (key: string, value: string) => setForm({ ...form, [key]: value });
   const updateImage = (key: string, value: string) => setImages({ ...images, [key]: value });

@@ -1,4 +1,7 @@
-import { atom } from "recoil";
+import { atom, RecoilEnv } from "recoil";
+
+// Suppress duplicate atom key warning during Vite HMR development
+RecoilEnv.RECOIL_DUPLICATE_ATOM_KEY_CHECKING_ENABLED = false;
 
 export const driverProfileState = atom<any | null>({
   key: "driverProfile",

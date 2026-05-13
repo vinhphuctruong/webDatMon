@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
 import { Page, Box, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
 import { vibrate as zmpVibrate } from "zmp-sdk";
@@ -22,15 +22,28 @@ const OrdersPage = () => {
   const knownPendingOrderIdsRef = useRef<Set<string>>(new Set());
   const didBootstrapOrdersRef = useRef(false);
 
-  const requestReason = (title: string, defaultReason: string) => {
-    const input = window.prompt(title, defaultReason);
-    if (input == null) return null;
-    const reason = input.trim();
-    if (reason.length < 2) {
-      openSnackbar({ text: "Lý do phải từ 2 ký tự", type: "warning" });
-      return null;
-    }
-    return reason;
+  const [promptState, setPromptState] = useState<{
+    title: string;
+    defaultValue: string;
+    onConfirm: (val: string) => void;
+    onCancel: () => void;
+  } | null>(null);
+
+  const requestReason = (title: string, defaultReason: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      setPromptState({
+        title,
+        defaultValue: defaultReason,
+        onConfirm: (val) => {
+          setPromptState(null);
+          resolve(val);
+        },
+        onCancel: () => {
+          setPromptState(null);
+          resolve(null);
+        },
+      });
+    });
   };
 
   const playNewOrderAlert = useCallback(async () => {
@@ -117,12 +130,12 @@ const OrdersPage = () => {
       } else if (action === "REJECT") {
         const target = orders.find((order) => order.id === orderId);
         if (target?.cancelRequestStatus === "PENDING") {
-          const reason = requestReason("Nhập lý do từ chối yêu cầu hủy", "Quán từ chối yêu cầu huỷ");
+          const reason = await requestReason("Nhập lý do từ chối yêu cầu hủy", "Quán từ chối yêu cầu huỷ");
           if (!reason) return;
           await rejectOrderCancelRequest(orderId, reason);
           openSnackbar({ text: "Đã từ chối yêu cầu huỷ", type: "success" });
         } else {
-          const reason = requestReason("Nhập lý do từ chối đơn", "Quán từ chối đơn");
+          const reason = await requestReason("Nhập lý do từ chối đơn", "Quán từ chối đơn");
           if (!reason) return;
           await cancelOrder(orderId, reason);
           openSnackbar({ text: "Đã từ chối đơn", type: "success" });
@@ -277,7 +290,7 @@ const OrdersPage = () => {
                         className="tm-interactive"
                         onClick={async (e) => {
                           e.stopPropagation();
-                          const reason = requestReason("Nhập lý do duyệt hủy", "Quán duyệt yêu cầu huỷ");
+                          const reason = await requestReason("Nhập lý do duyệt hủy", "Quán duyệt yêu cầu huỷ");
                           if (!reason) return;
                           try {
                             await approveOrderCancelRequest(order.id, reason);
@@ -335,7 +348,7 @@ const OrdersPage = () => {
                       className="tm-interactive"
                       onClick={async (e) => {
                         e.stopPropagation();
-                        const reason = requestReason(
+                        const reason = await requestReason(
                           "Nhập lý do hủy đơn",
                           "Quán huỷ đơn trước khi tài xế lấy hàng",
                         );
@@ -375,6 +388,91 @@ const OrdersPage = () => {
           </div>
         )}
       </Box>
+
+      {promptState && (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 14000,
+            background: "rgba(0, 0, 0, 0.4)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 340,
+              background: "#fff",
+              borderRadius: 16,
+              padding: 20,
+              boxShadow: "0 10px 25px rgba(0,0,0,0.2)",
+            }}
+          >
+            <Text.Title style={{ fontSize: 18, marginBottom: 12, textAlign: "center" }}>
+              {promptState.title}
+            </Text.Title>
+            <textarea
+              autoFocus
+              id="promptInput"
+              defaultValue={promptState.defaultValue}
+              rows={3}
+              style={{
+                width: "100%",
+                borderRadius: 12,
+                border: "1px solid var(--tm-border)",
+                padding: "12px",
+                outline: "none",
+                resize: "none",
+                fontSize: 15,
+                background: "#f9fafb",
+                boxSizing: "border-box",
+                marginBottom: 16,
+              }}
+            />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                onClick={promptState.onCancel}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: "1px solid #d1d5db",
+                  background: "#fff",
+                  fontWeight: 600,
+                  color: "#374151",
+                }}
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={() => {
+                  const val = (document.getElementById("promptInput") as HTMLTextAreaElement).value.trim();
+                  if (val.length < 2) {
+                    openSnackbar({ text: "Lý do phải từ 2 ký tự", type: "warning" });
+                    return;
+                  }
+                  promptState.onConfirm(val);
+                }}
+                style={{
+                  flex: 1,
+                  padding: "12px",
+                  borderRadius: 12,
+                  border: "none",
+                  background: "var(--tm-primary)",
+                  fontWeight: 700,
+                  color: "#fff",
+                }}
+              >
+                Xác nhận
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </Page>
   );
 };

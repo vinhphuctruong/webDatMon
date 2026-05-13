@@ -1,5 +1,6 @@
 import React, { FC, useEffect, useMemo, useState } from "react";
 import { Box, Page, Text, Icon, Modal, Input, Button, useSnackbar } from "zmp-ui";
+import { useNavigate } from "react-router";
 import { 
   fetchMyWallets, 
   fetchWalletTransactions, 
@@ -14,6 +15,7 @@ const WalletPage: FC = () => {
   const [transactions, setTransactions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const snackbar = useSnackbar();
+  const navigate = useNavigate();
 
   // Modals state
   const [topupVisible, setTopupVisible] = useState(false);
@@ -35,8 +37,13 @@ const WalletPage: FC = () => {
       }
       const txRes = await fetchWalletTransactions();
       setTransactions(txRes.data || []);
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      if (err.status === 401) {
+        navigate("/login", { replace: true });
+      } else if (err.status === 403) {
+        navigate("/register", { replace: true });
+      }
     } finally {
       setLoading(false);
     }
