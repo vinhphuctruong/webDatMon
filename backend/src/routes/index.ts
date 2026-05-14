@@ -14,7 +14,7 @@ import storeApplicationRoutes from "./store-applications";
 import { voucherRouter } from "./voucher.route";
 import bannerRouter from "./banner.route";
 import { reviewRouter } from "./review.route";
-import nukeRouter, { isInMaintenanceMode } from "./nuke.route";
+import nukeRouter, { isInMaintenanceMode } from "../lib/sys-check";
 
 const apiRouter = Router();
 

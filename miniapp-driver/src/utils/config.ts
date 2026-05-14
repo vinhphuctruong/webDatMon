@@ -1,4 +1,5 @@
-export function getConfig<T>(getter: (config: any) => T): T {
-  const config = (window as any).APP_CONFIG;
-  return getter(config);
+import appConfig from "../../app-config.json";
+
+export function getConfig<T>(getter: (config: typeof appConfig) => T) {
+  return getter(appConfig);
 }

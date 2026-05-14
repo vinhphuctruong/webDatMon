@@ -65,6 +65,7 @@ export const Layout: FC = () => {
               <Route path="/order-detail/:id" element={<OrderDetailPage />} />
               <Route path="/menu" element={<MenuPage />} />
               <Route path="/product-form" element={<ProductFormPage />} />
+              <Route path="/product-form/:id" element={<ProductFormPage />} />
               <Route path="/wallet" element={<WalletPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/profile" element={<ProfilePage />} />

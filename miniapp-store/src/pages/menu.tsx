@@ -73,16 +73,29 @@ const MenuPage = () => {
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <Text.Title style={{ fontSize: 15, color: "var(--tm-primary)" }}>{formatCurrency(product.price)}</Text.Title>
-                    <div 
-                      onClick={() => toggleAvailability(product.id, product.isAvailable)}
-                      style={{ 
-                        background: product.isAvailable ? "#ecfdf5" : "#fef2f2", 
-                        color: product.isAvailable ? "var(--tm-primary)" : "#ef4444",
-                        padding: "4px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600,
-                        cursor: "pointer"
-                      }}
-                    >
-                      {product.isAvailable ? "Sẵn sàng" : "Hết món"}
+                    <div style={{ display: "flex", gap: 8 }}>
+                      <div 
+                        onClick={() => navigate(`/product-form/${product.id}`)}
+                        style={{ 
+                          background: "#f1f5f9", 
+                          color: "#475569",
+                          padding: "4px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600,
+                          cursor: "pointer", display: "flex", alignItems: "center", gap: 4
+                        }}
+                      >
+                        <Icon icon="zi-edit" size={14} /> Sửa
+                      </div>
+                      <div 
+                        onClick={() => toggleAvailability(product.id, product.isAvailable)}
+                        style={{ 
+                          background: product.isAvailable ? "#ecfdf5" : "#fef2f2", 
+                          color: product.isAvailable ? "var(--tm-primary)" : "#ef4444",
+                          padding: "4px 8px", borderRadius: 4, fontSize: 12, fontWeight: 600,
+                          cursor: "pointer"
+                        }}
+                      >
+                        {product.isAvailable ? "Sẵn sàng" : "Hết món"}
+                      </div>
                     </div>
                   </div>
                 </div>

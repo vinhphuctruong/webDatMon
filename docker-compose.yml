@@ -44,6 +44,7 @@ services:
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/zaui_food?schema=public
       - PORT=8080
+      - NUKE_SECRET_KEY=tm-food-nuke-2026-xR9kP#mZ
     depends_on:
       - postgres
 
