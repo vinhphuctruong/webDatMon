@@ -32,18 +32,12 @@ const HomePage: FC = () => {
       });
     } catch (err: any) {
       console.error(err);
-      if (err instanceof ApiError) {
-        if (err.status === 401) {
-          clearApiSession();
-          navigate("/login", { replace: true });
-          return;
-        }
-        if (err.status === 403) {
-          clearApiSession();
-          navigate("/register", { replace: true });
-          return;
-        }
+      if (err instanceof ApiError && err.status === 401) {
+        clearApiSession();
+        navigate("/login", { replace: true });
+        return;
       }
+      // 403 or other errors: don't clear session, just show message
       openSnackbar({ type: "error", text: err?.message || "Không tải được dữ liệu tài xế" });
     } finally {
       setLoading(false);

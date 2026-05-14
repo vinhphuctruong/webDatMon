@@ -11,6 +11,24 @@ export class ApiError extends Error {
   }
 }
 
+/* ── Global auth event bus ────────────────────────────────── */
+
+type SessionEventCallback = (reason: string) => void;
+const sessionExpiredListeners = new Set<SessionEventCallback>();
+
+export function onSessionExpired(cb: SessionEventCallback) {
+  sessionExpiredListeners.add(cb);
+  return () => { sessionExpiredListeners.delete(cb); };
+}
+
+export function fireSessionExpired(reason: string) {
+  writeSession(null);
+  setAutoDemoLoginBlocked(true);
+  for (const cb of sessionExpiredListeners) {
+    try { cb(reason); } catch (_) { /* swallow */ }
+  }
+}
+
 interface Session {
   accessToken: string;
   refreshToken: string;
@@ -300,7 +318,17 @@ export async function apiFetch<T>(
   try {
     return await request<T>(path, init, session.accessToken);
   } catch (error) {
-    if (!(error instanceof ApiError) || error.status !== 401) {
+    if (error instanceof ApiError) {
+      // 403 from requireRole → user has wrong role, force re-login
+      if (error.status === 403 && error.message.includes("không có quyền")) {
+        fireSessionExpired("Phiên đăng nhập không hợp lệ. Vui lòng đăng nhập lại bằng tài khoản khách hàng.");
+        throw error;
+      }
+
+      if (error.status !== 401) {
+        throw error;
+      }
+    } else {
       throw error;
     }
 
@@ -311,7 +339,7 @@ export async function apiFetch<T>(
       if (_refreshError instanceof ApiError && _refreshError.status === 0) {
         throw _refreshError;
       }
-      writeSession(null);
+      fireSessionExpired("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.");
       throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại", 401);
     }
   }
@@ -338,6 +366,14 @@ export async function loginWithCredentials(payload: LoginPayload): Promise<AuthU
     method: "POST",
     body: JSON.stringify({ ...payload, role: "CUSTOMER" }),
   });
+
+  // Validate: only CUSTOMER role is allowed in this mini-app
+  if (response.user.role !== "CUSTOMER") {
+    throw new ApiError(
+      "Tài khoản này không phải tài khoản khách hàng. Vui lòng đăng nhập bằng email khách hàng.",
+      403,
+    );
+  }
 
   setAutoDemoLoginBlocked(false);
   writeSession(response.tokens);

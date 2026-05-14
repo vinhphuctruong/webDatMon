@@ -242,8 +242,10 @@ export async function apiFetch<T>(
       return await request<T>(path, init, session.accessToken);
     } catch (_refreshError: any) {
       if (_refreshError instanceof ApiError && _refreshError.status === 0) {
+        // Network error — keep session, let driver retry later
         throw _refreshError;
       }
+      // Definitive auth rejection — session is truly expired
       writeSession(null);
       throw new ApiError("Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại", 401);
     }

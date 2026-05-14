@@ -21,6 +21,7 @@ import { ScrollRestoration } from "./scroll-restoration";
 import { useHandlePayment, useSyncBackendState } from "hooks";
 import { ErrorBoundary } from "./error-boundary";
 import { OrderCancelNoticeListener } from "./order-cancel-notice-listener";
+import { SessionExpiredGuard } from "./session-expired-guard";
 
 if (import.meta.env.DEV) {
   document.body.style.setProperty("--zaui-safe-area-inset-top", "24px");
@@ -42,6 +43,7 @@ export const Layout: FC = () => {
     <Box flex flexDirection="column" className="h-screen">
       <ScrollRestoration />
       <OrderCancelNoticeListener />
+      <SessionExpiredGuard />
       <Box className="flex-1 flex flex-col overflow-hidden">
         <ErrorBoundary>
           <Suspense

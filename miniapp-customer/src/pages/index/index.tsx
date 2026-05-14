@@ -6,7 +6,7 @@ import { Banner } from "./banner";
 import { Categories } from "./categories";
 import { Recommend } from "./recommend";
 import { ProductList } from "./product-list";
-import { clearApiSession, fetchMyProfile } from "services/api";
+import { fireSessionExpired, fetchMyProfile } from "services/api";
 import { ActiveOrderBanner } from "components/active-order-banner";
 import { LocationGate } from "components/location-gate";
 
@@ -19,7 +19,12 @@ const HomePage: React.FunctionComponent = () => {
     fetchMyProfile()
       .then((profile) => {
         if (!active) return;
-        // console.log("Profile fetched", profile);
+        // Validate role: only CUSTOMER is allowed in this mini-app
+        if (profile.role && profile.role !== "CUSTOMER") {
+          fireSessionExpired(
+            "Tài khoản hiện tại không phải khách hàng. Vui lòng đăng nhập lại."
+          );
+        }
       })
       .catch(() => {
         if (!active) return;

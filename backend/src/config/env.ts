@@ -23,7 +23,7 @@ const envSchema = z.object({
   JWT_ACCESS_SECRET: z.string().min(16),
   JWT_REFRESH_SECRET: z.string().min(16),
   JWT_ACCESS_EXPIRES_IN: z.string().default("15m"),
-  JWT_REFRESH_EXPIRES_IN: z.string().default("30d"),
+  JWT_REFRESH_EXPIRES_IN: z.string().default("365d"),
   CORS_ORIGIN: z.string().default("http://localhost:3000"),
   GOOGLE_SMTP_USER: optionalEmail,
   GOOGLE_SMTP_APP_PASSWORD: optionalSecret,

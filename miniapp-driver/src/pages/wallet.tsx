@@ -41,8 +41,6 @@ const WalletPage: FC = () => {
       console.error(err);
       if (err.status === 401) {
         navigate("/login", { replace: true });
-      } else if (err.status === 403) {
-        navigate("/register", { replace: true });
       }
     } finally {
       setLoading(false);

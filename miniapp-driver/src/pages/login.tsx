@@ -1,7 +1,7 @@
 import React, { FC, useState, useEffect } from "react";
 import { Box, Page, Text, useSnackbar } from "zmp-ui";
 import { useNavigate } from "react-router";
-import { loginWithCredentials, clearApiSession } from "services/api";
+import { loginWithCredentials, hasSessionAsync } from "services/api";
 
 const LoginPage: FC = () => {
   const [email, setEmail] = useState("");
@@ -12,8 +12,10 @@ const LoginPage: FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Break any session loops by ensuring user is cleanly logged out when visiting login page
-    clearApiSession();
+    // If driver already has a valid session, skip login and go home
+    hasSessionAsync().then((has) => {
+      if (has) navigate("/", { replace: true });
+    });
   }, []);
 
   const handleLogin = async (event: React.FormEvent) => {
