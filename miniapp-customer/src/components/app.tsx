@@ -5,6 +5,7 @@ import { RecoilRoot } from "recoil";
 import { getConfig } from "utils/config";
 import { Layout } from "./layout";
 import { ConfigProvider } from "./config-provider";
+import { MaintenanceGate } from "./maintenance-gate";
 
 const MyApp = () => {
   React.useEffect(() => {
@@ -23,9 +24,11 @@ const MyApp = () => {
       >
         <App>
           <SnackbarProvider>
-            <ZMPRouter>
-              <Layout />
-            </ZMPRouter>
+            <MaintenanceGate>
+              <ZMPRouter>
+                <Layout />
+              </ZMPRouter>
+            </MaintenanceGate>
           </SnackbarProvider>
         </App>
       </ConfigProvider>
@@ -33,3 +36,4 @@ const MyApp = () => {
   );
 };
 export default MyApp;
+

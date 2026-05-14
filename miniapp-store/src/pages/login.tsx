@@ -8,7 +8,7 @@ const LoginPage = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
+
   const { openSnackbar } = useSnackbar();
   const navigate = useNavigate();
   const location = useLocation();
@@ -42,7 +42,7 @@ const LoginPage = () => {
     try {
       const user = await loginWithCredentials({ email: email.trim(), password });
       openSnackbar({ text: "Đăng nhập thành công", type: "success" });
-      
+
       if (user.role === "STORE_MANAGER" || user.role === "ADMIN") {
         navigate("/");
       } else {
@@ -105,12 +105,12 @@ const LoginPage = () => {
           {isRegisterIntent ? (
             <div style={{ marginBottom: 16, padding: 12, borderRadius: 8, background: "#fff3ed", border: "1px solid #ffdec7" }}>
               <Text size="small" style={{ color: "#c2410c", fontWeight: 500 }}>
-                Vui lòng đăng nhập tài khoản Zaui Food của bạn để tiếp tục Đăng ký mở quán.
+                Vui lòng đăng nhập tài khoản TM Food của bạn để tiếp tục Đăng ký mở quán.
               </Text>
             </div>
           ) : null}
           <Text.Title style={{ fontSize: 18, marginBottom: 16 }}>Đăng nhập</Text.Title>
-          
+
           <div style={{ display: "grid", gap: 12 }}>
             <input
               type="email"
@@ -123,7 +123,7 @@ const LoginPage = () => {
                 padding: "12px 14px",
               }}
             />
-            
+
             <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8 }}>
               <input
                 type={showPassword ? "text" : "password"}
@@ -151,7 +151,7 @@ const LoginPage = () => {
                 {showPassword ? "Ẩn" : "Hiện"}
               </button>
             </div>
-            
+
             <div style={{ textAlign: "right", marginTop: -4 }}>
               <button
                 type="button"
@@ -185,7 +185,7 @@ const LoginPage = () => {
             >
               {submitting ? "Đang xử lý..." : "Đăng nhập"}
             </button>
-            
+
             <button
               type="button"
               onClick={() => navigate("/register-account")}

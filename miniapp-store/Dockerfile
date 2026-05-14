@@ -22,7 +22,7 @@ COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Copy the built files from the previous stage
 # Note: Vite usually outputs to dist, but ZMP might output to www. We should copy dist (or www)
-COPY --from=builder /app/www /usr/share/nginx/html
+COPY --from=builder /app/src/www /usr/share/nginx/html
 
 EXPOSE 80
 

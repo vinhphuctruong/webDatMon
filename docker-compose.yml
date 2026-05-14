@@ -1,4 +1,4 @@
-version: "3.9"
+version: "3.7"
 
 services:
   postgres:
@@ -29,8 +29,7 @@ services:
     ports:
       - "5050:80"
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
 
   backend:
     build:
@@ -42,21 +41,44 @@ services:
       - "8080:8080"
     env_file:
       - ./backend/.env
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/zaui_food?schema=public
+      - PORT=8080
     depends_on:
-      postgres:
-        condition: service_healthy
+      - postgres
 
-  frontend:
+  admin-frontend:
     build:
-      context: ./miniapp-customer
+      context: ./admin-portal
       dockerfile: Dockerfile
-    container_name: zaui-food-frontend
+    container_name: zaui-food-admin
     restart: unless-stopped
-    ports:
-      - "3000:80"
     depends_on:
       - backend
 
+  nginx-proxy:
+    image: nginx:alpine
+    container_name: zaui-food-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx-proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - certbot_www:/var/www/certbot:ro
+      - certbot_certs:/etc/letsencrypt:ro
+    depends_on:
+      - admin-frontend
+      - backend
+
+  certbot:
+    image: certbot/certbot
+    container_name: zaui-food-certbot
+    volumes:
+      - certbot_www:/var/www/certbot
+      - certbot_certs:/etc/letsencrypt
+
 volumes:
   zaui_food_pgdata:
-
+  certbot_www:
+  certbot_certs:

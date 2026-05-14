@@ -852,7 +852,7 @@ orderRouter.post(
             type: WalletTransactionType.COD_HOLD_REFUND,
             amount: order.codHoldAmount,
             orderId: order.id,
-            paymentId: order.payment?.id,
+            paymentId: undefined,
             note: "Hoàn tiền COD do tài xế nhả đơn",
           });
         }

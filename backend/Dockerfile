@@ -10,7 +10,7 @@ RUN npx prisma generate
 
 COPY tsconfig.json ./
 COPY src ./src
-COPY admin ./admin
+
 COPY customer ./customer
 COPY driver ./driver
 COPY landing ./landing

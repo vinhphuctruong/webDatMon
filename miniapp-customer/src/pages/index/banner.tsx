@@ -1,4 +1,4 @@
-﻿import React, { FC, useEffect, useState } from "react";
+import React, { FC, useEffect, useState } from "react";
 import { Autoplay, Pagination } from "swiper";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Box, Text } from "zmp-ui";
@@ -12,12 +12,6 @@ interface BannerItem {
   sortOrder: number;
   isActive: boolean;
 }
-
-const FALLBACK_BANNERS: BannerItem[] = [
-  { id: "f1", title: "Giảm 50% cho đơn đầu tiên ", imageUrl: "", link: null, sortOrder: 0, isActive: true },
-  { id: "f2", title: "Freeship đơn từ 49K ", imageUrl: "", link: null, sortOrder: 1, isActive: true },
-  { id: "f3", title: "Combo trưa chỉ từ 39K ", imageUrl: "", link: null, sortOrder: 2, isActive: true },
-];
 
 const GRADIENT_COLORS = [
   "linear-gradient(135deg, #00a96d 0%, #00c97d 60%, #34d399 100%)",
@@ -72,13 +66,13 @@ export const Banner: FC = () => {
     apiFetch<{ data: BannerItem[] }>("/banners")
       .then((res) => {
         const active = (res.data || []).filter((b) => b.isActive);
-        setBanners(active.length > 0 ? active : FALLBACK_BANNERS);
+        setBanners(active);
       })
-      .catch(() => setBanners(FALLBACK_BANNERS))
+      .catch(() => setBanners([]))
       .finally(() => setLoaded(true));
   }, []);
 
-  if (!loaded) return null;
+  if (!loaded || banners.length === 0) return null;
 
   return (
     <Box className="bg-white">
@@ -131,3 +125,4 @@ export const Banner: FC = () => {
     </Box>
   );
 };
+
