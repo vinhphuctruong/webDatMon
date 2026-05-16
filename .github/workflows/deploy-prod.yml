@@ -1,0 +1,102 @@
+name: Deploy Production
+
+on:
+  workflow_run:
+    workflows:
+      - Release Images
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy (e.g. sha-abc123). Leave empty to use current commit SHA."
+        required: false
+        type: string
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  deploy:
+    name: Deploy to VPS (Production)
+    runs-on: ubuntu-latest
+    environment: production
+    if: >
+      (github.event_name == 'workflow_dispatch')
+      || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success')
+
+    steps:
+      - name: Resolve image tag
+        id: vars
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" && -n "${{ inputs.image_tag }}" ]]; then
+            echo "image_tag=${{ inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_EVENT_NAME}" == "workflow_run" ]]; then
+            echo "image_tag=sha-${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=sha-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy over SSH
+        uses: appleboy/ssh-action@v1.2.0
+        env:
+          IMAGE_TAG: ${{ steps.vars.outputs.image_tag }}
+          APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          GHCR_USER: ${{ secrets.GHCR_USER }}
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
+          API_HEALTH_URL: ${{ secrets.API_HEALTH_URL }}
+          ADMIN_HEALTH_URL: ${{ secrets.ADMIN_HEALTH_URL }}
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          port: ${{ secrets.VPS_PORT }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          envs: IMAGE_TAG,APP_DIR,GHCR_USER,GHCR_READ_TOKEN,API_HEALTH_URL,ADMIN_HEALTH_URL
+          script: |
+            set -euo pipefail
+
+            if [ -z "${APP_DIR}" ]; then
+              echo "APP_DIR secret is missing"
+              exit 1
+            fi
+
+            cd "${APP_DIR}"
+
+            if [ ! -f "docker-compose.yml" ]; then
+              echo "docker-compose.yml not found in ${APP_DIR}"
+              exit 1
+            fi
+
+            if [ ! -f "docker-compose.prod.yml" ]; then
+              echo "docker-compose.prod.yml not found in ${APP_DIR}. Create this file for production image-based deploy."
+              exit 1
+            fi
+
+            PREV_TAG="$(cat .deployed_image_tag 2>/dev/null || true)"
+            echo "Deploying IMAGE_TAG=${IMAGE_TAG}"
+            printf "IMAGE_TAG=%s\n" "${IMAGE_TAG}" > .deploy.env
+
+            if [ -n "${GHCR_USER}" ] && [ -n "${GHCR_READ_TOKEN}" ]; then
+              echo "${GHCR_READ_TOKEN}" | docker login ghcr.io -u "${GHCR_USER}" --password-stdin
+            fi
+
+            docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.prod.yml pull backend admin-frontend
+            docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.prod.yml up -d backend admin-frontend nginx-proxy
+
+            docker compose --env-file .deploy.env -f docker-compose.yml -f docker-compose.prod.yml exec -T backend npm run prisma:deploy
+
+            API_URL="${API_HEALTH_URL:-https://api.116.118.22.122.nip.io/api/v1/health}"
+            ADMIN_URL="${ADMIN_HEALTH_URL:-https://admin.116.118.22.122.nip.io/}"
+
+            curl -fsS "${API_URL}" >/dev/null
+            curl -fsS "${ADMIN_URL}" >/dev/null
+
+            echo "${IMAGE_TAG}" > .deployed_image_tag
+            echo "Deploy successful: ${IMAGE_TAG}"
