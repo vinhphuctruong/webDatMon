@@ -40,7 +40,6 @@ Update secrets in `.env` before production deployment.
 npm install
 npm run prisma:generate
 npm run prisma:migrate -- --name init
-npm run prisma:seed
 ```
 
 ## 4) Run API
@@ -55,13 +54,6 @@ Admin web URL: `http://localhost:8081/admin`
 Store Manager web URL: `http://localhost:8081/partner`
 Customer web URL: `http://localhost:8081/customer`
 Driver web URL: `http://localhost:8081/driver`
-
-## Demo users (from seed)
-
-- Admin: `admin@zauifood.local` / `12345678`
-- Customer: `customer@zauifood.local` / `12345678`
-- Store manager sample: `manager1@zauifood.local` / `12345678`
-- Driver: `driver1@zauifood.local` / `12345678`
 
 ## Main endpoints
 

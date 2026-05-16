@@ -1,24 +1,42 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Box, Text, Button } from "zmp-ui";
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL?.trim() || "/api/v1").replace(/\/$/, "");
-
-const HEALTH_CHECK_URL = `${API_BASE_URL}/categories`;
+const DEFAULT_API_BASE_URL = "/api/v1";
+const CONFIGURED_API_BASE_URL = (import.meta.env.VITE_API_BASE_URL?.trim() || DEFAULT_API_BASE_URL).replace(/\/$/, "");
 const RETRY_INTERVAL_MS = 10_000;
 
-async function checkBackendHealth(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(HEALTH_CHECK_URL, {
-      signal: controller.signal,
-      headers: { "ngrok-skip-browser-warning": "true" },
-    });
-    clearTimeout(timeout);
-    return res.ok;
-  } catch {
-    return false;
+function getHealthCheckCandidates() {
+  const candidates = new Set<string>();
+  candidates.add(`${DEFAULT_API_BASE_URL}/categories`);
+
+  if (CONFIGURED_API_BASE_URL) {
+    candidates.add(`${CONFIGURED_API_BASE_URL}/categories`);
+
+    if (typeof window !== "undefined" && window.location.protocol === "https:") {
+      const secureVariant = CONFIGURED_API_BASE_URL.replace(/^http:\/\//i, "https://");
+      candidates.add(`${secureVariant}/categories`);
+    }
   }
+
+  return Array.from(candidates);
+}
+
+async function checkBackendHealth(): Promise<boolean> {
+  for (const url of getHealthCheckCandidates()) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 6000);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: { "ngrok-skip-browser-warning": "true" },
+      });
+      clearTimeout(timeout);
+      if (res.ok) return true;
+    } catch {
+      // try next candidate
+    }
+  }
+  return false;
 }
 
 export const MaintenanceGate: React.FC<{ children: React.ReactNode }> = ({ children }) => {

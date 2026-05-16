@@ -1,4 +1,5 @@
 import {
+  CancelRequestStatus,
   OrderStatus,
   PaymentMethod,
   PaymentStatus,
@@ -63,6 +64,29 @@ const updateStatusSchema = z.object({
   cancelReason: z.string().max(255).optional(),
 });
 
+const cancelReasonSchema = z.object({
+  reason: z.string().trim().min(3).max(255).optional(),
+});
+
+const cancelReviewSchema = z.object({
+  reason: z.string().trim().min(3).max(255).optional(),
+});
+
+function normalizeCancelReason(
+  reason: string | undefined,
+  fallback: string,
+) {
+  if (!reason) return fallback;
+  const trimmed = reason.trim();
+  return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function assertNotTerminalOrder(orderStatus: OrderStatus) {
+  if (orderStatus === OrderStatus.CANCELLED || orderStatus === OrderStatus.DELIVERED) {
+    throw new HttpError(StatusCodes.BAD_REQUEST, "Đơn hàng đã kết thúc, không thể thực hiện thao tác này");
+  }
+}
+
 function toOrderResponse(order: any) {
   return {
     id: order.id,
@@ -89,6 +113,8 @@ function toOrderResponse(order: any) {
     estimatedDeliveryAt: order.estimatedDeliveryAt,
     completedAt: order.completedAt,
     customerConfirmedAt: order.customerConfirmedAt ?? null,
+    cancelRequestStatus: order.cancelRequestStatus ?? CancelRequestStatus.NONE,
+    cancelReason: order.cancelReason ?? null,
     placedAt: order.placedAt,
     createdAt: order.createdAt,
     userId: order.userId,
@@ -624,6 +650,16 @@ orderRouter.patch(
           orderId,
           reason: payload.cancelReason,
         });
+        await tx.order.update({
+          where: { id: orderId },
+          data: {
+            cancelRequestStatus:
+              existing.cancelRequestStatus === CancelRequestStatus.PENDING
+                ? CancelRequestStatus.APPROVED
+                : existing.cancelRequestStatus,
+            cancelReason: payload.cancelReason ?? existing.cancelReason,
+          },
+        });
       } else if (payload.status === OrderStatus.DELIVERED) {
         await settleDeliveredOrder(tx, {
           orderId,
@@ -746,6 +782,201 @@ orderRouter.post(
 );
 
 // --------------------------------------------------------------------------------
+// Cancel Request workflow (customer requests, store/admin reviews)
+// --------------------------------------------------------------------------------
+orderRouter.post(
+  "/:orderId/request-cancel",
+  requireRole(UserRole.CUSTOMER),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const payload = cancelReasonSchema.parse(req.body ?? {});
+    const user = req.user!;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+      if (order.userId !== user.id) {
+        throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của bạn");
+      }
+
+      assertNotTerminalOrder(order.status);
+
+      const usedReason = normalizeCancelReason(
+        payload.reason,
+        "Khách hàng yêu cầu huỷ đơn",
+      );
+
+      // Keep flow simple: customer can still self-cancel directly while order is pending.
+      if (order.status === OrderStatus.PENDING) {
+        await cancelOrderWithSettlementRollback(tx, {
+          orderId,
+          reason: usedReason,
+        });
+
+        return tx.order.update({
+          where: { id: orderId },
+          data: {
+            cancelRequestStatus: CancelRequestStatus.APPROVED,
+            cancelReason: usedReason,
+          },
+          include: { store: true, items: true, payment: true },
+        });
+      }
+
+      if (
+        order.status !== OrderStatus.CONFIRMED
+        && order.status !== OrderStatus.PREPARING
+      ) {
+        throw new HttpError(
+          StatusCodes.BAD_REQUEST,
+          "Đơn không còn trong giai đoạn cho phép gửi yêu cầu huỷ",
+        );
+      }
+
+      if (order.cancelRequestStatus === CancelRequestStatus.PENDING) {
+        throw new HttpError(StatusCodes.CONFLICT, "Yêu cầu huỷ đang chờ xử lý");
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          cancelRequestStatus: CancelRequestStatus.PENDING,
+          cancelReason: usedReason,
+        },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    try {
+      getIO().to(`store_${updated.storeId}`).emit("order_cancel_request_created", {
+        orderId: updated.id,
+        cancelReason: updated.cancelReason,
+        actorRole: UserRole.CUSTOMER,
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancel_request_created", err);
+    }
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+orderRouter.post(
+  "/:orderId/cancel-request/approve",
+  requireRole(UserRole.STORE_MANAGER, UserRole.ADMIN),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const payload = cancelReviewSchema.parse(req.body ?? {});
+    const user = req.user!;
+    const usedReason = normalizeCancelReason(payload.reason, "Yêu cầu huỷ được duyệt");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+
+      if (user.role === UserRole.STORE_MANAGER) {
+        const managedStore = await tx.store.findFirst({
+          where: { managerId: user.id },
+          select: { id: true },
+        });
+        if (!managedStore || managedStore.id !== order.storeId) {
+          throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của cửa hàng bạn");
+        }
+      }
+
+      assertNotTerminalOrder(order.status);
+
+      if (order.cancelRequestStatus !== CancelRequestStatus.PENDING) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Không có yêu cầu huỷ đang chờ xử lý");
+      }
+
+      await cancelOrderWithSettlementRollback(tx, {
+        orderId,
+        reason: usedReason,
+      });
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          cancelRequestStatus: CancelRequestStatus.APPROVED,
+          cancelReason: usedReason,
+        },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    try {
+      getIO().to(`user_${updated.userId}`).emit("order_cancellation_notice", {
+        orderId: updated.id,
+        action: "ORDER_CANCELLED",
+        actorRole: user.role,
+        cancelReason: usedReason,
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancellation_notice", err);
+    }
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+orderRouter.post(
+  "/:orderId/cancel-request/reject",
+  requireRole(UserRole.STORE_MANAGER, UserRole.ADMIN),
+  asyncHandler(async (req, res) => {
+    const { orderId } = req.params;
+    const payload = cancelReviewSchema.parse(req.body ?? {});
+    const user = req.user!;
+    const usedReason = normalizeCancelReason(payload.reason, "Yêu cầu huỷ bị từ chối");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      const order = await tx.order.findUnique({ where: { id: orderId } });
+      if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+
+      if (user.role === UserRole.STORE_MANAGER) {
+        const managedStore = await tx.store.findFirst({
+          where: { managerId: user.id },
+          select: { id: true },
+        });
+        if (!managedStore || managedStore.id !== order.storeId) {
+          throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của cửa hàng bạn");
+        }
+      }
+
+      assertNotTerminalOrder(order.status);
+
+      if (order.cancelRequestStatus !== CancelRequestStatus.PENDING) {
+        throw new HttpError(StatusCodes.BAD_REQUEST, "Không có yêu cầu huỷ đang chờ xử lý");
+      }
+
+      return tx.order.update({
+        where: { id: orderId },
+        data: {
+          cancelRequestStatus: CancelRequestStatus.REJECTED,
+          cancelReason: usedReason,
+        },
+        include: { store: true, items: true, payment: true },
+      });
+    });
+
+    try {
+      getIO().to(`user_${updated.userId}`).emit("order_cancel_request_rejected", {
+        orderId: updated.id,
+        actorRole: user.role,
+        cancelReason: usedReason,
+      });
+    } catch (err) {
+      console.warn("[Socket] Unable to emit order_cancel_request_rejected", err);
+    }
+
+    res.json({ data: toOrderResponse(updated) });
+  }),
+);
+
+// --------------------------------------------------------------------------------
 // Order Cancellation logic (Khách hàng & Quán)
 // --------------------------------------------------------------------------------
 orderRouter.post(
@@ -753,7 +984,7 @@ orderRouter.post(
   requireAuth,
   asyncHandler(async (req, res) => {
     const { orderId } = req.params;
-    const { reason } = req.body;
+    const payload = cancelReasonSchema.parse(req.body ?? {});
     const user = req.user!;
 
     let fallbackReason = "Đơn hàng đã bị huỷ";
@@ -764,12 +995,13 @@ orderRouter.post(
       fallbackReason = "Quán tạm quá tải, xin lỗi quý khách và mong bạn đặt lại sau ít phút";
     }
 
-    const usedReason = (typeof reason === "string" && reason.trim()) ? reason.trim() : fallbackReason;
+    const usedReason = normalizeCancelReason(payload.reason, fallbackReason);
 
     const updated = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
       const order = await tx.order.findUnique({ where: { id: orderId } });
       if (!order) throw new HttpError(StatusCodes.NOT_FOUND, "Không tìm thấy đơn hàng");
+      assertNotTerminalOrder(order.status);
 
       if (user.role === UserRole.CUSTOMER) {
         if (order.userId !== user.id) {
@@ -778,7 +1010,7 @@ orderRouter.post(
         if (order.status !== OrderStatus.PENDING) {
           throw new HttpError(
             StatusCodes.FORBIDDEN,
-            "Chỉ có thể tự hủy khi đơn đang chờ xác nhận. Quán đã nhận đơn, vui lòng gọi điện để yêu cầu hủy."
+            "Khách chỉ được tự huỷ khi đơn đang chờ xác nhận. Hãy dùng tính năng gửi yêu cầu huỷ."
           );
         }
       } else if (user.role === UserRole.STORE_MANAGER) {
@@ -786,8 +1018,15 @@ orderRouter.post(
         if (!store || order.storeId !== store.id) {
           throw new HttpError(StatusCodes.FORBIDDEN, "Không phải đơn hàng của cửa hàng bạn");
         }
-        if (order.status !== OrderStatus.PENDING && order.status !== OrderStatus.PREPARING) {
-          throw new HttpError(StatusCodes.FORBIDDEN, "Chỉ có thể hủy khi đơn đang chờ hoặc đang chuẩn bị.");
+        if (
+          order.status !== OrderStatus.PENDING
+          && order.status !== OrderStatus.CONFIRMED
+          && order.status !== OrderStatus.PREPARING
+        ) {
+          throw new HttpError(
+            StatusCodes.FORBIDDEN,
+            "Quán chỉ có thể huỷ khi đơn đang chờ, đã xác nhận hoặc đang chuẩn bị.",
+          );
         }
       } else if (user.role !== UserRole.ADMIN) {
         throw new HttpError(StatusCodes.FORBIDDEN, "Không có quyền huỷ đơn hàng");
@@ -798,8 +1037,16 @@ orderRouter.post(
         reason: usedReason,
       });
 
-      return tx.order.findUniqueOrThrow({
+      return tx.order.update({
         where: { id: orderId },
+        data: {
+          cancelRequestStatus:
+            order.cancelRequestStatus === CancelRequestStatus.PENDING
+            || user.role === UserRole.CUSTOMER
+              ? CancelRequestStatus.APPROVED
+              : order.cancelRequestStatus,
+          cancelReason: usedReason,
+        },
         include: { store: true, items: true, payment: true },
       });
     });
